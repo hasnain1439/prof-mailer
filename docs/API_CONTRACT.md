@@ -142,3 +142,42 @@ Two ways to connect the single Gmail account (GmailAccount id=1); connecting wit
 ## Dev helpers (agent B, mounted only when DRY_RUN=true)
 | POST | `/dev/simulate-reply` | `{ emailId: string, from?: string /* defaults to the professor email */, at?: ISO }` | `{ ok: true, threadId }`. Adds a fake inbound message to the dry-run thread store. The real detection still runs on the next `check-replies` |
 |---|---|---|---|
+
+---
+
+# Multi-user (v2): Google sign-in, per-user data, Gmail API
+
+Deployment shape: web on Vercel; Express API on Render (free); Neon DB; cron-job.org pings the API.
+The browser only talks to the web origin: Next.js rewrites `/api/:path*` → `${API_ORIGIN}/api/:path*`
+(prod: the Render URL; local: http://localhost:4100). So cookies are first-party on the web origin, and
+`NEXT_PUBLIC_API_URL` defaults to `/api`.
+
+## Auth (all public)
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/auth/google` | 302 to Google (scopes `openid email profile`, `state` in a short-lived httpOnly cookie). Optional `?next=/path` (relative only). |
+| GET | `/auth/google/callback` | Verifies state + id_token, upserts User by Google `sub`, creates a Session, sets `pm_session` cookie (httpOnly, SameSite=Lax, Secure in prod, 30 days), 302 to `${PUBLIC_URL}${next or "/"}`. On error, 302 `${PUBLIC_URL}/login?error=...`. |
+| GET | `/auth/me` | `{ user: { id, email, name, picture } }` or 401 `{ error: "Not signed in" }` |
+| POST | `/auth/logout` | 204, deletes the session and clears the cookie |
+| POST | `/auth/dev-login` | **Only when DEV_LOGIN_ENABLED=true AND NODE_ENV!=="production"** (else 404). `{ email, name? }` → creates/gets a user and signs in. For local QA without Google. |
+
+Every other `/api/*` route (except `/health` and `/auth/*`) requires a session: 401 `{ error: "Not signed in" }` otherwise.
+Everything is scoped to the signed-in user: professors, templates, emails, settings, Gmail account, import, dashboard.
+Accessing another user's id returns 404.
+
+## Gmail (per user)
+- `GET /gmail/connect`: 302 to Google with scopes `gmail.send gmail.readonly` (+ `openid email`), `access_type=offline`, `prompt=consent`, `login_hint=<user email>`, `include_granted_scopes=true`. Redirect URI `${PUBLIC_URL}/api/gmail/callback`.
+- `GET /gmail/callback`: stores the token on the user's GmailAccount, then 302 `${PUBLIC_URL}/gmail?connected=1`.
+- `GET /gmail/status`: same shape as before; `appPasswordEnabled: boolean` added (false unless env `APP_PASSWORD_ENABLED=true`, because Render free blocks SMTP).
+- `POST /gmail/test-send`: sends only to **the signed-in user's own email** (their Google address). DRY_RUN logs instead.
+
+## Jobs (cron)
+- `POST|GET /jobs/tick`: requires header `Authorization: Bearer ${CRON_SECRET}` (401 otherwise). Runs send-due, plus check-replies if the last check was ≥ 60 min ago. Returns `{ sendDue, checkReplies | null }`.
+- `POST /jobs/send-due`, `POST /jobs/check-replies`: same CRON_SECRET auth (no longer user-callable). `{ now? }` only in DRY_RUN.
+- `GET /health`: public, used by cron-job.org to keep the Render instance awake.
+- `/dev/simulate-reply`: DRY_RUN only, requires a session, and the email must belong to that user.
+
+## Sending rules (per user)
+- Each user has their own Settings row (defaults 3 / 2 / 20). `dailySendLimit` is capped at 50 server-side.
+- Spacing: at most one send per user per scheduler tick, and only if ≥ a random 30–120 s has passed since that user's last send (no long sleeps inside a request).
+- The daily limit uses the Karachi day, as before.
