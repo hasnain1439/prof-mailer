@@ -87,6 +87,8 @@ export async function handleOAuthCallback(code: string): Promise<string> {
 
   const data = {
     email,
+    authType: "OAUTH" as const,
+    appPasswordEnc: null,
     refreshToken,
     accessToken: tokens.access_token ?? null,
     expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
@@ -110,7 +112,7 @@ export async function getGmailAccount() {
 export async function getAuthorizedClient(): Promise<{ client: OAuth2Client; email: string } | null> {
   if (!isGoogleConfigured()) return null;
   const account = await getGmailAccount();
-  if (!account) return null;
+  if (!account || account.authType !== "OAUTH" || !account.refreshToken) return null;
   const client = newClient();
   client.setCredentials({
     refresh_token: account.refreshToken,
@@ -133,7 +135,8 @@ export async function getAuthorizedClient(): Promise<{ client: OAuth2Client; ema
 /** Delete the account; best-effort revoke of the refresh token. */
 export async function disconnectGmail(): Promise<void> {
   const account = await getGmailAccount();
-  if (account && isGoogleConfigured()) {
+  // App-password accounts have nothing to revoke (the user deletes the app password in their Google account).
+  if (account?.authType === "OAUTH" && account.refreshToken && isGoogleConfigured()) {
     try {
       await newClient().revokeToken(account.refreshToken);
     } catch {

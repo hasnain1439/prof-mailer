@@ -6,3 +6,6 @@ dist/
 
 # dry-run simulated Gmail threads
 .dryrun/
+
+# local secrets (encryption key for stored Gmail app password)
+.data/

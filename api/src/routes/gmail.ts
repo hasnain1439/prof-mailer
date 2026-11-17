@@ -2,6 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { env } from "../lib/env.js";
 import { HttpError, validateBody } from "../lib/http.js";
+import { connectWithAppPassword } from "../services/gmail/appPassword.js";
+import { normalizeAppPassword } from "../services/gmail/appPasswordFormat.js";
 import { sendTestEmail } from "../services/gmail/mailer.js";
 import {
   consumeState,
@@ -22,10 +24,14 @@ function webRedirect(params: Record<string, string>): string {
 
 gmailRouter.get("/status", async (_req, res) => {
   const account = await getGmailAccount();
+  const oauthConfigured = isGoogleConfigured();
   res.json({
-    configured: isGoogleConfigured(),
+    /** @deprecated same as oauthConfigured */
+    configured: oauthConfigured,
+    oauthConfigured,
     connected: Boolean(account),
     email: account?.email ?? null,
+    authType: account?.authType ?? null,
     dryRun: env.DRY_RUN,
     testRecipientSet: Boolean(env.TEST_RECIPIENT.trim()),
   });
@@ -54,6 +60,26 @@ gmailRouter.get("/callback", async (req, res) => {
     console.error("[gmail] OAuth callback failed:", msg.replace(/(code|token)=\S+/gi, "$1=[redacted]").slice(0, 200));
     return res.redirect(302, webRedirect({ error: "oauth_failed" }));
   }
+});
+
+// Connect with Gmail address + Google App Password (SMTP + IMAP). Verifies both logins before saving.
+// Never echo or log the password. Works in DRY_RUN too (connecting sends nothing).
+const appPasswordSchema = z.object({
+  email: z.string().trim().max(320),
+  appPassword: z.string().max(200),
+});
+
+gmailRouter.post("/app-password", validateBody(appPasswordSchema), async (req, res) => {
+  const body = req.body as z.infer<typeof appPasswordSchema>;
+  const password = normalizeAppPassword(body.appPassword);
+  if (!password) {
+    throw new HttpError(
+      400,
+      "An App Password is 16 letters (Google shows it as 4 groups of 4). Create one at https://myaccount.google.com/apppasswords - your normal Gmail password will not work.",
+    );
+  }
+  const { email } = await connectWithAppPassword(body.email, password);
+  res.json({ ok: true, email });
 });
 
 gmailRouter.post("/disconnect", async (_req, res) => {

@@ -16,7 +16,7 @@ All times are stored in UTC and shown in **Asia/Karachi** (PKT, UTC+5). The `sch
 
 - Node.js 20 or newer (`node -v`)
 - A Neon Postgres database (free tier is fine)
-- A Google account whose Gmail will send the emails
+- A Google account whose Gmail will send the emails (with 2-Step Verification on, for the App Password option)
 
 ## 2. Install
 
@@ -38,8 +38,9 @@ Copy-Item .env.example .env.local
 | `DIRECT_URL` | Neon **direct** connection string (same, without `-pooler`). Prisma migrations use it. |
 | `DRY_RUN` | `true` while testing. See [Switching DRY_RUN off](#7-switching-dry_run-off). |
 | `TEST_RECIPIENT` | Your own email address. The "Send test email" button only ever sends to this address. |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | From step 4. |
-| `GOOGLE_REDIRECT_URI` | `http://localhost:4000/api/gmail/callback` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Only for Option B in step 4 (OAuth). Leave empty if you use an App Password. |
+| `GOOGLE_REDIRECT_URI` | Only for Option B: `http://localhost:4000/api/gmail/callback` |
+| `ENCRYPTION_KEY` | Optional. 64 hex chars used to encrypt the stored App Password. If empty, a key is created in `api/.data/secret.key` on first connect. Keep that file: if it is lost, connect Gmail again. |
 | `SEND_DELAY_MIN_MS` / `SEND_DELAY_MAX_MS` | Random pause between sends. Defaults are 30000 and 120000 (30–120 s). |
 
 Then create the tables:
@@ -49,7 +50,26 @@ cd C:\Users\Farhan\prof-mailer\api
 npx prisma migrate deploy
 ```
 
-## 4. Create Google OAuth credentials
+## 4. Connect Gmail
+
+Pick **one** option. Connecting with one replaces the other.
+
+### Option A (easiest): Gmail + App Password
+
+No Google Cloud setup. The app sends through Gmail's SMTP server and reads replies over IMAP.
+
+1. Turn on **2-Step Verification** for your Google account: <https://myaccount.google.com/signinoptions/twosv>.
+2. Open <https://myaccount.google.com/apppasswords>.
+3. Create an app password named `prof-mailer`. Google shows 16 letters in 4 groups. Copy them.
+4. Start the app (step 5), open <http://localhost:3000/gmail>, enter your Gmail address and paste the app password (spaces are fine), then click **Connect**. The app checks the login before saving it, and nothing is sent.
+
+Notes:
+- Your normal Gmail password will not work. Only an App Password does.
+- If the app passwords page says the setting is not available, 2-Step Verification is off, or (for Google Workspace / school accounts) your admin has disabled app passwords. Use Option B instead.
+- IMAP must be enabled in Gmail (Settings → Forwarding and POP/IMAP). It is on by default for most accounts.
+- The app password is stored encrypted in the database. To revoke access, click **Disconnect** and delete the app password at <https://myaccount.google.com/apppasswords>.
+
+### Option B: Google OAuth credentials
 
 1. Open <https://console.cloud.google.com/> and create a project (for example "prof-mailer").
 2. **APIs & Services → Library**: search **Gmail API** and click **Enable**.

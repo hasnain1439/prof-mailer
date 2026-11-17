@@ -96,13 +96,21 @@ model Settings {
   updatedAt          DateTime @updatedAt
 }
 
+enum GmailAuthType {
+  OAUTH
+  APP_PASSWORD
+}
+
 // Single connected Gmail account (id = 1).
+// OAUTH: refreshToken (+ accessToken) set. APP_PASSWORD: appPasswordEnc set (AES-256-GCM, see src/lib/crypto.ts).
 model GmailAccount {
-  id           Int       @id @default(1)
-  email        String
-  refreshToken String
-  accessToken  String?
-  expiryDate   DateTime?
-  connectedAt  DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id             Int           @id @default(1)
+  email          String
+  authType       GmailAuthType @default(OAUTH)
+  refreshToken   String?
+  accessToken    String?
+  expiryDate     DateTime?
+  appPasswordEnc String?
+  connectedAt    DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }

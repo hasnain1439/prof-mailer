@@ -2,7 +2,7 @@ import { env } from "../lib/env.js";
 import { prisma } from "../lib/prisma.js";
 import { getSettings } from "../lib/settings.js";
 import { renderTemplate } from "../lib/template.js";
-import { getThreadMessages, isGmailConnected } from "../services/gmail/mailer.js";
+import { createThreadReader, isGmailConnected, type ThreadReader } from "../services/gmail/mailer.js";
 import { parseFromAddress } from "../services/gmail/mime.js";
 import { DAY_MS, followUpSubject, safeErrorMessage } from "./util.js";
 
@@ -73,6 +73,9 @@ export async function runCheckReplies(now: Date = new Date()): Promise<CheckRepl
 
     let template: Awaited<ReturnType<typeof pickFollowUpTemplate>> | undefined;
     let loggedNoTemplate = false;
+    // One reader (one IMAP connection for app-password accounts) for the whole run, opened lazily.
+    // Every thread's work below is inside its own try/catch, so the close() after the loop always runs.
+    let reader: ThreadReader | null = null;
 
     for (const [threadId, emails] of threads) {
       if (emails.some((e) => e.repliedAt)) continue;
@@ -82,7 +85,8 @@ export async function runCheckReplies(now: Date = new Date()): Promise<CheckRepl
       const firstSentAt = emails[0]!.sentAt ?? head.sentAt ?? now;
       try {
         result.threadsChecked++;
-        const messages = await getThreadMessages(threadId);
+        reader ??= await createThreadReader();
+        const messages = await reader.getThreadMessages(threadId);
         const profAddr = professor.email.trim().toLowerCase();
         const reply = messages.find(
           (m) => parseFromAddress(m.from) === profAddr && m.date.getTime() > firstSentAt.getTime(),
@@ -147,6 +151,7 @@ export async function runCheckReplies(now: Date = new Date()): Promise<CheckRepl
         console.error(`[check-replies] thread ${threadId} failed: ${safeErrorMessage(err)}`);
       }
     }
+    if (reader) await (reader as ThreadReader).close().catch(() => undefined);
     return result;
   } finally {
     running = false;

@@ -9,6 +9,8 @@ import { google } from "googleapis";
 import { env } from "../../lib/env.js";
 import { HttpError } from "../../lib/http.js";
 import { htmlToText } from "../../lib/template.js";
+import { ImapThreadReader, getAppPasswordCreds, sendViaSmtp } from "./appPassword.js";
+import { messageIdFromFallbackThreadId, toApiThreadId } from "./appPasswordFormat.js";
 import { appendDryRunMessage, getDryRunThread } from "./dryRunStore.js";
 import { buildMimeMessage, generateMessageId, isSingleAddress, toBase64Url } from "./mime.js";
 import { getAuthorizedClient, getGmailAccount } from "./oauth.js";
@@ -49,8 +51,11 @@ function rand(): string {
   return randomBytes(8).toString("hex");
 }
 
-/** True when a real (non-dry-run) send could happen right now. */
+/** True when a real (non-dry-run) send could happen right now (OAuth or app password). */
 export async function isGmailConnected(): Promise<boolean> {
+  const account = await getGmailAccount();
+  if (!account) return false;
+  if (account.authType === "APP_PASSWORD") return Boolean(account.appPasswordEnc);
   return (await getAuthorizedClient()) !== null;
 }
 
@@ -79,6 +84,14 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     return { gmailMessageId: `dry-msg-${rand()}`, gmailThreadId, messageIdHeader, dryRun: true };
   }
 
+  const account = await getGmailAccount();
+  if (account?.authType === "APP_PASSWORD") {
+    const creds = await getAppPasswordCreds();
+    if (!creds) throw new GmailNotConnectedError();
+    const r = await sendViaSmtp(creds, { ...input, to });
+    return { ...r, dryRun: false };
+  }
+
   const auth = await getAuthorizedClient();
   if (!auth) throw new GmailNotConnectedError();
   const gmail = google.gmail({ version: "v1", auth: auth.client });
@@ -98,10 +111,17 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 
   const res = await gmail.users.messages.send({
     userId: "me",
-    requestBody: { raw: toBase64Url(raw), ...(input.threadId ? { threadId: input.threadId } : {}) },
+    requestBody: {
+      raw: toBase64Url(raw),
+      // smtp- fallback ids (sent while on an app password) are not Gmail API ids; headers thread it.
+      ...(input.threadId && !messageIdFromFallbackThreadId(input.threadId)
+        ? { threadId: toApiThreadId(input.threadId) }
+        : {}),
+    },
   });
   const gmailMessageId = res.data.id;
-  const gmailThreadId = res.data.threadId;
+  // Follow-ups keep the stored thread id (it may be the IMAP/decimal or smtp- spelling) so they group with the root.
+  const gmailThreadId = input.threadId || res.data.threadId;
   if (!gmailMessageId || !gmailThreadId) throw new Error("Gmail send returned no message/thread id");
 
   // Gmail usually keeps our Message-ID, but read it back in case it was rewritten.
@@ -134,25 +154,44 @@ export async function sendTestEmail(opts: { subject?: string; body?: string }) {
   return { to, ...r };
 }
 
-/** Messages of a thread (oldest first). Real mode: Gmail metadata; DRY_RUN: the dry-run store. */
-export async function getThreadMessages(threadId: string): Promise<ThreadMessage[]> {
-  if (env.DRY_RUN) {
-    const msgs = await getDryRunThread(threadId);
-    return msgs
-      .map((m) => ({
-        from: m.from,
-        date: new Date(m.date),
-        ...(m.messageIdHeader ? { messageIdHeader: m.messageIdHeader } : {}),
-      }))
-      .sort((a, b) => a.date.getTime() - b.date.getTime());
-  }
+/** Reads threads for a check-replies run; close() when done (releases the IMAP connection, if any). */
+export interface ThreadReader {
+  getThreadMessages(threadId: string): Promise<ThreadMessage[]>;
+  close(): Promise<void>;
+}
 
+async function dryRunThreadMessages(threadId: string): Promise<ThreadMessage[]> {
+  const msgs = await getDryRunThread(threadId);
+  return msgs
+    .map((m) => ({
+      from: m.from,
+      date: new Date(m.date),
+      ...(m.messageIdHeader ? { messageIdHeader: m.messageIdHeader } : {}),
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+async function oauthThreadMessages(threadId: string): Promise<ThreadMessage[]> {
   const auth = await getAuthorizedClient();
   if (!auth) throw new GmailNotConnectedError();
   const gmail = google.gmail({ version: "v1", auth: auth.client });
+
+  let apiThreadId: string | null = toApiThreadId(threadId);
+  const fallbackMid = messageIdFromFallbackThreadId(threadId);
+  if (fallbackMid) {
+    // Sent over SMTP (app password) before switching to OAuth: resolve the thread via our Message-ID.
+    const found = await gmail.users.messages.list({
+      userId: "me",
+      q: `rfc822msgid:${fallbackMid.replace(/[<>"\s]/g, "")}`,
+      maxResults: 1,
+    });
+    apiThreadId = found.data.messages?.[0]?.threadId ?? null;
+    if (!apiThreadId) return [];
+  }
+
   const res = await gmail.users.threads.get({
     userId: "me",
-    id: threadId,
+    id: apiThreadId,
     format: "metadata",
     metadataHeaders: ["From", "Date", "Message-ID"],
   });
@@ -167,4 +206,36 @@ export async function getThreadMessages(threadId: string): Promise<ThreadMessage
     out.push({ from: get("from") ?? "", date, ...(mid ? { messageIdHeader: mid } : {}) });
   }
   return out.sort((a, b) => a.date.getTime() - b.date.getTime());
+}
+
+/**
+ * Thread reader for the current mode: DRY_RUN store, Gmail API (OAuth) or IMAP (app password,
+ * one connection reused for the whole run).
+ */
+export async function createThreadReader(): Promise<ThreadReader> {
+  if (!env.DRY_RUN) {
+    const account = await getGmailAccount();
+    if (account?.authType === "APP_PASSWORD") {
+      const creds = await getAppPasswordCreds();
+      if (!creds) throw new GmailNotConnectedError();
+      const reader = new ImapThreadReader(creds);
+      return { getThreadMessages: (id) => reader.getThreadMessages(id), close: () => reader.close() };
+    }
+  }
+  return { getThreadMessages, close: async () => undefined };
+}
+
+/** Messages of a thread (oldest first). Real mode: Gmail API or IMAP; DRY_RUN: the dry-run store. */
+export async function getThreadMessages(threadId: string): Promise<ThreadMessage[]> {
+  if (env.DRY_RUN) return dryRunThreadMessages(threadId);
+  const account = await getGmailAccount();
+  if (account?.authType === "APP_PASSWORD") {
+    const reader = await createThreadReader();
+    try {
+      return await reader.getThreadMessages(threadId);
+    } finally {
+      await reader.close();
+    }
+  }
+  return oauthThreadMessages(threadId);
 }

@@ -121,12 +121,17 @@ Use `getSettings()` from `src/lib/settings.ts`. Use `startOfKarachiDay()` for `s
 ```
 
 ## Gmail (agent B)
+Two ways to connect the single Gmail account (GmailAccount id=1); connecting with one replaces the other.
+- **APP_PASSWORD** (easiest): Gmail address + Google App Password. Sends over SMTP (smtp.gmail.com:465), reads Sent / All Mail over IMAP (imap.gmail.com:993). The password is stored AES-256-GCM encrypted (key: `ENCRYPTION_KEY` env, else auto-generated `api/.data/secret.key`) and is never returned or logged. `gmailThreadId` is Gmail's X-GM-THRID (decimal string) or, if Gmail had not indexed the sent message yet, `smtp-<Message-ID>` (replies are then matched via In-Reply-To / References).
+- **OAUTH**: Google Cloud OAuth client (`/gmail/connect`). `gmailThreadId` is the Gmail API (hex) thread id. Both spellings are accepted by either mode, so switching modes keeps reply detection working.
+
 | Method | Path | Response |
 |---|---|---|
-| GET | `/gmail/status` | `{ configured: boolean /* client id+secret present */, connected: boolean, email: string \| null, dryRun: boolean, testRecipientSet: boolean }` |
+| GET | `/gmail/status` | `{ oauthConfigured: boolean /* GOOGLE_CLIENT_ID+SECRET present */, configured: boolean /* deprecated alias of oauthConfigured */, connected: boolean, email: string \| null, authType: "OAUTH" \| "APP_PASSWORD" \| null, dryRun: boolean, testRecipientSet: boolean }` |
+| POST | `/gmail/app-password` | Body `{ email: string, appPassword: string }`. Whitespace/dashes in the password are stripped; it must then be 16 letters (else 400). Verifies the SMTP **and** IMAP login (~15 s timeouts) before saving; sends nothing (works in DRY_RUN). 200 `{ ok: true, email }`. 400 `{ error }` for a bad address/password format, or when Gmail rejects the login (`"Gmail rejected the login. Make sure 2-Step Verification is on and you used an App Password, not your normal password."`). 502 `{ error }` when Gmail can't be reached or IMAP is disabled |
 | GET | `/gmail/connect` | 302 to the Google consent screen (offline access, `prompt=consent`, scopes gmail.send + gmail.readonly + openid email). 503 if not configured |
 | GET | `/gmail/callback?code=&state=` | stores the refresh token in GmailAccount, then 302 to `${WEB_URL}/gmail?connected=1` (or `?error=...`) |
-| POST | `/gmail/disconnect` | 204, deletes GmailAccount (best-effort token revoke) |
+| POST | `/gmail/disconnect` | 204, deletes GmailAccount of either type (best-effort token revoke for OAUTH; nothing to revoke for APP_PASSWORD) |
 | POST | `/gmail/test-send` | Real send **only to TEST_RECIPIENT** (400 if unset, 409 if not connected). Body `{ subject?, body? }`. Response `{ ok: true, to: string, gmailThreadId, messageIdHeader }`. In DRY_RUN it logs instead and returns `{ ok: true, dryRun: true, to }` |
 
 ## Jobs (agent B). Manual triggers for the same code the cron runs
