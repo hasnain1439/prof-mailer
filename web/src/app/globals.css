@@ -7,6 +7,8 @@
   --bg: #f7f6f3;
   --surface: #ffffff;
   --border: #e4e2dd;
+  /* Stronger edge for form controls (WCAG 1.4.11 needs 3:1 against the background). */
+  --border-input: #8f8b84;
   --text: #1c1b19;
   --muted: #6b6862;
   --accent: #1f5f4a;
@@ -32,6 +34,7 @@
   --bg: #141413;
   --surface: #1c1b1a;
   --border: #2e2c2a;
+  --border-input: #6b6862;
   --text: #eceae6;
   --muted: #9c9890;
   --accent: #6db596;
@@ -75,6 +78,7 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-border: var(--border);
+  --color-border-input: var(--border-input);
   --color-text: var(--text);
   --color-muted: var(--muted);
   --color-accent: var(--accent);

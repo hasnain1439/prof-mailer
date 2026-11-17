@@ -187,13 +187,13 @@ export default function SettingsPage() {
       <PageHeader title="Settings" description="Send limits and follow-up behaviour. Environment flags are read-only and live in api/.env." />
       <ErrorBox error={error} onRetry={reload} />
       {loading && !data && (
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="grid max-w-6xl grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
           <Loading rows={5} />
           <Loading rows={4} />
         </div>
       )}
       {data && s && (
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="grid max-w-6xl grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
           <Card title="Sending and follow-ups" flush>
             <SettingsForm initial={data} onSaved={setLatest} />
           </Card>
@@ -204,9 +204,12 @@ export default function SettingsPage() {
                   {gmail.data?.connected ? (
                     <Mono className="break-all">{gmail.data.email ?? "Connected"}</Mono>
                   ) : (
-                    <Link href="/gmail" className={link}>
-                      Not connected
-                    </Link>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Badge tone="replied">Not connected</Badge>
+                      <Link href="/gmail" className={link}>
+                        Connect
+                      </Link>
+                    </span>
                   )}
                 </Row>
                 <Row name={<Mono className="!text-xs">DRY_RUN</Mono>}>

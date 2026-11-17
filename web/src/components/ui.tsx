@@ -15,15 +15,15 @@ import { IconAlert, IconCheckCircle, IconInfo, IconX } from "./icons";
 export const btn =
   "inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 export const btnPrimary = `${btn} border-accent bg-accent text-on-accent hover:border-accent-hover hover:bg-accent-hover`;
-export const btnSecondary = `${btn} border-border bg-surface text-text hover:bg-bg`;
+export const btnSecondary = `${btn} border-border-input bg-surface text-text hover:bg-bg`;
 export const btnDanger = `${btn} border-border bg-surface text-failed-fg hover:bg-failed-bg`;
 export const btnGhost = `${btn} border-transparent bg-transparent text-muted hover:bg-bg hover:text-text`;
 export const btnSmall = "!h-7 !px-2 !text-xs";
 
 export const input =
-  "block h-8 w-full rounded-md border border-border bg-surface px-2.5 text-[13px] text-text placeholder:text-muted focus:border-accent focus:outline-none";
+  "block h-8 w-full rounded-md border border-border-input bg-surface px-2.5 text-[13px] text-text placeholder:text-muted focus:border-accent focus:outline-none";
 export const textareaCls =
-  "block w-full rounded-md border border-border bg-surface px-2.5 py-2 text-[13px] text-text placeholder:text-muted focus:border-accent focus:outline-none";
+  "block w-full rounded-md border border-border-input bg-surface px-2.5 py-2 text-[13px] text-text placeholder:text-muted focus:border-accent focus:outline-none";
 export const label = "mb-1 block text-xs font-medium text-muted";
 export const link = "font-medium text-accent underline-offset-2 hover:underline";
 export const mono = "font-mono text-[13px]";
@@ -33,7 +33,7 @@ export const tableWrap = "max-h-[70vh] overflow-auto";
 export const table = "w-full border-separate border-spacing-0 text-[13px]";
 export const th =
   "sticky top-0 z-10 h-9 border-b border-border bg-surface px-3 text-left text-xs font-medium whitespace-nowrap text-muted first:pl-4 last:pr-4";
-export const td = "h-10 border-b border-border px-3 py-2 align-middle text-text first:pl-4 last:pr-4";
+export const td = "h-10 border-b border-border px-3 py-1 align-middle text-text first:pl-4 last:pr-4";
 /** Right-aligned monospace numeric cell. */
 export const tdNum = `${td} text-right font-mono tabular-nums`;
 export const tr = "hover:bg-bg";

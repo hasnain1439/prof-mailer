@@ -394,7 +394,7 @@ export default function TemplatesPage() {
             <IconPencil size={14} />
             Edit
           </Button>
-          <Button size="sm" variant="ghost" className="hover:!bg-failed-bg hover:!text-failed-fg" aria-label={`Delete ${t.name}`} onClick={() => remove(t)}>
+          <Button size="sm" variant="ghost" className="!text-failed-fg hover:!bg-failed-bg" aria-label={`Delete ${t.name}`} onClick={() => remove(t)}>
             <IconTrash size={14} />
             Delete
           </Button>

@@ -229,7 +229,7 @@ export default function ProfessorsPage() {
                         variant="ghost"
                         size="sm"
                         aria-label={`Delete ${p.name}`}
-                        className="hover:!bg-failed-bg hover:!text-failed-fg"
+                        className="!text-failed-fg hover:!bg-failed-bg"
                         onClick={() => remove(p)}
                       >
                         <IconTrash size={14} />
