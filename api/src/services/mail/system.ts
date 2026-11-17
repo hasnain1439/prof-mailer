@@ -80,7 +80,7 @@ function greeting(name: string | null): string {
 export function sendVerificationEmail(to: string, name: string | null, url: string): Promise<boolean> {
   const lines = [
     greeting(name),
-    `Thanks for signing up for ${APP_NAME}. Please confirm your email address to activate your account.`,
+    `Thanks for signing up for ${APP_NAME}. Open the link below to confirm your email address and choose your password.`,
     "This link expires in 24 hours. If you did not sign up, you can ignore this email.",
   ];
   return deliver(
@@ -88,7 +88,7 @@ export function sendVerificationEmail(to: string, name: string | null, url: stri
       to,
       subject: `Confirm your email for ${APP_NAME}`,
       text: `${lines[0]}\n\n${lines[1]}\n\n${url}\n\n${lines[2]}\n`,
-      html: layout(lines, { url, label: "Confirm email" }),
+      html: layout(lines, { url, label: "Confirm email and set password" }),
     },
     "verification email",
   );

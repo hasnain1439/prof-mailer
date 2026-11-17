@@ -17,6 +17,8 @@ function DevLogin({ next }: { next: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Dev login never exists in production builds: don't probe the API there.
+    if (process.env.NODE_ENV === "production") return;
     let cancelled = false;
     // Probe with an empty body: a disabled endpoint answers 404, an enabled one rejects the missing email.
     api.devLogin({ email: "" }).then(

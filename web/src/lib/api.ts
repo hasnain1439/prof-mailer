@@ -139,12 +139,12 @@ export const api = {
   logout: () => request<void>("/auth/logout", { method: "POST", allowUnauthorized: true }),
   devLogin: (body: { email: string; name?: string }) =>
     request<{ user: AuthUser }>("/auth/dev-login", { method: "POST", json: body, allowUnauthorized: true }),
-  signup: (body: { name: string; email: string; password: string }) =>
+  signup: (body: { name: string; email: string }) =>
     request<{ ok: true }>("/auth/signup", { method: "POST", json: body, allowUnauthorized: true }),
   login: (body: { email: string; password: string }) =>
     request<{ user: AuthUser }>("/auth/login", { method: "POST", json: body, allowUnauthorized: true }),
-  verifyEmail: (token: string) =>
-    request<{ ok: true }>("/auth/verify-email", { method: "POST", json: { token }, allowUnauthorized: true }),
+  verifyEmail: (token: string, password: string) =>
+    request<{ ok: true }>("/auth/verify-email", { method: "POST", json: { token, password }, allowUnauthorized: true }),
   resendVerification: (email: string) =>
     request<{ ok: true }>("/auth/resend-verification", { method: "POST", json: { email }, allowUnauthorized: true }),
   forgotPassword: (email: string) =>

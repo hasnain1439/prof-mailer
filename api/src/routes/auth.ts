@@ -24,8 +24,13 @@ export const authRouter = Router();
 
 /** Stricter per-IP limit for signup / login / forgot / resend (burst 10, then 5 per minute). */
 const strictLimiter = rateLimit({ capacity: 10, refillPerMinute: 5 });
-/** Per-account login failures: 10 per 15 minutes, then 429 until the window ends. */
+/**
+ * Login failures: 10 per (account, IP) per 15 min, plus 50 per account from all IPs, so one attacker
+ * can't lock a user out from their own network while distributed guessing is still capped.
+ */
 const loginFailures = new AttemptCounter(10, 15 * 60 * 1000);
+const loginFailuresPerAccount = new AttemptCounter(50, 15 * 60 * 1000);
+const failureKey = (email: string, ip: string | undefined) => `${email}|${ip ?? "?"}`;
 /** System mail per recipient address: at most 5 per hour (stops mail-bombing through resend/forgot). */
 const mailPerAddress = new AttemptCounter(5, 60 * 60 * 1000);
 
@@ -58,22 +63,21 @@ async function startVerification(user: { id: string; email: string; name: string
 // ---------------------------------------------------------------------------------------------
 // signup
 
+// The password is NOT chosen at signup. It is set on the verification page, so only the person who controls
+// the mailbox can ever set it (prevents pre-verification account takeover).
 const signupSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
   email: emailField,
-  password: passwordField,
 });
 
 authRouter.post("/signup", strictLimiter, validateBody(signupSchema), async (req, res) => {
   const body = req.body as z.infer<typeof signupSchema>;
-  // Hash first on every path so the response time does not reveal whether the address exists.
-  const passwordHash = await hashPassword(body.password);
   const existing = await prisma.user.findUnique({ where: { email: body.email } });
 
   if (!existing) {
     try {
       const user = await prisma.user.create({
-        data: { email: body.email, name: body.name, passwordHash },
+        data: { email: body.email, name: body.name, passwordHash: null },
         select: { id: true, email: true, name: true },
       });
       await startVerification(user);
@@ -86,29 +90,32 @@ authRouter.post("/signup", strictLimiter, validateBody(signupSchema), async (req
     const forgot = new URL("/forgot-password", env.PUBLIC_URL).toString();
     sendInBackground(existing.email, () => sendAlreadyRegisteredEmail(existing.email, existing.name, login, forgot));
   } else {
-    // Unverified account: the newest signup wins (only the mailbox owner can verify it).
-    await prisma.user.update({ where: { id: existing.id }, data: { name: body.name, passwordHash } });
-    await revokeAllSessions(existing.id);
-    await startVerification({ id: existing.id, email: existing.email, name: body.name });
+    // Unverified account: nothing about it changes; the mailbox owner just gets a fresh link.
+    await startVerification({ id: existing.id, email: existing.email, name: existing.name });
   }
   res.status(201).json({ ok: true });
 });
 
 // ---------------------------------------------------------------------------------------------
-// verify email (signs in)
+// verify email + set password (signs in)
 
-const verifySchema = z.object({ token: tokenField });
+const verifySchema = z.object({ token: tokenField, password: passwordField });
 
 authRouter.post("/verify-email", validateBody(verifySchema), async (req, res) => {
-  const { token } = req.body as z.infer<typeof verifySchema>;
+  const { token, password } = req.body as z.infer<typeof verifySchema>;
+  const passwordHash = await hashPassword(password);
   const userId = await consumeAuthToken(token, "VERIFY_EMAIL");
   if (!userId) throw new HttpError(400, "This link is invalid or has expired. Request a new one.");
   const user = await prisma.user.findUnique({ where: { id: userId }, select: AUTH_USER_SELECT });
   if (!user) throw new HttpError(400, "This link is invalid or has expired. Request a new one.");
-  const verified = user.emailVerifiedAt
-    ? user
-    : await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() }, select: AUTH_USER_SELECT });
+  // The link proves control of the mailbox: this is the only place (besides reset) a password is set.
+  const verified = await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, emailVerifiedAt: user.emailVerifiedAt ?? new Date() },
+    select: AUTH_USER_SELECT,
+  });
   await prisma.authToken.deleteMany({ where: { userId, type: "VERIFY_EMAIL" } });
+  await revokeAllSessions(userId);
   await destroySession(req, res);
   await createSession(req, res, userId);
   res.json({ ok: true, user: publicUser(verified) });
@@ -135,19 +142,21 @@ const INVALID_LOGIN = "Invalid email or password";
 
 authRouter.post("/login", strictLimiter, validateBody(loginSchema), async (req, res) => {
   const { email, password } = req.body as z.infer<typeof loginSchema>;
-  if (loginFailures.isBlocked(email)) {
+  if (loginFailures.isBlocked(failureKey(email, req.ip)) || loginFailuresPerAccount.isBlocked(email)) {
     throw new HttpError(429, "Too many failed sign-in attempts. Try again in 15 minutes or reset your password.");
   }
   const user = await prisma.user.findUnique({ where: { email }, select: { ...AUTH_USER_SELECT, passwordHash: true } });
-  const ok = user ? await verifyPassword(password, user.passwordHash) : await dummyVerify(password);
+  const ok = user?.passwordHash ? await verifyPassword(password, user.passwordHash) : await dummyVerify(password);
   if (!user || !ok) {
-    loginFailures.hit(email);
+    loginFailures.hit(failureKey(email, req.ip));
+    loginFailuresPerAccount.hit(email);
     throw new HttpError(401, INVALID_LOGIN);
   }
   if (!user.emailVerifiedAt) {
     throw new HttpError(403, "Please verify your email address first. Check your inbox for the link.", undefined, "EMAIL_NOT_VERIFIED");
   }
-  loginFailures.reset(email);
+  loginFailures.reset(failureKey(email, req.ip));
+  loginFailuresPerAccount.reset(email);
   await destroySession(req, res);
   await createSession(req, res, user.id);
   res.json({ user: publicUser(user) });
@@ -184,7 +193,7 @@ authRouter.post("/reset-password", strictLimiter, validateBody(resetSchema), asy
   });
   await prisma.authToken.deleteMany({ where: { userId } });
   await revokeAllSessions(userId);
-  loginFailures.reset(user.email);
+  loginFailuresPerAccount.reset(user.email);
   await createSession(req, res, userId);
   res.json({ ok: true, user: publicUser(user) });
 });

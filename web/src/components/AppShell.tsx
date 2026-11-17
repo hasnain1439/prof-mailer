@@ -191,7 +191,7 @@ function AuthGate({ children }: { children: ReactNode }) {
         <div className="w-full max-w-sm">
           <Notice
             tone="error"
-            title="Can't reach the server"
+            title={/too many requests/i.test(error) ? "Too many requests" : "Can't reach the server"}
             className=""
             action={
               <Button size="sm" onClick={refresh}>

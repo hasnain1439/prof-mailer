@@ -22,7 +22,12 @@ const appPasswordLimiter = rateLimit({ capacity: 5, refillPerMinute: 2 });
 
 // ---- public ----
 apiRouter.use("/health", healthRouter);
-apiRouter.use("/auth", authLimiter, authRouter);
+// /auth/me runs on every page load and logout must always work: keep them out of the auth limiter.
+apiRouter.use(
+  "/auth",
+  (req, res, next) => (req.path === "/me" || req.path === "/logout" ? next() : authLimiter(req, res, next)),
+  authRouter,
+);
 apiRouter.use("/jobs", jobsRouter); // CRON_SECRET bearer
 
 // ---- signed-in with a verified email (401 / 403 EMAIL_NOT_VERIFIED otherwise) ----

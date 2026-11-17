@@ -4,17 +4,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/components/Auth";
-import { AuthCard, AuthLink, AuthLinks, PasswordInput, ResendVerification } from "@/components/AuthCard";
+import { AuthCard, AuthLink, AuthLinks, ResendVerification } from "@/components/AuthCard";
 import { Button, Field, Input, Notice } from "@/components/ui";
-
-const MIN_PASSWORD = 8;
 
 export function SignupPanel() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -24,21 +21,14 @@ export function SignupPanel() {
     if (!loading && user) router.replace("/");
   }, [loading, user, router]);
 
-  const tooShort = password.length > 0 && password.length < MIN_PASSWORD;
-
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (password.length < MIN_PASSWORD) {
-      setError(`Password must be at least ${MIN_PASSWORD} characters.`);
-      return;
-    }
     setBusy(true);
     setError(null);
     const addr = email.trim();
     try {
-      await api.signup({ name: name.trim(), email: addr, password });
+      await api.signup({ name: name.trim(), email: addr });
       setSentTo(addr);
-      setPassword("");
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -50,7 +40,7 @@ export function SignupPanel() {
     return (
       <AuthCard title="Check your inbox">
         <Notice tone="success" className="">
-          We sent a verification link to {sentTo}. Open it to finish creating your account.
+          We sent a link to {sentTo}. Open it to confirm your email and choose your password.
         </Notice>
         <p className="mt-3 text-xs text-muted">The link expires in 24 hours. Didn&apos;t get it? Check your spam folder, or send it again.</p>
         <div className="mt-4">
@@ -89,21 +79,7 @@ export function SignupPanel() {
             onChange={(e) => setEmail(e.target.value)}
           />
         </Field>
-        <Field
-          label="Password"
-          htmlFor="signup-password"
-          hint={<span className={tooShort ? "text-failed-fg" : undefined}>At least {MIN_PASSWORD} characters.</span>}
-        >
-          <PasswordInput
-            id="signup-password"
-            required
-            minLength={MIN_PASSWORD}
-            autoComplete="new-password"
-            value={password}
-            disabled={busy}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </Field>
+        <p className="text-xs text-muted">We&apos;ll email you a link to confirm your address and choose a password.</p>
 
         {error && (
           <Notice tone="error" className="">
@@ -115,7 +91,7 @@ export function SignupPanel() {
           type="submit"
           variant="primary"
           className="w-full"
-          disabled={busy || !name.trim() || !email.trim() || password.length < MIN_PASSWORD}
+          disabled={busy || !name.trim() || !email.trim()}
         >
           {busy ? "Creating account…" : "Create account"}
         </Button>

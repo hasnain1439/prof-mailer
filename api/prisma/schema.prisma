@@ -33,7 +33,7 @@ model User {
   email           String        @unique
   name            String?
   // "scrypt$N$r$p$<salt b64>$<hash b64>" (src/lib/password.ts)
-  passwordHash    String
+  passwordHash    String? // null until the user sets it on the verification page
   emailVerifiedAt DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt

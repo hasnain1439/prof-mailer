@@ -207,7 +207,7 @@ sending, IMAP imap.gmail.com:993 for reply checks).
 
 System mail (verification / password reset) is sent through the app owner's SMTP account from env:
 `SMTP_HOST, SMTP_PORT (default 465), SMTP_SECURE (default true when port 465), SMTP_USER, SMTP_PASS, MAIL_FROM`
-(e.g. `prof-mailer <no-reply@programmingbridge.org>`). If SMTP is not configured and NODE_ENV !== "production",
+(e.g. `prof-mailer <no-reply@example.org>`). If SMTP is not configured and NODE_ENV !== "production",
 the API logs the link to the console instead of sending (dev only). In production a missing SMTP config fails at startup.
 
 ## Auth (public, rate limited)
@@ -231,3 +231,13 @@ Tokens are 32 random bytes; the DB stores only their sha256. Passwords are hashe
 - `POST /gmail/app-password` `{ email, appPassword }`: unchanged (verifies SMTP + IMAP, stores the password encrypted). Always enabled.
 - `POST /gmail/disconnect`, `POST /gmail/test-send` (to the user's own login email): unchanged.
 - `/gmail/connect` and `/gmail/callback` are removed.
+
+
+## v3.1: password is set on the verification page (account-takeover fix)
+
+- `POST /auth/signup` takes `{ name, email }` only (no password). New address: creates an unverified user with no password and emails a link. Unverified existing address: nothing changes, a fresh link is emailed. Verified address: a "someone tried to sign up" note. Always 201 `{ ok: true }`.
+- `POST /auth/verify-email` takes `{ token, password }` (8-200 chars): sets the password, marks the email verified, revokes all other sessions, signs in. Returns `{ ok: true, user }`. The web page `/verify-email?token=...` shows a "Set your password" form.
+- Only the mailbox owner can set a password (verify link or reset link), so signing up with someone else's address gives no access.
+- Login failures are limited per (email, IP) (10 / 15 min) and per email overall (50 / 15 min).
+- `/auth/me` and `/auth/logout` are not rate limited. `TRUST_PROXY_HOPS` (default 1; 2 on Render behind the Vercel rewrite) sets how many proxies to trust for the client IP.
+- All error responses may include a machine-readable `code`.

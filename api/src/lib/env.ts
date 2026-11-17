@@ -57,6 +57,7 @@ if (IS_PROD) {
 export const env = {
   NODE_ENV,
   IS_PROD,
+  TRUST_PROXY_HOPS: int("TRUST_PROXY_HOPS", 1),
   PORT: int("PORT", 4100),
   PUBLIC_URL,
   DATABASE_URL: required("DATABASE_URL"),
