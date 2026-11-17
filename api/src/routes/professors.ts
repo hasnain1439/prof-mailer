@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
+import { uid } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError, parseQuery, validateBody } from "../lib/http.js";
 import { PROFESSOR_STATUSES, emailStr, optStr, reqStr } from "../services/core/schemas.js";
@@ -15,7 +16,7 @@ const listQuery = z.object({
 
 professorsRouter.get("/", async (req, res) => {
   const { status, country, q } = parseQuery(listQuery, req.query);
-  const where: Prisma.ProfessorWhereInput = {};
+  const where: Prisma.ProfessorWhereInput = { userId: uid(req) };
   if (status) where.status = status;
   if (country) where.country = country;
   if (q) {
@@ -45,9 +46,9 @@ professorsRouter.get("/", async (req, res) => {
   );
 });
 
-professorsRouter.get("/countries", async (_req, res) => {
+professorsRouter.get("/countries", async (req, res) => {
   const rows = await prisma.professor.findMany({
-    where: { country: { not: null } },
+    where: { userId: uid(req), country: { not: null } },
     distinct: ["country"],
     select: { country: true },
   });
@@ -59,13 +60,19 @@ professorsRouter.get("/countries", async (_req, res) => {
 });
 
 professorsRouter.get("/:id", async (req, res) => {
-  const prof = await prisma.professor.findUnique({
-    where: { id: req.params.id },
+  const prof = await prisma.professor.findFirst({
+    where: { id: req.params.id, userId: uid(req) },
     include: { emails: { orderBy: { scheduledAt: "asc" } } },
   });
   if (!prof) throw new HttpError(404, "Professor not found");
   res.json(prof);
 });
+
+async function getOwnedOr404(userId: string, id: string) {
+  const p = await prisma.professor.findFirst({ where: { id, userId }, select: { id: true } });
+  if (!p) throw new HttpError(404, "Professor not found");
+  return p;
+}
 
 const createSchema = z.object({
   name: reqStr,
@@ -82,24 +89,34 @@ const patchSchema = createSchema.partial();
 
 professorsRouter.post("/", validateBody(createSchema), async (req, res) => {
   const data = req.body as z.infer<typeof createSchema>;
-  const exists = await prisma.professor.findUnique({ where: { email: data.email }, select: { id: true } });
+  const userId = uid(req);
+  const exists = await prisma.professor.findUnique({
+    where: { userId_email: { userId, email: data.email } },
+    select: { id: true },
+  });
   if (exists) throw new HttpError(409, "A professor with this email already exists", { id: exists.id });
-  const prof = await prisma.professor.create({ data });
+  const prof = await prisma.professor.create({ data: { ...data, userId } });
   res.status(201).json(prof);
 });
 
 professorsRouter.patch("/:id", validateBody(patchSchema), async (req, res) => {
   const data = req.body as z.infer<typeof patchSchema>;
   const id = req.params.id as string;
+  const userId = uid(req);
+  await getOwnedOr404(userId, id);
   if (data.email) {
-    const other = await prisma.professor.findUnique({ where: { email: data.email }, select: { id: true } });
+    const other = await prisma.professor.findUnique({
+      where: { userId_email: { userId, email: data.email } },
+      select: { id: true },
+    });
     if (other && other.id !== id) throw new HttpError(409, "A professor with this email already exists", { id: other.id });
   }
-  const prof = await prisma.professor.update({ where: { id }, data }); // P2025 → 404
+  const prof = await prisma.professor.update({ where: { id, userId }, data }); // P2025 → 404
   res.json(prof);
 });
 
 professorsRouter.delete("/:id", async (req, res) => {
-  await prisma.professor.delete({ where: { id: req.params.id } }); // cascades emails
+  const r = await prisma.professor.deleteMany({ where: { id: req.params.id, userId: uid(req) } }); // cascades emails
+  if (r.count === 0) throw new HttpError(404, "Professor not found");
   res.status(204).end();
 });

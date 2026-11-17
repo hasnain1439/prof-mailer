@@ -1,6 +1,9 @@
 import { prisma } from "./prisma.js";
 
-/** Returns the single Settings row, creating it with defaults if missing. */
-export function getSettings() {
-  return prisma.settings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+/** Server-side cap on dailySendLimit (Gmail reputation / abuse guard). */
+export const MAX_DAILY_SEND_LIMIT = 50;
+
+/** Returns the user's Settings row, creating it with defaults if missing. */
+export function getSettings(userId: string) {
+  return prisma.settings.upsert({ where: { userId }, update: {}, create: { userId } });
 }

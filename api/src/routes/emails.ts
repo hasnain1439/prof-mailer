@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { EmailStatus, Prisma } from "@prisma/client";
+import { uid } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError, parseQuery, validateBody } from "../lib/http.js";
 import { EMAIL_STATUSES, professorSummarySelect } from "../services/core/schemas.js";
@@ -21,7 +22,7 @@ const ACTIVE: ReadonlySet<EmailStatus> = new Set(["SCHEDULED", "SENDING"]);
 
 emailsRouter.get("/", async (req, res) => {
   const { status, professorId, limit } = parseQuery(listQuery, req.query);
-  const where: Prisma.EmailWhereInput = {};
+  const where: Prisma.EmailWhereInput = { userId: uid(req) };
   if (status.length) where.status = { in: status };
   if (professorId) where.professorId = professorId;
 
@@ -40,25 +41,26 @@ emailsRouter.get("/", async (req, res) => {
   res.json(emails.slice(0, limit));
 });
 
-async function getEmailOr404(id: string) {
-  const e = await prisma.email.findUnique({ where: { id } });
+async function getEmailOr404(userId: string, id: string) {
+  const e = await prisma.email.findFirst({ where: { id, userId } });
   if (!e) throw new HttpError(404, "Email not found");
   return e;
 }
 
 emailsRouter.post("/:id/cancel", async (req, res) => {
   const id = req.params.id;
-  const e = await getEmailOr404(id);
+  const userId = uid(req);
+  const e = await getEmailOr404(userId, id);
   if (e.status !== "SCHEDULED" && e.status !== "FAILED") {
     throw new HttpError(409, `Cannot cancel an email with status ${e.status}`);
   }
   // Guard against a concurrent status change (e.g. the sender picking it up).
   const r = await prisma.email.updateMany({
-    where: { id, status: { in: ["SCHEDULED", "FAILED"] } },
+    where: { id, userId, status: { in: ["SCHEDULED", "FAILED"] } },
     data: { status: "CANCELLED" },
   });
   if (r.count === 0) throw new HttpError(409, "Email status changed; please refresh");
-  res.json(await getEmailOr404(id));
+  res.json(await getEmailOr404(userId, id));
 });
 
 const patchSchema = z.object({
@@ -70,11 +72,12 @@ const patchSchema = z.object({
 emailsRouter.patch("/:id", validateBody(patchSchema), async (req, res) => {
   const id = req.params.id as string;
   const { scheduledAt, subject, body } = req.body as z.infer<typeof patchSchema>;
-  const e = await getEmailOr404(id);
+  const userId = uid(req);
+  const e = await getEmailOr404(userId, id);
   const allowed: EmailStatus[] = ["SCHEDULED", "FAILED", "CANCELLED"];
   if (!allowed.includes(e.status)) throw new HttpError(409, `Cannot reschedule an email with status ${e.status}`);
   const r = await prisma.email.updateMany({
-    where: { id, status: { in: allowed } },
+    where: { id, userId, status: { in: allowed } },
     data: {
       scheduledAt,
       status: "SCHEDULED",
@@ -84,5 +87,5 @@ emailsRouter.patch("/:id", validateBody(patchSchema), async (req, res) => {
     },
   });
   if (r.count === 0) throw new HttpError(409, "Email status changed; please refresh");
-  res.json(await getEmailOr404(id));
+  res.json(await getEmailOr404(userId, id));
 });

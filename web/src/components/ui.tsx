@@ -369,7 +369,7 @@ export function DryRunBadge({ className = "" }: { className?: string }) {
       tone="replied"
       className={className}
     >
-      <span title="DRY_RUN is on: no real emails are sent. Set DRY_RUN=false in api/.env and restart the API to send for real.">Dry run: emails are only logged</span>
+      <span title="DRY_RUN is on for this server: no real emails are sent, they are only logged.">Dry run: emails are only logged</span>
     </Badge>
   );
 }

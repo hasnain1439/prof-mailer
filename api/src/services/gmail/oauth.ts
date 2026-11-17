@@ -1,12 +1,12 @@
 /**
- * Google OAuth2 for the single connected Gmail account (GmailAccount id = 1).
- * Never log tokens, auth codes or the client secret.
+ * Google OAuth2: sign-in (openid email profile) and per-user Gmail access (gmail.send + gmail.readonly).
+ * One OAuth "Web application" client serves both. Never log tokens, auth codes or the client secret.
  */
-import { randomBytes } from "node:crypto";
 import { google } from "googleapis";
 import { env } from "../../lib/env.js";
 import { prisma } from "../../lib/prisma.js";
 
+export const LOGIN_SCOPES = ["openid", "email", "profile"];
 export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.readonly",
@@ -20,69 +20,89 @@ export function isGoogleConfigured(): boolean {
   return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 }
 
-function newClient(): OAuth2Client {
-  return new google.auth.OAuth2(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, env.GOOGLE_REDIRECT_URI);
+export function googleClient(redirectUri: string): OAuth2Client {
+  return new google.auth.OAuth2(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, redirectUri);
 }
 
-// ---- state (CSRF) kept in memory with a short TTL ----
-const STATE_TTL_MS = 10 * 60 * 1000;
-const pendingStates = new Map<string, number>(); // state -> expiresAt
+// ---------------------------------------------------------------------------------------------
+// Sign in with Google
 
-function pruneStates(now = Date.now()) {
-  for (const [s, exp] of pendingStates) if (exp <= now) pendingStates.delete(s);
+export function createLoginAuthUrl(state: string): string {
+  return googleClient(env.LOGIN_REDIRECT_URI).generateAuthUrl({
+    scope: LOGIN_SCOPES,
+    state,
+    prompt: "select_account",
+    include_granted_scopes: true,
+  });
 }
 
-/** Consent-screen URL with a fresh one-time state. */
-export function createAuthUrl(): string {
-  pruneStates();
-  const state = randomBytes(24).toString("hex");
-  pendingStates.set(state, Date.now() + STATE_TTL_MS);
-  return newClient().generateAuthUrl({
+export interface GoogleIdentity {
+  sub: string;
+  email: string;
+  name: string | null;
+  picture: string | null;
+}
+
+/** Verify an id_token (signature, issuer, expiry, audience = our client id). Requires a verified email. */
+export async function verifyIdToken(client: OAuth2Client, idToken: string): Promise<GoogleIdentity> {
+  const ticket = await client.verifyIdToken({ idToken, audience: env.GOOGLE_CLIENT_ID });
+  const p = ticket.getPayload();
+  if (!p?.sub || !p.email) throw new Error("id_token has no subject/email");
+  if (p.email_verified !== true) throw new Error("Google email is not verified");
+  return { sub: p.sub, email: p.email.toLowerCase(), name: p.name ?? null, picture: p.picture ?? null };
+}
+
+/** Exchange the login code and return the verified Google identity. */
+export async function exchangeLoginCode(code: string): Promise<GoogleIdentity> {
+  const client = googleClient(env.LOGIN_REDIRECT_URI);
+  const { tokens } = await client.getToken(code);
+  if (!tokens.id_token) throw new Error("Google returned no id_token");
+  return verifyIdToken(client, tokens.id_token);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Per-user Gmail
+
+export function createGmailAuthUrl(state: string, loginHint: string): string {
+  return googleClient(env.GMAIL_REDIRECT_URI).generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: GMAIL_SCOPES,
     include_granted_scopes: true,
+    login_hint: loginHint,
     state,
   });
 }
 
-/** One-time check: valid, unexpired state is consumed. */
-export function consumeState(state: unknown): boolean {
-  pruneStates();
-  if (typeof state !== "string" || !pendingStates.has(state)) return false;
-  pendingStates.delete(state);
-  return true;
-}
-
-/** Email from an id_token payload (token came straight from Google's token endpoint over TLS). */
-function emailFromIdToken(idToken: string | null | undefined): string | null {
-  if (!idToken) return null;
-  try {
-    const payload = JSON.parse(Buffer.from(idToken.split(".")[1] ?? "", "base64url").toString("utf8")) as {
-      email?: unknown;
-    };
-    return typeof payload.email === "string" ? payload.email.toLowerCase() : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Exchange the auth code, resolve the account email and upsert GmailAccount id=1. Returns the email. */
-export async function handleOAuthCallback(code: string): Promise<string> {
-  const client = newClient();
+/** Exchange the Gmail auth code and upsert the user's GmailAccount. Returns the Gmail address. */
+export async function handleGmailCallback(userId: string, code: string): Promise<string> {
+  const client = googleClient(env.GMAIL_REDIRECT_URI);
   const { tokens } = await client.getToken(code);
   client.setCredentials(tokens);
 
-  let email = emailFromIdToken(tokens.id_token);
+  const scopes = new Set((tokens.scope ?? "").split(/\s+/).filter(Boolean));
+  if (!scopes.has(GMAIL_SCOPES[0]!) || !scopes.has(GMAIL_SCOPES[1]!)) {
+    throw new Error("Gmail permissions were not granted");
+  }
+
+  let email: string | null = null;
+  if (tokens.id_token) {
+    try {
+      email = (await verifyIdToken(client, tokens.id_token)).email;
+    } catch {
+      email = null;
+    }
+  }
   if (!email) {
     const profile = await google.gmail({ version: "v1", auth: client }).users.getProfile({ userId: "me" });
     email = profile.data.emailAddress?.toLowerCase() ?? null;
   }
   if (!email) throw new Error("Could not determine the Gmail account address");
 
-  const existing = await prisma.gmailAccount.findUnique({ where: { id: 1 } });
-  // Google may omit refresh_token on re-consent; keep the old one in that case.
-  const refreshToken = tokens.refresh_token ?? existing?.refreshToken;
+  const existing = await prisma.gmailAccount.findUnique({ where: { userId } });
+  // Google may omit refresh_token on re-consent; keep the old one only if it is the same account.
+  const refreshToken =
+    tokens.refresh_token ?? (existing?.authType === "OAUTH" && existing.email === email ? existing.refreshToken : null);
   if (!refreshToken) throw new Error("Google did not return a refresh token");
 
   const data = {
@@ -94,31 +114,32 @@ export async function handleOAuthCallback(code: string): Promise<string> {
     expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
   };
   await prisma.gmailAccount.upsert({
-    where: { id: 1 },
+    where: { userId },
     update: { ...data, connectedAt: new Date() },
-    create: { id: 1, ...data },
+    create: { userId, ...data },
   });
   return email;
 }
 
-export async function getGmailAccount() {
-  return prisma.gmailAccount.findUnique({ where: { id: 1 } });
+export async function getGmailAccount(userId: string) {
+  return prisma.gmailAccount.findUnique({ where: { userId } });
 }
 
 /**
- * Authorised OAuth2 client for the connected account, or null when not connected/configured.
+ * Authorised OAuth2 client for the user's connected account, or null when not connected/configured.
  * Refreshed tokens are persisted via the client's 'tokens' event.
  */
-export async function getAuthorizedClient(): Promise<{ client: OAuth2Client; email: string } | null> {
+export async function getAuthorizedClient(userId: string): Promise<{ client: OAuth2Client; email: string } | null> {
   if (!isGoogleConfigured()) return null;
-  const account = await getGmailAccount();
+  const account = await getGmailAccount(userId);
   if (!account || account.authType !== "OAUTH" || !account.refreshToken) return null;
-  const client = newClient();
+  const client = googleClient(env.GMAIL_REDIRECT_URI);
   client.setCredentials({
     refresh_token: account.refreshToken,
     access_token: account.accessToken ?? null,
     expiry_date: account.expiryDate ? account.expiryDate.getTime() : null,
   });
+  const accountId = account.id;
   client.on("tokens", (t) => {
     const update: { accessToken?: string; expiryDate?: Date | null; refreshToken?: string } = {};
     if (t.access_token) update.accessToken = t.access_token;
@@ -126,22 +147,22 @@ export async function getAuthorizedClient(): Promise<{ client: OAuth2Client; ema
     if (t.refresh_token) update.refreshToken = t.refresh_token;
     if (Object.keys(update).length === 0) return;
     prisma.gmailAccount
-      .updateMany({ where: { id: 1 }, data: update })
-      .catch((err: unknown) => console.error("[gmail] failed to persist refreshed token:", (err as Error).message));
+      .updateMany({ where: { id: accountId, userId }, data: update })
+      .catch(() => console.error("[gmail] failed to persist a refreshed token"));
   });
   return { client, email: account.email };
 }
 
-/** Delete the account; best-effort revoke of the refresh token. */
-export async function disconnectGmail(): Promise<void> {
-  const account = await getGmailAccount();
+/** Delete the user's account; best-effort revoke of the refresh token. */
+export async function disconnectGmail(userId: string): Promise<void> {
+  const account = await getGmailAccount(userId);
   // App-password accounts have nothing to revoke (the user deletes the app password in their Google account).
   if (account?.authType === "OAUTH" && account.refreshToken && isGoogleConfigured()) {
     try {
-      await newClient().revokeToken(account.refreshToken);
+      await googleClient(env.GMAIL_REDIRECT_URI).revokeToken(account.refreshToken);
     } catch {
       console.warn("[gmail] token revoke failed (ignored)");
     }
   }
-  await prisma.gmailAccount.deleteMany({ where: { id: 1 } });
+  await prisma.gmailAccount.deleteMany({ where: { userId } });
 }

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
+import { uid } from "../lib/auth.js";
 import { env } from "../lib/env.js";
 import { HttpError, validateBody } from "../lib/http.js";
 import { prisma } from "../lib/prisma.js";
@@ -18,7 +19,10 @@ const simulateSchema = z.object({
 devRouter.post("/simulate-reply", validateBody(simulateSchema), async (req, res) => {
   if (!env.DRY_RUN) throw new HttpError(404, "Not found");
   const body = req.body as z.infer<typeof simulateSchema>;
-  const email = await prisma.email.findUnique({ where: { id: body.emailId }, include: { professor: true } });
+  const email = await prisma.email.findFirst({
+    where: { id: body.emailId, userId: uid(req) },
+    include: { professor: true },
+  });
   if (!email) throw new HttpError(404, "Email not found");
   if (email.status !== "SENT" || !email.gmailThreadId) {
     throw new HttpError(409, "Email has not been sent (no thread to reply to)");

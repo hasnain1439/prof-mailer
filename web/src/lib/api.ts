@@ -1,4 +1,5 @@
 import type {
+  AuthUser,
   Dashboard,
   Email,
   EmailStatus,
@@ -20,7 +21,11 @@ import type {
   TemplateInput,
 } from "./types";
 
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api").replace(/\/+$/, "");
+/** Same-origin by default: Next.js rewrites /api/* to the Express API (see next.config.ts). */
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/+$/, "");
+
+/** Fired on window whenever an API call answers 401; AuthProvider listens and sends the user to /login. */
+export const UNAUTHORIZED_EVENT = "pm:unauthorized";
 
 export class ApiError extends Error {
   constructor(
@@ -68,19 +73,27 @@ interface RequestOptions {
   query?: Query;
   json?: unknown;
   form?: FormData;
+  /** Don't broadcast a 401 (used by the auth calls themselves). */
+  allowUnauthorized?: boolean;
 }
 
 export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const url = new URL(API_URL + path);
+  // API_URL may be relative ("/api"), so resolve it against the page origin.
+  const base = typeof window !== "undefined" ? window.location.origin : "http://localhost";
+  const url = new URL(API_URL + path, base);
   for (const [k, v] of Object.entries(opts.query ?? {})) {
     if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
   }
-  const init: RequestInit = { method: opts.method ?? "GET", headers: { Accept: "application/json" }, cache: "no-store" };
-  if (opts.json !== undefined) {
-    init.headers = { ...init.headers, "Content-Type": "application/json" };
-    init.body = JSON.stringify(opts.json);
-  } else if (opts.form) {
+  const method = opts.method ?? "GET";
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const init: RequestInit = { method, headers, cache: "no-store", credentials: "include" };
+  if (opts.form) {
+    // multipart: the browser sets Content-Type with the boundary
     init.body = opts.form;
+  } else if (method !== "GET") {
+    // The API rejects mutations without a JSON content type (CSRF guard), even when there is no body.
+    headers["Content-Type"] = "application/json";
+    if (opts.json !== undefined) init.body = JSON.stringify(opts.json);
   }
 
   let res: Response;
@@ -88,6 +101,10 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     res = await fetch(url, init);
   } catch {
     throw new ApiError(`Could not reach the API at ${API_URL}. Is it running?`, 0);
+  }
+
+  if (res.status === 401 && !opts.allowUnauthorized && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   }
 
   if (res.status === 204) return undefined as T;
@@ -115,6 +132,13 @@ export function errorMessage(e: unknown): string {
 }
 
 export const api = {
+  // Auth
+  me: () => request<{ user: AuthUser }>("/auth/me", { allowUnauthorized: true }),
+  logout: () => request<void>("/auth/logout", { method: "POST", allowUnauthorized: true }),
+  devLogin: (body: { email: string; name?: string }) =>
+    request<{ user: AuthUser }>("/auth/dev-login", { method: "POST", json: body, allowUnauthorized: true }),
+  googleSignInUrl: (next?: string) => `${API_URL}/auth/google${next ? `?next=${encodeURIComponent(next)}` : ""}`,
+
   // Dashboard
   dashboard: () => request<Dashboard>("/dashboard"),
 

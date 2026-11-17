@@ -1,0 +1,59 @@
+import type { CookieOptions, Request, Response } from "express";
+import { env } from "./env.js";
+
+/** Parse the Cookie header (no dependency). Malformed pairs are skipped. */
+export function parseCookies(header: string | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!header) return out;
+  for (const part of header.split(";")) {
+    const i = part.indexOf("=");
+    if (i <= 0) continue;
+    const name = part.slice(0, i).trim();
+    let value = part.slice(i + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+    if (!name || name in out) continue;
+    try {
+      out[name] = decodeURIComponent(value);
+    } catch {
+      // skip undecodable values
+    }
+  }
+  return out;
+}
+
+export function getCookie(req: Request, name: string): string | undefined {
+  return parseCookies(req.headers.cookie)[name];
+}
+
+export function baseCookieOptions(): CookieOptions {
+  return { httpOnly: true, sameSite: "lax", secure: env.COOKIE_SECURE, path: "/" };
+}
+
+export function setCookie(res: Response, name: string, value: string, maxAgeMs: number, path = "/"): void {
+  res.cookie(name, value, { ...baseCookieOptions(), path, maxAge: maxAgeMs });
+}
+
+export function clearCookie(res: Response, name: string, path = "/"): void {
+  res.clearCookie(name, { ...baseCookieOptions(), path });
+}
+
+const STATE_TTL_MS = 10 * 60 * 1000;
+
+/** Short-lived httpOnly cookie carrying OAuth state as base64url JSON (compared with the query state). */
+export function setStateCookie(res: Response, name: string, data: Record<string, string>, path: string): void {
+  setCookie(res, name, Buffer.from(JSON.stringify(data), "utf8").toString("base64url"), STATE_TTL_MS, path);
+}
+
+export function readStateCookie(req: Request, name: string): Record<string, string> | null {
+  const raw = getCookie(req, name);
+  if (!raw || raw.length > 2000) return null;
+  try {
+    const v = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as unknown;
+    if (!v || typeof v !== "object") return null;
+    const out: Record<string, string> = {};
+    for (const [k, x] of Object.entries(v)) if (typeof x === "string") out[k] = x;
+    return out;
+  } catch {
+    return null;
+  }
+}

@@ -2,131 +2,17 @@
 
 import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { API_URL, api, errorMessage } from "@/lib/api";
+import { api, errorMessage } from "@/lib/api";
 import type { GmailStatus } from "@/lib/types";
+import { useAuth } from "@/components/Auth";
 import { useGmailStatus } from "@/components/GmailStatus";
-import { IconCheck, IconCopy, IconExternal, IconRefresh, IconSend } from "@/components/icons";
+import { IconExternal, IconMail, IconRefresh, IconSend } from "@/components/icons";
 import { DryRunPill } from "@/components/SendingFrom";
 import { useToast } from "@/components/Toast";
-import { Badge, Button, Card, ErrorBox, Field, Input, Loading, Mono, Notice, PageHeader, btnPrimary, btnSecondary, btnSmall, link } from "@/components/ui";
-
-const DEFAULT_REDIRECT = "http://localhost:4000/api/gmail/callback";
+import { Badge, Button, Card, ErrorBox, Field, Input, Loading, Mono, Notice, PageHeader, btnPrimary, link } from "@/components/ui";
 
 function Code({ children }: { children: ReactNode }) {
   return <code className="rounded-sm border border-border bg-bg px-1 py-px font-mono text-[0.85em] text-text">{children}</code>;
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      size="sm"
-      onClick={() => {
-        void navigator.clipboard?.writeText(text).then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        });
-      }}
-    >
-      {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-      {copied ? "Copied" : "Copy"}
-    </Button>
-  );
-}
-
-/** Plain numbered step: mono number, title, body. */
-function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
-  return (
-    <li className="flex gap-3">
-      <span className="w-5 shrink-0 pt-px text-right font-mono text-[13px] text-muted">{n}.</span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium text-text">{title}</p>
-        <div className="mt-1 space-y-2 text-[13px] text-muted">{children}</div>
-      </div>
-    </li>
-  );
-}
-
-function SetupGuide({ configured, onRecheck }: { configured: boolean; onRecheck: () => void }) {
-  const likelyRedirect = `${API_URL}/gmail/callback`;
-  const differs = likelyRedirect !== DEFAULT_REDIRECT;
-  return (
-    <ol className="space-y-4">
-      <Step n={1} title="Create a Google Cloud project">
-        <p>
-          Open the{" "}
-          <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer" className={link}>
-            Google Cloud console <IconExternal size={12} className="inline" />
-          </a>{" "}
-          and create a new project (any name, e.g. “prof-mailer”).
-        </p>
-      </Step>
-      <Step n={2} title="Enable the Gmail API">
-        <p>
-          In <em>APIs &amp; Services → Library</em>, search for <strong className="text-text">Gmail API</strong> and click{" "}
-          <strong className="text-text">Enable</strong>.
-        </p>
-      </Step>
-      <Step n={3} title="Configure the OAuth consent screen">
-        <p>
-          In <em>APIs &amp; Services → OAuth consent screen</em>, choose <strong className="text-text">External</strong>, fill in the app name and
-          your email, and under <strong className="text-text">Test users</strong> add the Gmail address you&apos;ll send from. (While the app is in
-          “Testing”, only test users can connect.)
-        </p>
-      </Step>
-      <Step n={4} title="Create a Web OAuth client">
-        <p>
-          In <em>Credentials → Create credentials → OAuth client ID</em>, pick <strong className="text-text">Web application</strong> and add
-          this <strong className="text-text">Authorized redirect URI</strong>:
-        </p>
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-bg px-3 py-1.5">
-          <code className="min-w-0 flex-1 font-mono text-xs break-all text-text">{DEFAULT_REDIRECT}</code>
-          <CopyButton text={DEFAULT_REDIRECT} />
-        </div>
-        <p className="text-xs">
-          If you run the API on another port or host, the redirect URI must exactly match <Code>GOOGLE_REDIRECT_URI</Code> in{" "}
-          <Code>api/.env</Code>.
-          {differs && (
-            <>
-              {" "}
-              This web app talks to the API at <Code>{API_URL}</Code>, so you probably want <Code>{likelyRedirect}</Code> in both places.
-            </>
-          )}
-        </p>
-      </Step>
-      <Step n={5} title="Add the credentials to api/.env">
-        <pre className="overflow-x-auto rounded-md border border-border bg-bg p-3 font-mono text-xs leading-relaxed text-text">
-          {`GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=xxxxxxxx
-# only if not ${DEFAULT_REDIRECT}:
-GOOGLE_REDIRECT_URI=${differs ? likelyRedirect : DEFAULT_REDIRECT}
-# where "Send test email" goes:
-TEST_RECIPIENT=you@example.com`}
-        </pre>
-      </Step>
-      <Step n={6} title="Restart the API">
-        <p>Stop and start the API server so it picks up the new environment variables.</p>
-        {!configured && (
-          <Button size="sm" onClick={onRecheck}>
-            <IconRefresh size={14} />
-            Check again
-          </Button>
-        )}
-      </Step>
-      <Step n={7} title="Connect your Gmail account">
-        <p>Click Connect Gmail and sign in with the test-user account. You&apos;ll be redirected back here.</p>
-        {configured ? (
-          <a href={api.gmailConnectUrl} className={`${btnPrimary} ${btnSmall}`}>
-            Connect Gmail
-          </a>
-        ) : (
-          <Button size="sm" variant="primary" disabled title="Finish steps 1–6 first">
-            Connect Gmail
-          </Button>
-        )}
-      </Step>
-    </ol>
-  );
 }
 
 function StatusRow({ name, children }: { name: ReactNode; children: ReactNode }) {
@@ -186,13 +72,8 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
 
   return (
     <Card
-      title={
-        <span className="inline-flex flex-wrap items-center gap-2">
-          Option A: Gmail with an app password
-          <Badge tone="sent">Recommended</Badge>
-        </span>
-      }
-      description="Takes about two minutes. Sends over SMTP and checks replies over IMAP."
+      title="Alternative: Gmail with an app password"
+      description="Sends over SMTP and checks replies over IMAP. Use this only if connecting with Google doesn't work for your account."
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <form onSubmit={submit} className="space-y-3" autoComplete="off">
@@ -258,7 +139,7 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
           <ul className="list-disc space-y-1 border-t border-border pt-3 pl-5 text-xs">
             <li>Your normal Gmail password won&apos;t work; it must be an app password.</li>
             <li>Google Workspace (university/company) accounts may have app passwords disabled by the admin.</li>
-            <li>The password is stored encrypted on your own server.</li>
+            <li>The password is stored encrypted.</li>
           </ul>
         </div>
       </div>
@@ -266,35 +147,52 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
   );
 }
 
-function OAuthOption({ data, onRecheck }: { data: GmailStatus; onRecheck: () => void }) {
+function GoogleConnectCard({ data }: { data: GmailStatus }) {
+  const { user } = useAuth();
   return (
-    <details className="group mb-4 rounded-md border border-border bg-surface">
-      <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-2.5 select-none hover:bg-bg">
-        <span className="text-sm font-semibold text-text">Option B: Sign in with Google (OAuth)</span>
-        <span className="text-xs text-muted">{data.oauthConfigured ? "Google OAuth client is configured" : "Requires Google Cloud setup, about 10 minutes"}</span>
-        <span className="ml-auto text-xs text-muted group-open:hidden">Show</span>
-        <span className="ml-auto hidden text-xs text-muted group-open:inline">Hide</span>
-      </summary>
-      <div className="border-t border-border p-4">
-        {data.oauthConfigured ? (
-          <div className="flex flex-wrap items-center gap-4">
-            <p className="min-w-0 flex-1 text-[13px] text-muted">
-              Sign in with the Google account you added as a test user on the OAuth consent screen. You&apos;ll be redirected back here.
-            </p>
-            <a href={api.gmailConnectUrl} className={btnSecondary}>
-              Connect with Google
+    <Card title="Connect Gmail" description="Mail is sent from your own Gmail account, through Google.">
+      <div className="space-y-3 text-[13px] text-muted">
+        <p>Google will ask you to allow prof-mailer to:</p>
+        <ul className="list-disc space-y-1 pl-5 marker:text-border">
+          <li>
+            <strong className="font-medium text-text">Send email on your behalf</strong>: only the emails and follow-ups you schedule here.
+          </li>
+          <li>
+            <strong className="font-medium text-text">Read your email</strong>: used only to spot replies in the threads prof-mailer started, so
+            follow-ups stop when a professor answers.
+          </li>
+        </ul>
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          {data.oauthConfigured ? (
+            <a href={api.gmailConnectUrl} className={btnPrimary}>
+              <IconMail />
+              Connect Gmail
             </a>
-          </div>
-        ) : (
-          <SetupGuide configured={data.oauthConfigured} onRecheck={onRecheck} />
-        )}
+          ) : (
+            <Button variant="primary" disabled>
+              <IconMail />
+              Connect Gmail
+            </Button>
+          )}
+          <span className="text-xs">
+            {user ? (
+              <>
+                Choose <Mono className="!text-xs text-text">{user.email}</Mono> or another Gmail address. You&apos;ll come back here afterwards.
+              </>
+            ) : (
+              "You'll come back here afterwards."
+            )}
+          </span>
+        </div>
+        {!data.oauthConfigured && <p className="text-xs">Google sign-in isn&apos;t configured on the server.</p>}
       </div>
-    </details>
+    </Card>
   );
 }
 
 function ConnectedCard({
   data,
+  userEmail,
   busy,
   switching,
   onToggleSwitch,
@@ -302,6 +200,7 @@ function ConnectedCard({
   onTestSend,
 }: {
   data: GmailStatus;
+  userEmail: string | null;
   busy: boolean;
   switching: boolean;
   onToggleSwitch: () => void;
@@ -322,16 +221,10 @@ function ConnectedCard({
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
-        {data.testRecipientSet ? (
-          <Button variant="primary" onClick={onTestSend} disabled={busy}>
-            <IconSend />
-            {busy ? "Working…" : "Send test email to TEST_RECIPIENT"}
-          </Button>
-        ) : (
-          <span className="text-xs text-muted">
-            Set <Code>TEST_RECIPIENT</Code> in <Code>api/.env</Code> to enable the test-send button.
-          </span>
-        )}
+        <Button variant="primary" onClick={onTestSend} disabled={busy}>
+          <IconSend />
+          {busy ? "Working…" : `Send a test email to ${userEmail ?? "yourself"}`}
+        </Button>
         <div className="ml-auto flex gap-2">
           <Button onClick={onToggleSwitch} aria-expanded={switching}>
             {switching ? "Cancel switch" : "Switch account"}
@@ -378,6 +271,7 @@ export function GmailPanel() {
   const toast = useToast();
 
   const { data, error, loading, reload } = useGmailStatus();
+  const { user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -464,6 +358,7 @@ export function GmailPanel() {
             {data.connected ? (
               <ConnectedCard
                 data={data}
+                userEmail={user?.email ?? null}
                 busy={busy}
                 switching={switching}
                 onToggleSwitch={() => setSwitching((v) => !v)}
@@ -472,7 +367,7 @@ export function GmailPanel() {
               />
             ) : (
               <Notice tone="warning" title="No Gmail account connected">
-                Connect the Gmail account you&apos;ll send from. Option A takes about two minutes.
+                Connect the Gmail account you&apos;ll send from. Scheduled emails can&apos;t go out until you do.
               </Notice>
             )}
 
@@ -481,8 +376,8 @@ export function GmailPanel() {
                 {data.connected && (
                   <Notice tone="info">Connecting another account replaces the current connection ({data.email ?? "current account"}).</Notice>
                 )}
-                <AppPasswordCard onConnected={onConnected} />
-                <OAuthOption data={data} onRecheck={reload} />
+                <GoogleConnectCard data={data} />
+                {data.appPasswordEnabled && <AppPasswordCard onConnected={onConnected} />}
               </>
             )}
 
@@ -499,20 +394,14 @@ export function GmailPanel() {
                   <Mono className="break-all">{data.email ?? "—"}</Mono>
                 </StatusRow>
                 <StatusRow name="Connected via">{data.authType ? <AuthTypeBadge authType={data.authType} /> : "—"}</StatusRow>
-                <StatusRow name="OAuth client configured">
-                  <YesNo ok={data.oauthConfigured} />
-                </StatusRow>
                 <StatusRow name={<Mono className="!text-xs">DRY_RUN</Mono>}>
                   {data.dryRun ? <Badge tone="replied">On: logged only</Badge> : <Badge tone="sent">Off: real sends</Badge>}
-                </StatusRow>
-                <StatusRow name="Test recipient set">
-                  <YesNo ok={data.testRecipientSet} />
                 </StatusRow>
               </dl>
             </Card>
             {data.dryRun && (
               <Notice tone="warning" title="Dry run is on">
-                Emails are only logged, never sent. Set <Code>DRY_RUN=false</Code> in <Code>api/.env</Code> and restart the API to send for real.
+                Emails are only logged, never sent. Dry run is a server setting controlled by the app owner.
               </Notice>
             )}
           </div>

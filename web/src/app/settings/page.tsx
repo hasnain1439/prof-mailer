@@ -5,6 +5,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { api, errorMessage } from "@/lib/api";
 import type { SettingsInput, SettingsResponse } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
+import { useAuth } from "@/components/Auth";
 import { useGmailStatus } from "@/components/GmailStatus";
 import { IconCheck } from "@/components/icons";
 import { useToast } from "@/components/Toast";
@@ -79,7 +80,7 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
           </div>
         )}
         <Section title="Sending" description="Caps how many emails go out per Karachi calendar day.">
-          {num("dailySendLimit", "Daily send limit", 1, 500, "1–500 emails per day", "emails")}
+          {num("dailySendLimit", "Daily send limit", 1, 50, "Max 50 per day", "emails")}
         </Section>
         <Section title="Follow-ups" description="Automatically nudge professors who haven't replied.">
           {num("followUpAfterDays", "Follow up after", 1, 60, "1–60 days without a reply", "days")}
@@ -179,12 +180,13 @@ function Row({ name, children }: { name: ReactNode; children: ReactNode }) {
 export default function SettingsPage() {
   const { data, error, loading, reload } = useApi(() => api.getSettings());
   const gmail = useGmailStatus();
+  const { user } = useAuth();
   const [latest, setLatest] = useState<SettingsResponse | null>(null);
   const s = latest ?? data;
 
   return (
     <div>
-      <PageHeader title="Settings" description="Send limits and follow-up behaviour. Environment flags are read-only and live in api/.env." />
+      <PageHeader title="Settings" description="Send limits and follow-up behaviour for your account. Server flags are read-only." />
       <ErrorBox error={error} onRetry={reload} />
       {loading && !data && (
         <div className="grid max-w-6xl grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
@@ -198,8 +200,11 @@ export default function SettingsPage() {
             <SettingsForm initial={data} onSaved={setLatest} />
           </Card>
           <div>
-            <Card title="Environment" description="Read-only">
+            <Card title="Account" description="Read-only">
               <dl className="-my-2 divide-y divide-border">
+                <Row name="Signed in as">
+                  <Mono className="break-all">{user?.email ?? "—"}</Mono>
+                </Row>
                 <Row name="Sending from">
                   {gmail.data?.connected ? (
                     <Mono className="break-all">{gmail.data.email ?? "Connected"}</Mono>
@@ -215,7 +220,6 @@ export default function SettingsPage() {
                 <Row name={<Mono className="!text-xs">DRY_RUN</Mono>}>
                   {s.dryRun ? <Badge tone="replied">On: logged only</Badge> : <Badge tone="sent">Off: real sends</Badge>}
                 </Row>
-                <Row name="Test recipient">{s.testRecipientSet ? "Configured" : "Not set"}</Row>
                 <Row name="Timezone">
                   <Mono>{s.timezone}</Mono>
                 </Row>
@@ -228,8 +232,7 @@ export default function SettingsPage() {
             </Card>
             <Notice tone={s.dryRun ? "warning" : "info"}>
               {s.dryRun ? "No real emails are sent while DRY_RUN is on. " : ""}
-              To change it, set <code className="font-mono">DRY_RUN</code> in <code className="font-mono">api/.env</code> and restart the API.
-              TEST_RECIPIENT is also configured there.
+              <code className="font-mono">DRY_RUN</code> is a server setting controlled by the app owner.
             </Notice>
           </div>
         </div>

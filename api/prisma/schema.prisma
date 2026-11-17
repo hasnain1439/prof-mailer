@@ -9,6 +9,7 @@ datasource db {
 }
 
 // All DateTime columns are stored in UTC. The UI renders them in Asia/Karachi.
+// Every user-owned row carries userId; all queries are scoped by it.
 
 enum ProfessorStatus {
   NOT_SENT
@@ -26,10 +27,41 @@ enum EmailStatus {
   CANCELLED
 }
 
+model User {
+  id           String        @id @default(cuid())
+  googleSub    String        @unique
+  email        String
+  name         String?
+  picture      String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  sessions     Session[]
+  professors   Professor[]
+  templates    Template[]
+  emails       Email[]
+  settings     Settings?
+  gmailAccount GmailAccount?
+}
+
+// id = sha256(hex) of the random session token held in the pm_session cookie.
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model Professor {
   id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
-  email         String          @unique
+  email         String
   university    String
   country       String?
   researchFocus String?
@@ -41,12 +73,16 @@ model Professor {
   updatedAt     DateTime        @updatedAt
   emails        Email[]
 
+  @@unique([userId, email])
+  @@index([userId])
   @@index([status])
   @@index([country])
 }
 
 model Template {
   id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name       String
   subject    String
   body       String
@@ -55,10 +91,15 @@ model Template {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   emails     Email[]
+
+  @@index([userId])
 }
 
 model Email {
   id              String      @id @default(cuid())
+  // Denormalised from professor.userId for fast scoping.
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   professorId     String
   professor       Professor   @relation(fields: [professorId], references: [id], onDelete: Cascade)
   templateId      String?
@@ -81,19 +122,31 @@ model Email {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
+  @@index([userId, status, scheduledAt])
   @@index([status, scheduledAt])
   @@index([professorId])
   @@index([gmailThreadId])
 }
 
-// Single-row table (id = 1).
+// One row per user (created with defaults on first read).
 model Settings {
-  id                 Int      @id @default(1)
-  followUpAfterDays  Int      @default(3)
-  maxFollowUps       Int      @default(2)
-  dailySendLimit     Int      @default(20)
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  followUpAfterDays  Int       @default(3)
+  maxFollowUps       Int       @default(2)
+  dailySendLimit     Int       @default(20)
   followUpTemplateId String?
-  updatedAt          DateTime @updatedAt
+  // Spacing between sends: the scheduler won't send for this user before this instant.
+  nextSendAfter      DateTime?
+  updatedAt          DateTime  @updatedAt
+}
+
+// Global key/value state for the scheduler (e.g. lastReplyCheckAt), so restarts don't re-run jobs early.
+model AppState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 enum GmailAuthType {
@@ -101,10 +154,12 @@ enum GmailAuthType {
   APP_PASSWORD
 }
 
-// Single connected Gmail account (id = 1).
+// One connected Gmail account per user.
 // OAUTH: refreshToken (+ accessToken) set. APP_PASSWORD: appPasswordEnc set (AES-256-GCM, see src/lib/crypto.ts).
 model GmailAccount {
-  id             Int           @id @default(1)
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   email          String
   authType       GmailAuthType @default(OAUTH)
   refreshToken   String?

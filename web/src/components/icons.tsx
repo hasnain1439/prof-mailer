@@ -15,6 +15,7 @@ import {
   Inbox,
   Info,
   LayoutDashboard,
+  LogOut,
   Mail,
   Menu,
   Pencil,
@@ -71,3 +72,4 @@ export const IconFile = wrap(FileText);
 export const IconCopy = wrap(Copy);
 export const IconCalendar = wrap(Calendar);
 export const IconLogo = wrap(Mail);
+export const IconLogOut = wrap(LogOut);

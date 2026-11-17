@@ -59,7 +59,7 @@ function SendingFromBanner() {
 
   const dryRun = data.dryRun && (
     <Notice tone="warning" title="Dry run is on">
-      No real emails are sent; they are only logged. Set DRY_RUN=false in api/.env and restart the API to send for real.
+      No real emails are sent; they are only logged. Dry run is a server setting controlled by the app owner.
     </Notice>
   );
 

@@ -1,13 +1,43 @@
-/** Registers node-cron jobs. Called from src/index.ts when SCHEDULER_ENABLED. */
+/** Registers node-cron jobs (called from src/index.ts when SCHEDULER_ENABLED) and the /jobs/tick runner. */
 import cron from "node-cron";
-import { runCheckReplies } from "./checkReplies.js";
-import { resetStaleSending, runSendDue } from "./sendDue.js";
+import { pruneExpiredSessions } from "../lib/auth.js";
+import { maybeRunCheckReplies, type CheckRepliesResult } from "./checkReplies.js";
+import { resetStaleSending, runSendDue, type SendDueResult } from "./sendDue.js";
 import { safeErrorMessage } from "./util.js";
 
 export { runSendDue, resetStaleSending } from "./sendDue.js";
-export { runCheckReplies } from "./checkReplies.js";
+export { runCheckReplies, maybeRunCheckReplies } from "./checkReplies.js";
+
+const HOUR_MS = 60 * 60 * 1000;
 
 let started = false;
+
+function logSendDue(r: SendDueResult) {
+  if (r.processed > 0 || r.failed > 0) {
+    console.log(
+      `[send-due] processed=${r.processed} sent=${r.sent} failed=${r.failed} ` +
+        `skippedDueToLimit=${r.skippedDueToLimit} remainingToday=${r.remainingToday}`,
+    );
+  }
+}
+
+function logCheckReplies(r: CheckRepliesResult | null) {
+  if (r && (r.repliesFound > 0 || r.followUpsCreated > 0 || r.followUpsCancelled > 0)) {
+    console.log(
+      `[check-replies] threadsChecked=${r.threadsChecked} repliesFound=${r.repliesFound} ` +
+        `followUpsCreated=${r.followUpsCreated} followUpsCancelled=${r.followUpsCancelled}`,
+    );
+  }
+}
+
+/** External cron tick: send-due, plus check-replies when the last check is >= 60 min old. */
+export async function runTick(): Promise<{ sendDue: SendDueResult; checkReplies: CheckRepliesResult | null }> {
+  const sendDue = await runSendDue();
+  logSendDue(sendDue);
+  const checkReplies = await maybeRunCheckReplies(HOUR_MS);
+  logCheckReplies(checkReplies);
+  return { sendDue, checkReplies };
+}
 
 export function startScheduler(): void {
   if (started) return;
@@ -21,13 +51,7 @@ export function startScheduler(): void {
     "* * * * *",
     async () => {
       try {
-        const r = await runSendDue();
-        if (r.processed > 0 || r.failed > 0) {
-          console.log(
-            `[send-due] processed=${r.processed} sent=${r.sent} failed=${r.failed} ` +
-              `skippedDueToLimit=${r.skippedDueToLimit} remainingToday=${r.remainingToday}`,
-          );
-        }
+        logSendDue(await runSendDue());
       } catch (err) {
         console.error(`[send-due] run failed: ${safeErrorMessage(err)}`);
       }
@@ -39,15 +63,15 @@ export function startScheduler(): void {
     "0 * * * *",
     async () => {
       try {
-        const r = await runCheckReplies();
-        if (r.repliesFound > 0 || r.followUpsCreated > 0 || r.followUpsCancelled > 0) {
-          console.log(
-            `[check-replies] threadsChecked=${r.threadsChecked} repliesFound=${r.repliesFound} ` +
-              `followUpsCreated=${r.followUpsCreated} followUpsCancelled=${r.followUpsCancelled}`,
-          );
-        }
+        // Slightly under an hour so a /jobs/tick run a few minutes earlier doesn't push this to the next hour.
+        logCheckReplies(await maybeRunCheckReplies(50 * 60 * 1000));
       } catch (err) {
         console.error(`[check-replies] run failed: ${safeErrorMessage(err)}`);
+      }
+      try {
+        await pruneExpiredSessions();
+      } catch (err) {
+        console.error(`[scheduler] session prune failed: ${safeErrorMessage(err)}`);
       }
     },
     { name: "check-replies", noOverlap: true },

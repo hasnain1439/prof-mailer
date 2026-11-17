@@ -147,10 +147,17 @@ export interface Dashboard {
   dailySendLimit: number;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+  picture: string | null;
+}
+
 export type GmailAuthType = "OAUTH" | "APP_PASSWORD";
 
 export interface GmailStatus {
-  /** Google OAuth client id/secret present in api/.env. */
+  /** Google OAuth client configured on the server. */
   oauthConfigured: boolean;
   /** @deprecated alias of oauthConfigured */
   configured: boolean;
@@ -158,7 +165,10 @@ export interface GmailStatus {
   email: string | null;
   authType: GmailAuthType | null;
   dryRun: boolean;
+  /** Legacy single-user flag; unused in the multi-user UI. */
   testRecipientSet: boolean;
+  /** App Password (SMTP/IMAP) connect is offered only when the server enables it. */
+  appPasswordEnabled: boolean;
 }
 
 export interface GmailAppPasswordResult {

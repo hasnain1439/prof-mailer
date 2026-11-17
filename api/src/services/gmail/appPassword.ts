@@ -143,8 +143,8 @@ async function specialMailbox(client: ImapFlow, use: "\\Sent" | "\\All"): Promis
 // ---------------------------------------------------------------------------------------------
 // connect
 
-/** Verify SMTP and IMAP logins, then store the account (GmailAccount id=1). Throws HttpError. */
-export async function connectWithAppPassword(rawEmail: string, password: string): Promise<{ email: string }> {
+/** Verify SMTP and IMAP logins, then store the user's GmailAccount. Throws HttpError. */
+export async function connectWithAppPassword(userId: string, rawEmail: string, password: string): Promise<{ email: string }> {
   const email = rawEmail.trim().toLowerCase();
   if (!isSingleAddress(email)) throw new HttpError(400, "Enter a valid Gmail address");
   const creds = { email, password };
@@ -180,16 +180,16 @@ export async function connectWithAppPassword(rawEmail: string, password: string)
     expiryDate: null,
   };
   await prisma.gmailAccount.upsert({
-    where: { id: 1 },
+    where: { userId },
     update: { ...data, connectedAt: new Date() },
-    create: { id: 1, ...data },
+    create: { userId, ...data },
   });
   return { email };
 }
 
 /** Decrypted credentials of the connected app-password account, or null. */
-export async function getAppPasswordCreds(): Promise<AppPasswordCreds | null> {
-  const account = await prisma.gmailAccount.findUnique({ where: { id: 1 } });
+export async function getAppPasswordCreds(userId: string): Promise<AppPasswordCreds | null> {
+  const account = await prisma.gmailAccount.findUnique({ where: { userId } });
   if (!account || account.authType !== "APP_PASSWORD" || !account.appPasswordEnc) return null;
   return { email: account.email, password: decryptSecret(account.appPasswordEnc) };
 }

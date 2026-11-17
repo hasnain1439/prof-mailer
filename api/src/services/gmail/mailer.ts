@@ -2,7 +2,8 @@
  * The ONE place that sends email. In DRY_RUN nothing leaves the process: the message is logged
  * and recorded in the dry-run thread store.
  *
- * Callers: sendTestEmail (recipient forced to TEST_RECIPIENT) and the send-due job (professor address).
+ * Every call is for one user and uses that user's GmailAccount. Callers: sendTestEmail (recipient
+ * forced to the signed-in user's own address) and the send-due job (professor address).
  */
 import { randomBytes } from "node:crypto";
 import { google } from "googleapis";
@@ -13,7 +14,7 @@ import { ImapThreadReader, getAppPasswordCreds, sendViaSmtp } from "./appPasswor
 import { messageIdFromFallbackThreadId, toApiThreadId } from "./appPasswordFormat.js";
 import { appendDryRunMessage, getDryRunThread } from "./dryRunStore.js";
 import { buildMimeMessage, generateMessageId, isSingleAddress, toBase64Url } from "./mime.js";
-import { getAuthorizedClient, getGmailAccount } from "./oauth.js";
+import { getAuthorizedClient, getGmailAccount, type OAuth2Client } from "./oauth.js";
 
 export interface SendEmailInput {
   to: string;
@@ -51,27 +52,27 @@ function rand(): string {
   return randomBytes(8).toString("hex");
 }
 
-/** True when a real (non-dry-run) send could happen right now (OAuth or app password). */
-export async function isGmailConnected(): Promise<boolean> {
-  const account = await getGmailAccount();
+/** True when a real (non-dry-run) send could happen right now for this user. */
+export async function isGmailConnected(userId: string): Promise<boolean> {
+  const account = await getGmailAccount(userId);
   if (!account) return false;
-  if (account.authType === "APP_PASSWORD") return Boolean(account.appPasswordEnc);
-  return (await getAuthorizedClient()) !== null;
+  if (account.authType === "APP_PASSWORD") return env.APP_PASSWORD_ENABLED && Boolean(account.appPasswordEnc);
+  return (await getAuthorizedClient(userId)) !== null;
 }
 
-export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+export async function sendEmail(userId: string, input: SendEmailInput): Promise<SendEmailResult> {
   const to = input.to.trim().toLowerCase();
   if (!isSingleAddress(to)) throw new Error("Invalid recipient address");
 
   if (env.DRY_RUN) {
-    const account = await getGmailAccount().catch(() => null);
+    const account = await getGmailAccount(userId).catch(() => null);
     const from = account?.email ?? DRY_FROM_FALLBACK;
     const gmailThreadId = input.threadId || `dry-thread-${rand()}`;
     const messageIdHeader = `<dry-${rand()}@prof-mailer.local>`;
     const preview = (input.isHtml ? htmlToText(input.body) : input.body).replace(/\s+/g, " ").trim().slice(0, 80);
     console.log(
-      `[DRY_RUN] would send to=${to} subject=${JSON.stringify(input.subject)} threadId=${input.threadId ?? "(new)"} ` +
-        `body="${preview}${input.body.length > 80 ? "…" : ""}"`,
+      `[DRY_RUN] user=${userId} would send to=${to} subject=${JSON.stringify(input.subject)} ` +
+        `threadId=${input.threadId ?? "(new)"} body="${preview}${input.body.length > 80 ? "…" : ""}"`,
     );
     await appendDryRunMessage(gmailThreadId, {
       direction: "outbound",
@@ -84,15 +85,16 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     return { gmailMessageId: `dry-msg-${rand()}`, gmailThreadId, messageIdHeader, dryRun: true };
   }
 
-  const account = await getGmailAccount();
+  const account = await getGmailAccount(userId);
   if (account?.authType === "APP_PASSWORD") {
-    const creds = await getAppPasswordCreds();
+    if (!env.APP_PASSWORD_ENABLED) throw new GmailNotConnectedError();
+    const creds = await getAppPasswordCreds(userId);
     if (!creds) throw new GmailNotConnectedError();
     const r = await sendViaSmtp(creds, { ...input, to });
     return { ...r, dryRun: false };
   }
 
-  const auth = await getAuthorizedClient();
+  const auth = await getAuthorizedClient(userId);
   if (!auth) throw new GmailNotConnectedError();
   const gmail = google.gmail({ version: "v1", auth: auth.client });
 
@@ -141,20 +143,19 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   return { gmailMessageId, gmailThreadId, messageIdHeader, dryRun: false };
 }
 
-/** Manual test send. The recipient is ALWAYS env.TEST_RECIPIENT. */
-export async function sendTestEmail(opts: { subject?: string; body?: string }) {
-  const to = env.TEST_RECIPIENT.trim();
-  if (!to) throw new HttpError(400, "TEST_RECIPIENT is not set");
-  if (!isSingleAddress(to)) throw new HttpError(400, "TEST_RECIPIENT is not a valid single email address");
-  if (!env.DRY_RUN && !(await isGmailConnected())) throw new HttpError(409, "Gmail is not connected");
+/** Manual test send. The recipient is ALWAYS the signed-in user's own (Google) address. */
+export async function sendTestEmail(userId: string, ownEmail: string, opts: { subject?: string; body?: string }) {
+  const to = ownEmail.trim().toLowerCase();
+  if (!isSingleAddress(to)) throw new HttpError(400, "Your account email is not a valid address");
+  if (!env.DRY_RUN && !(await isGmailConnected(userId))) throw new HttpError(409, "Gmail is not connected");
   const subject = opts.subject?.trim() || "prof-mailer test email";
   const body =
     opts.body?.trim() || `This is a test email from prof-mailer, sent at ${new Date().toISOString()}.`;
-  const r = await sendEmail({ to, subject, body });
+  const r = await sendEmail(userId, { to, subject, body });
   return { to, ...r };
 }
 
-/** Reads threads for a check-replies run; close() when done (releases the IMAP connection, if any). */
+/** Reads threads for one user during a check-replies run; close() when done. */
 export interface ThreadReader {
   getThreadMessages(threadId: string): Promise<ThreadMessage[]>;
   close(): Promise<void>;
@@ -171,10 +172,8 @@ async function dryRunThreadMessages(threadId: string): Promise<ThreadMessage[]> 
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
-async function oauthThreadMessages(threadId: string): Promise<ThreadMessage[]> {
-  const auth = await getAuthorizedClient();
-  if (!auth) throw new GmailNotConnectedError();
-  const gmail = google.gmail({ version: "v1", auth: auth.client });
+async function oauthThreadMessages(client: OAuth2Client, threadId: string): Promise<ThreadMessage[]> {
+  const gmail = google.gmail({ version: "v1", auth: client });
 
   let apiThreadId: string | null = toApiThreadId(threadId);
   const fallbackMid = messageIdFromFallbackThreadId(threadId);
@@ -209,33 +208,20 @@ async function oauthThreadMessages(threadId: string): Promise<ThreadMessage[]> {
 }
 
 /**
- * Thread reader for the current mode: DRY_RUN store, Gmail API (OAuth) or IMAP (app password,
- * one connection reused for the whole run).
+ * Thread reader for one user: DRY_RUN store, Gmail API (OAuth, one client for the run) or IMAP
+ * (app password, one connection reused for the run; only when APP_PASSWORD_ENABLED).
  */
-export async function createThreadReader(): Promise<ThreadReader> {
-  if (!env.DRY_RUN) {
-    const account = await getGmailAccount();
-    if (account?.authType === "APP_PASSWORD") {
-      const creds = await getAppPasswordCreds();
-      if (!creds) throw new GmailNotConnectedError();
-      const reader = new ImapThreadReader(creds);
-      return { getThreadMessages: (id) => reader.getThreadMessages(id), close: () => reader.close() };
-    }
-  }
-  return { getThreadMessages, close: async () => undefined };
-}
-
-/** Messages of a thread (oldest first). Real mode: Gmail API or IMAP; DRY_RUN: the dry-run store. */
-export async function getThreadMessages(threadId: string): Promise<ThreadMessage[]> {
-  if (env.DRY_RUN) return dryRunThreadMessages(threadId);
-  const account = await getGmailAccount();
+export async function createThreadReader(userId: string): Promise<ThreadReader> {
+  if (env.DRY_RUN) return { getThreadMessages: dryRunThreadMessages, close: async () => undefined };
+  const account = await getGmailAccount(userId);
   if (account?.authType === "APP_PASSWORD") {
-    const reader = await createThreadReader();
-    try {
-      return await reader.getThreadMessages(threadId);
-    } finally {
-      await reader.close();
-    }
+    if (!env.APP_PASSWORD_ENABLED) throw new GmailNotConnectedError();
+    const creds = await getAppPasswordCreds(userId);
+    if (!creds) throw new GmailNotConnectedError();
+    const reader = new ImapThreadReader(creds);
+    return { getThreadMessages: (id) => reader.getThreadMessages(id), close: () => reader.close() };
   }
-  return oauthThreadMessages(threadId);
+  const auth = await getAuthorizedClient(userId);
+  if (!auth) throw new GmailNotConnectedError();
+  return { getThreadMessages: (id) => oauthThreadMessages(auth.client, id), close: async () => undefined };
 }

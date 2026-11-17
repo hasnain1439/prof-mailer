@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from "express";
 import multer from "multer";
 import Papa from "papaparse";
 import { z } from "zod";
+import { uid } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError, validateBody } from "../lib/http.js";
 import {
@@ -50,17 +51,17 @@ const uploadFile: RequestHandler = (req, res, next) => {
   });
 };
 
-async function loadTemplate(templateId: string | undefined): Promise<ImportTemplate | null> {
+async function loadTemplate(userId: string, templateId: string | undefined): Promise<ImportTemplate | null> {
   if (!templateId) return null;
-  const t = await prisma.template.findUnique({ where: { id: templateId }, select: { subject: true, body: true, isHtml: true } });
+  const t = await prisma.template.findFirst({ where: { id: templateId, userId }, select: { subject: true, body: true, isHtml: true } });
   if (!t) throw new HttpError(400, "Template not found", { templateId });
   return t;
 }
 
-async function existingEmailSet(rows: ParsedRow[]): Promise<Set<string>> {
+async function existingEmailSet(userId: string, rows: ParsedRow[]): Promise<Set<string>> {
   const emails = [...new Set(rows.map((r) => normalizeEmail(r.data.email)).filter(Boolean))];
   if (emails.length === 0) return new Set();
-  const found = await prisma.professor.findMany({ where: { email: { in: emails } }, select: { email: true } });
+  const found = await prisma.professor.findMany({ where: { userId, email: { in: emails } }, select: { email: true } });
   return new Set(found.map((p) => p.email));
 }
 
@@ -118,7 +119,8 @@ importRouter.post("/preview", uploadFile, async (req, res) => {
   const rawTemplateId: unknown = req.body?.templateId;
   const templateId = typeof rawTemplateId === "string" && rawTemplateId.trim() ? rawTemplateId.trim() : undefined;
 
-  const template = await loadTemplate(templateId);
+  const userId = uid(req);
+  const template = await loadTemplate(userId, templateId);
   let parsed: ParsedRow[];
   try {
     parsed = parseImportFile(file.buffer, file.originalname);
@@ -126,7 +128,7 @@ importRouter.post("/preview", uploadFile, async (req, res) => {
     if (e instanceof ImportParseError) throw new HttpError(400, e.message);
     throw e;
   }
-  const rows = validateImportRows(parsed, template, await existingEmailSet(parsed));
+  const rows = validateImportRows(parsed, template, await existingEmailSet(userId, parsed));
   const errorCount = rows.filter((r) => r.errors.length > 0).length;
   res.json({ rows, validCount: rows.length - errorCount, errorCount });
 });
@@ -148,10 +150,11 @@ const commitSchema = z.object({
 
 importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
   const body = req.body as z.infer<typeof commitSchema>;
-  const template = await loadTemplate(body.templateId || undefined);
+  const userId = uid(req);
+  const template = await loadTemplate(userId, body.templateId || undefined);
 
   const parsed: ParsedRow[] = body.rows.map((data, i) => ({ rowNumber: i + 2, data }));
-  const existing = await existingEmailSet(parsed);
+  const existing = await existingEmailSet(userId, parsed);
   const valid = validateImportRows(parsed, template, existing).filter((r) => r.errors.length === 0);
   const templateId = body.templateId || null;
 
@@ -172,8 +175,8 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
           ...(d.profileUrl ? { profileUrl: d.profileUrl } : {}),
         };
         const prof = await tx.professor.upsert({
-          where: { email },
-          create: { email, name: d.name, university: d.university, ...optional },
+          where: { userId_email: { userId, email } },
+          create: { userId, email, name: d.name, university: d.university, ...optional },
           update: { name: d.name, university: d.university, ...optional },
           select: { id: true },
         });
@@ -182,6 +185,7 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
 
         await tx.email.create({
           data: {
+            userId,
             professorId: prof.id,
             templateId,
             subject: row.subject,
