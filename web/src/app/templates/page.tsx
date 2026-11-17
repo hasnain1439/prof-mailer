@@ -5,23 +5,33 @@ import { useRef, useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
 import type { Template } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
-import { EmailBody, HtmlBadge } from "@/components/EmailBody";
+import { EmailBody } from "@/components/EmailBody";
 import { IconEye, IconFile, IconPencil, IconPlus, IconTemplate, IconTrash, IconUpload, IconX } from "@/components/icons";
 import { MAX_HTML_UPLOAD_BYTES, PROFESSIONAL_LAYOUT, extractHtmlTitle } from "@/lib/emailLayout";
 import { useToast } from "@/components/Toast";
 import {
+  Badge,
+  Button,
   Card,
   EmptyCard,
   ErrorBox,
+  Field,
+  Input,
+  Mono,
+  Notice,
   PageHeader,
-  Skeleton,
-  btnGhost,
-  btnPrimary,
+  Select,
+  Table,
+  TableSkeleton,
+  Td,
+  Th,
   btnSecondary,
   btnSmall,
   input,
   label,
   link,
+  textareaCls,
+  tr,
 } from "@/components/ui";
 
 const PLACEHOLDERS = [
@@ -119,13 +129,10 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
     <form onSubmit={submit} className="space-y-4">
       <ErrorBox error={error} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-        <div>
-          <label className={label} htmlFor="t-name">
-            Name *
-          </label>
-          <input id="t-name" required className={input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        </div>
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-2 ring-1 ring-inset ring-line-strong has-[:checked]:bg-accent-soft has-[:checked]:text-accent-fg has-[:checked]:ring-accent-line">
+        <Field label="Name *" htmlFor="t-name">
+          <Input id="t-name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <label className="flex h-8 cursor-pointer items-center gap-2 text-[13px] text-text">
           <input
             type="checkbox"
             className="h-4 w-4 accent-accent"
@@ -135,84 +142,76 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
           Follow-up template
         </label>
       </div>
-      <div>
-        <label className={label} htmlFor="t-subject">
-          Subject *
-        </label>
+      <Field label="Subject *" htmlFor="t-subject">
         <input
           id="t-subject"
           ref={subjectRef}
-          required
           className={input}
+          required
           value={form.subject}
           onFocus={() => (lastFocused.current = "subject")}
           onChange={(e) => setForm({ ...form, subject: e.target.value })}
         />
-      </div>
-      <div className="rounded-lg bg-surface-2/70 p-3 ring-1 ring-line">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-fg-2">Format</span>
-          <div className="flex rounded-lg bg-surface-3/70 p-0.5" role="radiogroup" aria-label="Body format">
-            {[
-              { v: false, l: "Plain text" },
-              { v: true, l: "HTML" },
-            ].map((o) => (
-              <button
-                key={o.l}
-                type="button"
-                role="radio"
-                aria-checked={form.isHtml === o.v}
-                onClick={() => setForm((f) => ({ ...f, isHtml: o.v }))}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                  form.isHtml === o.v ? "bg-surface text-fg shadow-sm" : "text-fg-2 hover:text-fg"
-                }`}
-              >
-                {o.l}
-              </button>
-            ))}
-          </div>
-          <div className="ml-auto flex flex-wrap gap-2">
-            <button type="button" className={`${btnSecondary} ${btnSmall}`} onClick={() => htmlFile.current?.click()}>
-              <IconUpload size={13} />
-              Upload .html file
+      </Field>
+      <div className="flex flex-wrap items-center gap-2 border-y border-border py-3">
+        <span className="text-xs font-medium text-muted">Format</span>
+        <div className="inline-flex rounded-md border border-border bg-bg p-0.5" role="radiogroup" aria-label="Body format">
+          {[
+            { v: false, l: "Plain text" },
+            { v: true, l: "HTML" },
+          ].map((o) => (
+            <button
+              key={o.l}
+              type="button"
+              role="radio"
+              aria-checked={form.isHtml === o.v}
+              onClick={() => setForm((f) => ({ ...f, isHtml: o.v }))}
+              className={`h-6 rounded-sm border px-2.5 text-xs font-medium transition-colors ${
+                form.isHtml === o.v ? "border-border bg-surface text-text" : "border-transparent text-muted hover:text-text"
+              }`}
+            >
+              {o.l}
             </button>
-            <button type="button" className={`${btnSecondary} ${btnSmall}`} onClick={applyLayout}>
-              <IconFile size={13} />
-              Start from professional layout
-            </button>
-            <input
-              ref={htmlFile}
-              type="file"
-              accept=".html,.htm,text/html"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-              onChange={(e) => loadHtmlFile(e.target.files?.[0])}
-            />
-          </div>
+          ))}
         </div>
-        <p className="mt-2 text-xs text-muted">
-          Tip: for professors, a simple, personal-looking email usually gets more replies than a heavily designed one — keep the HTML light.
+        <div className="ml-auto flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => htmlFile.current?.click()}>
+            <IconUpload size={14} />
+            Upload .html file
+          </Button>
+          <Button size="sm" onClick={applyLayout}>
+            <IconFile size={14} />
+            Start from professional layout
+          </Button>
+          <input
+            ref={htmlFile}
+            type="file"
+            accept=".html,.htm,text/html"
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={(e) => loadHtmlFile(e.target.files?.[0])}
+          />
+        </div>
+        <p className="w-full text-xs text-muted">
+          A simple, personal-looking email usually gets more replies from professors than a heavily designed one. Keep the HTML light.
         </p>
-        {fileNote && <p className="mt-1 text-xs text-success-fg">{fileNote}</p>}
+        {fileNote && <p className="w-full text-xs text-sent-fg">{fileNote}</p>}
       </div>
       <div className={form.isHtml ? "grid grid-cols-1 gap-4 xl:grid-cols-2" : ""}>
-        <div>
-          <label className={label} htmlFor="t-body">
-            {form.isHtml ? "HTML body *" : "Body *"}
-          </label>
+        <Field label={form.isHtml ? "HTML body *" : "Body *"} htmlFor="t-body">
           <textarea
             id="t-body"
             ref={bodyRef}
             required
             rows={form.isHtml ? 18 : 12}
             spellCheck={!form.isHtml}
-            className={`${input} font-mono ${form.isHtml ? "text-xs leading-relaxed" : "text-[13px] leading-relaxed"}`}
+            className={`${textareaCls} leading-relaxed ${form.isHtml ? "!bg-bg font-mono !text-xs" : ""}`}
             value={form.body}
             onFocus={() => (lastFocused.current = "body")}
             onChange={(e) => setForm({ ...form, body: e.target.value })}
           />
-        </div>
+        </Field>
         {form.isHtml && (
           <div>
             <p className={label}>Live preview (placeholders shown unfilled)</p>
@@ -220,15 +219,15 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
           </div>
         )}
       </div>
-      <div className="rounded-lg bg-surface-2 p-3 ring-1 ring-line">
-        <p className="mb-2 text-xs text-fg-2">Placeholders: click to insert at the cursor in the subject or body.</p>
-        <div className="flex flex-wrap gap-2">
+      <div>
+        <p className="mb-1.5 text-xs text-muted">Placeholders: click to insert at the cursor in the subject or body.</p>
+        <div className="flex flex-wrap gap-1.5">
           {PLACEHOLDERS.map((p) => (
             <button
               key={p.key}
               type="button"
               title={p.help}
-              className={`${btnSecondary} ${btnSmall} font-mono`}
+              className="h-6 rounded-md border border-border bg-bg px-2 font-mono text-xs text-text transition-colors hover:border-accent hover:text-accent"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => insert(p.key)}
             >
@@ -237,13 +236,13 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
           ))}
         </div>
       </div>
-      <div className="flex justify-end gap-2">
-        <button type="button" className={btnSecondary} onClick={onCancel} disabled={busy}>
+      <div className="flex justify-end gap-2 border-t border-border pt-4">
+        <Button onClick={onCancel} disabled={busy}>
           Cancel
-        </button>
-        <button type="submit" className={btnPrimary} disabled={busy}>
+        </Button>
+        <Button type="submit" variant="primary" disabled={busy}>
           {busy ? "Saving…" : form.id ? "Save template" : "Create template"}
-        </button>
+        </Button>
       </div>
     </form>
   );
@@ -274,7 +273,7 @@ function TemplatePreview({ template }: { template: Template }) {
     <div className="space-y-4">
       <ErrorBox error={professors.error} onRetry={professors.reload} />
       {professors.data && professors.data.length === 0 && (
-        <p className="text-sm text-muted">
+        <p className="text-[13px] text-muted">
           Add or{" "}
           <Link href="/import" className={link}>
             import
@@ -284,32 +283,31 @@ function TemplatePreview({ template }: { template: Template }) {
       )}
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-64 flex-1">
-          <label className={label} htmlFor="pv-prof">
-            Preview for professor
-          </label>
-          <select id="pv-prof" className={input} value={professorId} onChange={(e) => setProfessorId(e.target.value)}>
-            <option value="">Choose a professor…</option>
-            {(professors.data ?? []).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.university})
-              </option>
-            ))}
-          </select>
+          <Field label="Preview for professor" htmlFor="pv-prof">
+            <Select id="pv-prof" value={professorId} onChange={(e) => setProfessorId(e.target.value)}>
+              <option value="">Choose a professor…</option>
+              {(professors.data ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.university})
+                </option>
+              ))}
+            </Select>
+          </Field>
         </div>
-        <button type="button" className={btnPrimary} disabled={!professorId || busy} onClick={run}>
-          <IconEye size={16} />
+        <Button variant="primary" disabled={!professorId || busy} onClick={run}>
+          <IconEye />
           {busy ? "Rendering…" : "Preview"}
-        </button>
+        </Button>
       </div>
       <ErrorBox error={error} />
       {result && (
-        <div className="overflow-hidden rounded-lg ring-1 ring-line">
-          <div className="border-b border-line bg-surface-2 px-4 py-2.5 text-sm">
+        <div className="overflow-hidden rounded-md border border-border">
+          <div className="border-b border-border bg-bg px-3 py-2 text-[13px]">
             <span className="text-muted">Subject: </span>
-            <span className="font-medium text-fg">{result.subject}</span>
+            <span className="font-medium text-text">{result.subject}</span>
           </div>
           <div className={result.isHtml ? "p-2" : "p-4"}>
-            <EmailBody body={result.body} isHtml={!!result.isHtml} textClassName="text-fg" title="Rendered email preview" />
+            <EmailBody body={result.body} isHtml={!!result.isHtml} textClassName="text-text" title="Rendered email preview" />
           </div>
         </div>
       )}
@@ -317,7 +315,7 @@ function TemplatePreview({ template }: { template: Template }) {
   );
 }
 
-const pill = "rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset";
+const outlineBadge = "border border-border bg-surface text-muted";
 
 export default function TemplatesPage() {
   const toast = useToast();
@@ -350,72 +348,68 @@ export default function TemplatesPage() {
   const initial = data?.filter((t) => !t.isFollowUp) ?? [];
   const followUps = data?.filter((t) => t.isFollowUp) ?? [];
 
-  const renderTemplate = (t: Template) => (
-    <div key={t.id} className="flex flex-col rounded-xl bg-surface shadow-sm ring-1 ring-line transition hover:shadow-md">
-      <div className="px-5 pt-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="truncate font-semibold text-fg">{t.name}</h3>
-          {t.isFollowUp ? (
-            <span className={`${pill} bg-accent-soft text-accent-fg ring-accent-line`}>Follow-up</span>
-          ) : (
-            <span className={`${pill} bg-surface-3 text-fg-2 ring-line-strong`}>Initial</span>
-          )}
-          {t.isHtml && <HtmlBadge />}
-          {t.isFollowUp && t.id === followUpId && (
-            <span className={`${pill} bg-success-soft text-success-fg ring-success-line`}>Used for follow-ups</span>
-          )}
+  const rows = [...initial, ...followUps];
+  const noFollowUpSelected = !!settings.data && followUps.length > 0 && !followUps.some((t) => t.id === followUpId);
+
+  const renderRow = (t: Template) => (
+    <tr key={t.id} className={tr}>
+      <Td className="max-w-64">
+        <span className="block truncate font-medium" title={t.name}>
+          {t.name}
+        </span>
+      </Td>
+      <Td className="max-w-md">
+        <span className="block truncate text-muted" title={t.subject}>
+          {t.subject}
+        </span>
+      </Td>
+      <Td>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {t.isFollowUp ? <Badge tone="scheduled">Follow-up</Badge> : <Badge className={outlineBadge}>Initial</Badge>}
+          {t.isHtml && <Badge className={`${outlineBadge} font-mono`}>HTML</Badge>}
+          {t.isFollowUp && t.id === followUpId && <Badge tone="sent">Used for follow-ups</Badge>}
         </div>
-        <p className="mt-1 truncate text-sm text-fg-2" title={t.subject}>
-          <span className="text-subtle">Subject:</span> {t.subject}
-        </p>
-      </div>
-      {t.isHtml ? (
-        <div className="mx-5 mt-3 flex-1">
-          <EmailBody body={t.body} isHtml height={144} title={`${t.name} preview`} />
+      </Td>
+      <Td className="text-right whitespace-nowrap">
+        <div className="inline-flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setDraft(null);
+              setPreviewing(t);
+            }}
+          >
+            <IconEye size={14} />
+            Preview
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setPreviewing(null);
+              setDraft({ id: t.id, name: t.name, subject: t.subject, body: t.body, isFollowUp: t.isFollowUp, isHtml: !!t.isHtml });
+            }}
+          >
+            <IconPencil size={14} />
+            Edit
+          </Button>
+          <Button size="sm" variant="ghost" className="hover:!bg-failed-bg hover:!text-failed-fg" aria-label={`Delete ${t.name}`} onClick={() => remove(t)}>
+            <IconTrash size={14} />
+            Delete
+          </Button>
         </div>
-      ) : (
-        <pre className="mx-5 mt-3 max-h-36 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface-2 p-3 font-sans text-xs leading-relaxed text-fg-2">
-          {t.body}
-        </pre>
-      )}
-      <div className="mt-3 flex items-center gap-1 border-t border-line px-3 py-2">
-        <button
-          type="button"
-          className={`${btnGhost} !text-xs`}
-          onClick={() => {
-            setDraft(null);
-            setPreviewing(t);
-          }}
-        >
-          <IconEye size={14} />
-          Preview
-        </button>
-        <button
-          type="button"
-          className={`${btnGhost} !text-xs`}
-          onClick={() => {
-            setPreviewing(null);
-            setDraft({ id: t.id, name: t.name, subject: t.subject, body: t.body, isFollowUp: t.isFollowUp, isHtml: !!t.isHtml });
-          }}
-        >
-          <IconPencil size={14} />
-          Edit
-        </button>
-        <button type="button" className={`${btnGhost} ml-auto !text-xs !text-danger-fg hover:!bg-danger-soft`} onClick={() => remove(t)}>
-          <IconTrash size={14} />
-          Delete
-        </button>
-      </div>
-    </div>
+      </Td>
+    </tr>
   );
 
   return (
     <div>
       <PageHeader title="Templates" description="Reusable emails with placeholders like {{name}} that are filled in for each professor.">
-        <button type="button" className={btnPrimary} onClick={() => startNew()}>
-          <IconPlus size={16} />
+        <Button variant="primary" onClick={() => startNew()}>
+          <IconPlus />
           New template
-        </button>
+        </Button>
       </PageHeader>
 
       <ErrorBox error={error} onRetry={reload} />
@@ -425,9 +419,9 @@ export default function TemplatesPage() {
         <Card
           title={draft.id ? `Edit "${draft.name}"` : draft.isFollowUp ? "New follow-up template" : "New template"}
           actions={
-            <button type="button" aria-label="Close editor" className={btnGhost} onClick={() => setDraft(null)}>
-              <IconX size={16} />
-            </button>
+            <Button size="sm" variant="ghost" aria-label="Close editor" onClick={() => setDraft(null)}>
+              <IconX />
+            </Button>
           }
         >
           <TemplateEditor
@@ -447,22 +441,16 @@ export default function TemplatesPage() {
         <Card
           title={`Preview: ${previewing.name}`}
           actions={
-            <button type="button" className={`${btnSecondary} ${btnSmall}`} onClick={() => setPreviewing(null)}>
+            <Button size="sm" onClick={() => setPreviewing(null)}>
               Close
-            </button>
+            </Button>
           }
         >
           <TemplatePreview key={previewing.id} template={previewing} />
         </Card>
       )}
 
-      {loading && !data && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-56 rounded-xl" />
-          ))}
-        </div>
-      )}
+      {loading && !data && <TableSkeleton rows={4} cols={4} />}
       {data &&
         (data.length === 0 ? (
           !draft && (
@@ -471,12 +459,10 @@ export default function TemplatesPage() {
               title="No templates yet"
               action={
                 <>
-                  <button type="button" className={btnPrimary} onClick={() => startNew(false)}>
+                  <Button variant="primary" onClick={() => startNew(false)}>
                     Create initial email
-                  </button>
-                  <button type="button" className={btnSecondary} onClick={() => startNew(true)}>
-                    Create follow-up
-                  </button>
+                  </Button>
+                  <Button onClick={() => startNew(true)}>Create follow-up</Button>
                 </>
               }
             >
@@ -484,46 +470,63 @@ export default function TemplatesPage() {
             </EmptyCard>
           )
         ) : (
-          <div className="space-y-6">
-            <section>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Initial emails ({initial.length})</h2>
-              {initial.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-line-strong px-5 py-6 text-center text-sm text-muted">
-                  No initial templates.{" "}
-                  <button type="button" className={link} onClick={() => startNew(false)}>
-                    Create one
-                  </button>
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{initial.map(renderTemplate)}</div>
-              )}
-            </section>
-            <section>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Follow-ups ({followUps.length})</h2>
-              {followUps.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-line-strong px-5 py-6 text-center text-sm text-muted">
-                  No follow-up templates.{" "}
-                  <button type="button" className={link} onClick={() => startNew(true)}>
-                    Create one
-                  </button>{" "}
-                  and select it in Settings.
-                </p>
-              ) : (
+          <>
+            {noFollowUpSelected && (
+              <Notice
+                tone="warning"
+                action={
+                  <Link href="/settings" className={`${btnSecondary} ${btnSmall}`}>
+                    Open settings
+                  </Link>
+                }
+              >
+                None of your follow-up templates is selected for follow-ups yet.
+              </Notice>
+            )}
+            <Card
+              flush
+              title="All templates"
+              description={
                 <>
-                  {settings.data && !followUps.some((t) => t.id === followUpId) && (
-                    <p className="mb-3 text-xs text-warning-fg">
-                      None of these is selected for follow-ups yet.{" "}
-                      <Link href="/settings" className={link}>
-                        Choose one in Settings
-                      </Link>
-                      .
-                    </p>
-                  )}
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">{followUps.map(renderTemplate)}</div>
+                  <Mono className="!text-xs">{initial.length}</Mono> initial · <Mono className="!text-xs">{followUps.length}</Mono> follow-up
                 </>
+              }
+            >
+              <Table
+                scroll={false}
+                head={
+                  <>
+                    <Th>Name</Th>
+                    <Th>Subject</Th>
+                    <Th>Type</Th>
+                    <Th className="text-right">Actions</Th>
+                  </>
+                }
+              >
+                {rows.map(renderRow)}
+              </Table>
+              {(initial.length === 0 || followUps.length === 0) && (
+                <p className="px-4 py-2.5 text-xs text-muted">
+                  {initial.length === 0 ? (
+                    <>
+                      No initial templates.{" "}
+                      <button type="button" className={link} onClick={() => startNew(false)}>
+                        Create one
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      No follow-up templates.{" "}
+                      <button type="button" className={link} onClick={() => startNew(true)}>
+                        Create one
+                      </button>{" "}
+                      and select it in Settings.
+                    </>
+                  )}
+                </p>
               )}
-            </section>
-          </div>
+            </Card>
+          </>
         ))}
     </div>
   );

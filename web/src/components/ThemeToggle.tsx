@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { THEME_STORAGE_KEY as KEY } from "@/lib/theme";
 
 export type ThemeChoice = "light" | "dark" | "system";
@@ -40,28 +41,10 @@ function setChoice(choice: ThemeChoice) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-const Sun = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" />
-  </svg>
-);
-const Moon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
-  </svg>
-);
-const Monitor = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="3" y="4" width="18" height="12" rx="2" />
-    <path d="M8 20h8M12 16v4" />
-  </svg>
-);
-
 const options: { value: ThemeChoice; label: string; icon: ReactNode }[] = [
-  { value: "light", label: "Light", icon: <Sun /> },
-  { value: "dark", label: "Dark", icon: <Moon /> },
-  { value: "system", label: "System", icon: <Monitor /> },
+  { value: "light", label: "Light", icon: <Sun size={14} strokeWidth={1.75} aria-hidden="true" /> },
+  { value: "dark", label: "Dark", icon: <Moon size={14} strokeWidth={1.75} aria-hidden="true" /> },
+  { value: "system", label: "System", icon: <Monitor size={14} strokeWidth={1.75} aria-hidden="true" /> },
 ];
 
 /** Light / Dark / System segmented control. `compact` hides the text labels. */
@@ -78,7 +61,7 @@ export function ThemeToggle({ compact }: { compact?: boolean }) {
   }, [choice]);
 
   return (
-    <div role="radiogroup" aria-label="Colour theme" className={`flex rounded-lg bg-surface-3 p-0.5 ${compact ? "" : "w-full"}`}>
+    <div role="radiogroup" aria-label="Colour theme" className={`flex rounded-md border border-border bg-bg p-0.5 ${compact ? "" : "w-full"}`}>
       {options.map((o) => {
         const active = choice === o.value;
         return (
@@ -89,8 +72,8 @@ export function ThemeToggle({ compact }: { compact?: boolean }) {
             aria-checked={active}
             title={`${o.label} theme`}
             onClick={() => setChoice(o.value)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-              active ? "bg-surface text-fg shadow-sm ring-1 ring-line" : "text-muted hover:text-fg"
+            className={`flex h-6 flex-1 items-center justify-center gap-1 rounded-sm px-1.5 text-xs transition-colors ${
+              active ? "bg-surface font-medium text-text" : "text-muted hover:text-text"
             }`}
           >
             {o.icon}

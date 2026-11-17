@@ -11,14 +11,11 @@ import { ToastProvider } from "./Toast";
 
 function Brand({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <Link href="/" onClick={onNavigate} className="flex items-center gap-2.5">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-fg shadow-sm">
-        <IconLogo size={18} />
+    <Link href="/" onClick={onNavigate} className="flex items-center gap-2 rounded-md">
+      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-on-accent">
+        <IconLogo size={14} />
       </span>
-      <span className="leading-tight">
-        <span className="block text-sm font-semibold text-fg">prof-mailer</span>
-        <span className="hidden text-[11px] text-muted min-[400px]:block">Master&apos;s outreach</span>
-      </span>
+      <span className="text-sm font-semibold text-text">prof-mailer</span>
     </Link>
   );
 }
@@ -26,33 +23,32 @@ function Brand({ onNavigate }: { onNavigate?: () => void }) {
 function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="px-4 pt-4 pb-5">
+      <div className="flex h-12 items-center px-4">
         <Brand onNavigate={onNavigate} />
       </div>
-      <div className="flex-1 overflow-y-auto px-3">
+      <div className="flex-1 overflow-y-auto px-2 py-2">
         <Suspense fallback={<NavLinks active={null} />}>
           <Nav onNavigate={onNavigate} />
         </Suspense>
       </div>
-      <div className="space-y-2.5 border-t border-line p-3">
+      <div className="space-y-2 border-t border-border p-3">
         <SendingFrom onNavigate={onNavigate} />
         <ThemeToggle />
-        <p className="px-1 text-[11px] text-subtle">All times in Asia/Karachi (PKT, UTC+5)</p>
+        <p className="text-[11px] text-muted">Times in Asia/Karachi (PKT)</p>
       </div>
     </div>
   );
 }
 
-/** Compact connection dot for the mobile top bar. */
-function MobileStatusDot() {
+/** Compact connection indicator for the mobile top bar. */
+function MobileStatus() {
   const { data, error } = useGmailStatus();
-  const color = error && !data ? "bg-subtle" : data?.connected ? "bg-success" : data ? "bg-warning" : "bg-line-strong";
-  const title = error && !data ? "API offline" : !data ? "Checking Gmail…" : data.connected ? `Sending from ${data.email ?? "connected account"}` : "No Gmail connected";
+  const dot = error && !data ? "bg-muted" : data?.connected ? "bg-accent" : "bg-replied-fg";
+  const text = error && !data ? "API offline" : data?.connected ? data.email : data ? "No Gmail" : "Gmail";
   return (
-    <Link href="/gmail" title={title} className="flex items-center gap-1.5 rounded-full px-2 py-1 text-xs text-fg-2 ring-1 ring-line">
-      <span className={`h-2 w-2 rounded-full ${color}`} />
-      <span className="hidden max-w-[10rem] truncate min-[480px]:inline">{data?.connected ? data.email : error && !data ? "API offline" : data ? "No Gmail" : "Gmail"}</span>
-      {data?.dryRun && <span className="rounded bg-warning-soft px-1 text-[10px] font-bold text-warning-fg">DRY</span>}
+    <Link href="/gmail" className="flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-text">
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      <span className="hidden max-w-[10rem] truncate font-mono min-[480px]:inline">{text}</span>
     </Link>
   );
 }
@@ -71,51 +67,36 @@ function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      {/* Desktop sidebar: a sticky flex column (not position:fixed), so it always takes its own space at >= lg. */}
-      <aside className="sticky top-0 z-30 hidden h-screen w-60 shrink-0 border-r border-line bg-surface lg:block">
+      <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 border-r border-border bg-surface lg:block">
         <SidebarContents />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-border bg-surface px-4 lg:hidden">
+          <button type="button" aria-label="Open navigation" className="-ml-1 rounded-md p-1.5 text-muted hover:bg-bg hover:text-text" onClick={() => setOpen(true)}>
+            <IconMenu />
+          </button>
+          <Brand />
+          <div className="ml-auto">
+            <MobileStatus />
+          </div>
+        </header>
 
-      {/* Mobile top bar */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-surface/90 px-4 py-3 backdrop-blur lg:hidden">
-        <button
-          type="button"
-          aria-label="Open navigation"
-          className="-ml-1 rounded-md p-1.5 text-fg-2 hover:bg-surface-3"
-          onClick={() => setOpen(true)}
-        >
-          <IconMenu size={20} />
-        </button>
-        <Brand />
-        <div className="ml-auto flex items-center gap-2">
-          <MobileStatusDot />
-          <ThemeToggle compact />
-        </div>
-      </header>
+        {open && (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <div className="absolute inset-0 bg-black/40" onClick={close} />
+            <aside className="drawer-in absolute inset-y-0 left-0 w-[260px] max-w-[85vw] border-r border-border bg-surface">
+              <button type="button" aria-label="Close navigation" className="absolute top-3 right-3 rounded-md p-1.5 text-muted hover:bg-bg" onClick={close}>
+                <IconX />
+              </button>
+              <SidebarContents onNavigate={close} />
+            </aside>
+          </div>
+        )}
 
-      {/* Mobile drawer */}
-      {open && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-slate-900/40" onClick={close} />
-          <aside className="drawer-in absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-surface shadow-xl">
-            <button
-              type="button"
-              aria-label="Close navigation"
-              className="absolute top-5 right-3 rounded-md p-1.5 text-muted hover:bg-surface-3"
-              onClick={close}
-            >
-              <IconX size={18} />
-            </button>
-            <SidebarContents onNavigate={close} />
-          </aside>
-        </div>
-      )}
-
-      <main className="flex-1">
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-6">{children}</div>
-      </main>
+        <main className="flex-1">
+          <div className="mx-auto w-full max-w-[1200px] p-6">{children}</div>
+        </main>
       </div>
     </div>
   );

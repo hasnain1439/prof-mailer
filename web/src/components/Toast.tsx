@@ -20,9 +20,9 @@ export function useToast(): ToastFn {
 }
 
 const toneStyles: Record<ToastTone, { ring: string; icon: ReactNode }> = {
-  success: { ring: "text-success-fg", icon: <IconCheckCircle size={18} /> },
-  error: { ring: "text-danger-fg", icon: <IconAlert size={18} /> },
-  info: { ring: "text-primary-text", icon: <IconInfo size={18} /> },
+  success: { ring: "text-sent-fg", icon: <IconCheckCircle /> },
+  error: { ring: "text-failed-fg", icon: <IconAlert /> },
+  info: { ring: "text-scheduled-fg", icon: <IconInfo /> },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -62,12 +62,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role={t.tone === "error" ? "alert" : "status"}
-            className="toast-in pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl bg-surface px-4 py-3 text-sm text-fg shadow-lg ring-1 ring-line"
+            className="toast-in pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-md border border-border bg-surface px-3 py-2.5 text-[13px] text-text shadow-sm"
           >
             <span className={`mt-0.5 shrink-0 ${toneStyles[t.tone].ring}`}>{toneStyles[t.tone].icon}</span>
             <span className="min-w-0 flex-1 break-words">{t.message}</span>
-            <button type="button" aria-label="Dismiss" className="shrink-0 text-subtle hover:text-fg-2" onClick={() => dismiss(t.id)}>
-              <IconX size={16} />
+            <button type="button" aria-label="Dismiss" className="shrink-0 rounded-sm text-muted hover:text-text" onClick={() => dismiss(t.id)}>
+              <IconX />
             </button>
           </div>
         ))}

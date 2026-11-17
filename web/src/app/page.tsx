@@ -7,23 +7,15 @@ import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { EmailActions } from "@/components/EmailActions";
 import { useGmailStatus } from "@/components/GmailStatus";
+import { IconArrowRight, IconCheck, IconClock, IconInbox, IconRefresh, IconReply } from "@/components/icons";
 import {
-  IconAlert,
-  IconArrowRight,
-  IconCheck,
-  IconClock,
-  IconInbox,
-  IconMail,
-  IconRefresh,
-  IconReply,
-  IconSend,
-} from "@/components/icons";
-import { DryRunPill } from "@/components/SendingFrom";
-import {
-  Avatar,
+  Badge,
+  Button,
   Card,
   EmptyState,
   ErrorBox,
+  Mono,
+  Notice,
   PageHeader,
   Skeleton,
   TypeChip,
@@ -33,28 +25,11 @@ import {
   link,
 } from "@/components/ui";
 
-function StatCard({
-  label,
-  value,
-  icon,
-  iconClass,
-  children,
-}: {
-  label: string;
-  value: ReactNode;
-  icon: ReactNode;
-  iconClass: string;
-  children?: ReactNode;
-}) {
+function Stat({ label, value, children }: { label: string; value: ReactNode; children?: ReactNode }) {
   return (
-    <div className="rounded-xl bg-surface p-4 shadow-sm ring-1 ring-line">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-muted">{label}</p>
-          <p className="mt-1 text-2xl font-semibold tracking-tight text-fg tabular-nums">{value}</p>
-        </div>
-        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconClass}`}>{icon}</span>
-      </div>
+    <div className="rounded-md border border-border bg-surface px-4 py-3">
+      <p className="text-[13px] text-muted">{label}</p>
+      <p className="mt-0.5 font-mono text-xl leading-7 font-medium text-text tabular-nums">{value}</p>
       {children}
     </div>
   );
@@ -62,52 +37,62 @@ function StatCard({
 
 function StatSkeleton() {
   return (
-    <div className="rounded-xl bg-surface p-4 shadow-sm ring-1 ring-line">
+    <div className="rounded-md border border-border bg-surface px-4 py-3">
       <Skeleton className="h-3 w-20" />
-      <Skeleton className="mt-3 h-7 w-14" />
+      <Skeleton className="mt-2.5 h-5 w-12" />
     </div>
   );
 }
 
-/** "Emails are sent from …" line, or a warning when Gmail is not connected. */
+/** Sending account line, plus warning notices for dry run / no Gmail connected. */
 function SendingFromBanner() {
   const { data, error } = useGmailStatus();
   if (error && !data) {
     return (
-      <div className="mb-5 flex items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm text-fg-2 shadow-sm ring-1 ring-line">
-        <span className="h-2 w-2 rounded-full bg-subtle" />
+      <div className="mb-4 flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-[13px] text-muted">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted" />
         API offline: can&apos;t tell which Gmail account is connected.
       </div>
     );
   }
-  if (!data) return <Skeleton className="mb-5 h-12 w-full rounded-xl" />;
+  if (!data) return <Skeleton className="mb-4 h-9 w-full" />;
+
+  const dryRun = data.dryRun && (
+    <Notice tone="warning" title="Dry run is on">
+      No real emails are sent; they are only logged. Set DRY_RUN=false in api/.env and restart the API to send for real.
+    </Notice>
+  );
+
   if (data.connected) {
     return (
-      <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-surface px-4 py-3 text-sm shadow-sm ring-1 ring-line">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-success-soft text-success-fg">
-          <IconMail size={16} />
-        </span>
-        <span className="text-fg-2">
-          Emails are sent from <strong className="font-semibold text-fg">{data.email ?? "your connected account"}</strong>
-        </span>
-        {data.dryRun && <DryRunPill />}
-        <Link href="/gmail" className={`ml-auto text-sm ${link}`}>
-          Manage
-        </Link>
-      </div>
+      <>
+        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border bg-surface px-3 py-2 text-[13px]">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+          <span className="text-muted">Sending from</span>
+          <Mono className="text-text">{data.email ?? "your connected account"}</Mono>
+          <Link href="/gmail" className={`ml-auto ${link}`}>
+            Manage
+          </Link>
+        </div>
+        {dryRun}
+      </>
     );
   }
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-fg ring-1 ring-warning-line">
-      <IconAlert size={18} className="text-warning" />
-      <span>
-        <strong className="font-semibold">No Gmail account connected.</strong> Scheduled emails can&apos;t be sent until you connect one.
-      </span>
-      {data.dryRun && <DryRunPill />}
-      <Link href="/gmail" className={`${btnPrimary} ${btnSmall} ml-auto`}>
-        Connect Gmail
-      </Link>
-    </div>
+    <>
+      <Notice
+        tone="warning"
+        title="No Gmail account connected"
+        action={
+          <Link href="/gmail" className={`${btnPrimary} ${btnSmall}`}>
+            Connect Gmail
+          </Link>
+        }
+      >
+        Scheduled emails can&apos;t be sent until you connect one.
+      </Notice>
+      {dryRun}
+    </>
   );
 }
 
@@ -158,38 +143,53 @@ function GettingStarted() {
   return (
     <Card
       title="Getting started"
-      description={`${doneCount} of ${items.length} steps complete`}
+      flush
       actions={
-        <div className="h-1.5 w-32 overflow-hidden rounded-full bg-surface-3">
-          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(doneCount / items.length) * 100}%` }} />
+        <div className="flex items-center gap-2 text-muted">
+          <Mono className="!text-xs">
+            {doneCount} / {items.length}
+          </Mono>
+          <div className="h-1 w-24 overflow-hidden rounded-sm bg-border" aria-hidden="true">
+            <div className="h-full bg-accent" style={{ width: `${(doneCount / items.length) * 100}%` }} />
+          </div>
         </div>
       }
-      flush
     >
-      <ol className="divide-y divide-line">
+      <ol className="divide-y divide-border">
         {items.map((item, i) => (
-          <li key={item.title} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
+          <li key={item.title} className="flex items-center gap-3 px-4 py-2">
             <span
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                item.done ? "bg-success text-white" : "bg-surface text-muted ring-1 ring-line-strong"
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border font-mono text-[11px] ${
+                item.done ? "border-accent bg-accent text-on-accent" : "border-border text-muted"
               }`}
             >
-              {item.done ? <IconCheck size={14} /> : i + 1}
+              {item.done ? <IconCheck size={12} /> : i + 1}
             </span>
             <div className="min-w-0 flex-1">
-              <p className={`text-sm font-medium ${item.done ? "text-subtle line-through" : "text-fg"}`}>{item.title}</p>
-              <p className="text-xs text-muted">{item.help}</p>
+              <p className={`text-[13px] font-medium ${item.done ? "text-muted line-through" : "text-text"}`}>
+                {item.title}
+                {item.done && <span className="sr-only"> (done)</span>}
+              </p>
+              <p className="truncate text-xs text-muted">{item.help}</p>
             </div>
             {!item.done && (
               <Link href={item.href} className={`${btnSecondary} ${btnSmall}`}>
                 {item.cta}
-                <IconArrowRight size={13} />
               </Link>
             )}
           </li>
         ))}
       </ol>
     </Card>
+  );
+}
+
+function CardLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className={`inline-flex items-center gap-1 text-[13px] ${link}`}>
+      {children}
+      <IconArrowRight size={14} />
+    </Link>
   );
 }
 
@@ -200,16 +200,16 @@ export default function DashboardPage() {
   return (
     <div>
       <PageHeader title="Dashboard" description="Your outreach at a glance. All times are Karachi time (PKT).">
-        <button type="button" className={btnSecondary} onClick={reload} disabled={loading}>
-          <IconRefresh size={16} className={loading ? "animate-spin" : undefined} />
+        <Button onClick={reload} disabled={loading}>
+          <IconRefresh className={loading ? "animate-spin" : undefined} />
           Refresh
-        </button>
+        </Button>
       </PageHeader>
 
       <SendingFromBanner />
       <ErrorBox error={error} onRetry={reload} />
 
-      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {!data ? (
           <>
             <StatSkeleton />
@@ -219,35 +219,28 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
-            <StatCard label="Scheduled" value={data.counts.scheduled} icon={<IconClock size={20} />} iconClass="bg-primary-soft text-primary-text" />
-            <StatCard
+            <Stat label="Scheduled" value={data.counts.scheduled} />
+            <Stat
               label="Sent today"
               value={
                 <>
                   {data.counts.sentToday}
-                  <span className="text-base font-medium text-subtle"> / {data.dailySendLimit}</span>
+                  <span className="text-sm text-muted"> / {data.dailySendLimit}</span>
                 </>
               }
-              icon={<IconSend size={20} />}
-              iconClass="bg-info-soft text-info-fg"
             >
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-3" title={`${Math.round(sentPct)}% of daily limit`}>
-                <div className={`h-full rounded-full ${sentPct >= 100 ? "bg-warning" : "bg-info"}`} style={{ width: `${sentPct}%` }} />
+              <div className="mt-2 h-1 overflow-hidden rounded-sm bg-border" title={`${Math.round(sentPct)}% of daily limit`}>
+                <div className={`h-full ${sentPct >= 100 ? "bg-replied-fg" : "bg-accent"}`} style={{ width: `${sentPct}%` }} />
               </div>
-            </StatCard>
-            <StatCard label="Replied" value={data.counts.replied} icon={<IconReply size={20} />} iconClass="bg-success-soft text-success-fg" />
-            <StatCard
-              label="Failed"
-              value={<span className={data.counts.failed > 0 ? "text-danger-fg" : undefined}>{data.counts.failed}</span>}
-              icon={<IconAlert size={20} />}
-              iconClass={data.counts.failed > 0 ? "bg-danger-soft text-danger-fg" : "bg-surface-3 text-muted"}
-            >
+            </Stat>
+            <Stat label="Replied" value={data.counts.replied} />
+            <Stat label="Failed" value={<span className={data.counts.failed > 0 ? "text-failed-fg" : undefined}>{data.counts.failed}</span>}>
               {data.counts.failed > 0 && (
-                <Link href="/queue" className={`mt-3 inline-block text-xs ${link}`}>
-                  Review in queue →
+                <Link href="/queue" className={`mt-1 inline-block text-xs ${link}`}>
+                  Review in queue
                 </Link>
               )}
-            </StatCard>
+            </Stat>
           </>
         )}
       </div>
@@ -255,29 +248,19 @@ export default function DashboardPage() {
       <GettingStarted />
 
       {loading && !data && (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <Skeleton className="h-64 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
         </div>
       )}
 
       {data && (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <Card
-            title="Upcoming"
-            description="Next 10 scheduled emails"
-            flush
-            className="!mb-0"
-            actions={
-              <Link href="/queue" className={`text-sm ${link}`}>
-                Full queue →
-              </Link>
-            }
-          >
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <Card title="Upcoming" description="Next 10 scheduled emails" flush className="!mb-0" actions={<CardLink href="/queue">Full queue</CardLink>}>
             {data.upcoming.length === 0 ? (
               <EmptyState
                 compact
-                icon={<IconClock size={20} />}
+                icon={<IconClock />}
                 title="Nothing scheduled"
                 action={
                   <Link href="/import" className={`${btnPrimary} ${btnSmall}`}>
@@ -288,29 +271,23 @@ export default function DashboardPage() {
                 Import a list of professors to schedule your first emails.
               </EmptyState>
             ) : (
-              <ul className="divide-y divide-line">
+              <ul className="divide-y divide-border">
                 {data.upcoming.map((e) => (
-                  <li key={e.id} className="flex gap-3 px-4 py-3 transition-colors sm:px-5 hover:bg-surface-2/70">
-                    <Avatar name={e.professor.name} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <Link href={`/professors/${e.professor.id}`} className="truncate text-sm font-medium text-fg hover:text-primary-text">
+                  <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 hover:bg-bg">
+                    <div className="min-w-0 flex-1 basis-56">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Link href={`/professors/${e.professor.id}`} className="truncate text-[13px] font-medium text-text hover:text-accent">
                           {e.professor.name}
                         </Link>
                         <TypeChip followUpNo={e.followUpNo} />
                       </div>
-                      <p className="truncate text-sm text-fg-2" title={e.subject}>
+                      <p className="truncate text-[13px] text-muted" title={`${e.subject} · ${e.professor.university}`}>
                         {e.subject}
                       </p>
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
-                        <IconClock size={12} />
-                        {formatKarachi(e.scheduledAt)}
-                        <span className="text-subtle">·</span>
-                        <span className="truncate">{e.professor.university}</span>
-                      </p>
-                      <div className="mt-2">
-                        <EmailActions email={e} onChanged={reload} />
-                      </div>
+                    </div>
+                    <Mono className="shrink-0 !text-xs whitespace-nowrap text-muted">{formatKarachi(e.scheduledAt)}</Mono>
+                    <div className="shrink-0">
+                      <EmailActions email={e} onChanged={reload} />
                     </div>
                   </li>
                 ))}
@@ -318,46 +295,40 @@ export default function DashboardPage() {
             )}
           </Card>
 
-          <Card
-            title="Recently sent"
-            description="Last 10 emails sent"
-            flush
-            className="!mb-0"
-            actions={
-              <Link href="/sent" className={`text-sm ${link}`}>
-                All sent →
-              </Link>
-            }
-          >
+          <Card title="Recently sent" description="Last 10 emails sent" flush className="!mb-0" actions={<CardLink href="/sent">All sent</CardLink>}>
             {data.recentSent.length === 0 ? (
-              <EmptyState compact icon={<IconInbox size={20} />} title="Nothing sent yet">
+              <EmptyState compact icon={<IconInbox />} title="Nothing sent yet">
                 Sent emails and replies will appear here.
               </EmptyState>
             ) : (
-              <ul className="divide-y divide-line">
+              <ul className="divide-y divide-border">
                 {data.recentSent.map((e) => (
-                  <li key={e.id} className="flex gap-3 px-4 py-3 transition-colors sm:px-5 hover:bg-surface-2/70">
-                    <Avatar name={e.professor.name} size="sm" />
+                  <li key={e.id} className="flex items-center gap-3 px-4 py-2 hover:bg-bg">
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <Link href={`/professors/${e.professor.id}`} className="truncate text-sm font-medium text-fg hover:text-primary-text">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Link href={`/professors/${e.professor.id}`} className="truncate text-[13px] font-medium text-text hover:text-accent">
                           {e.professor.name}
                         </Link>
                         <TypeChip followUpNo={e.followUpNo} />
                         {e.repliedAt && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success-fg ring-1 ring-inset ring-success-line">
-                            <IconReply size={11} />
+                          <Badge tone="replied" className="gap-1">
+                            <IconReply size={12} />
                             Replied
-                          </span>
+                          </Badge>
                         )}
                       </div>
-                      <p className="truncate text-sm text-fg-2" title={e.subject}>
+                      <p className="truncate text-[13px] text-muted" title={e.subject}>
                         {e.subject}
                       </p>
-                      <p className="mt-0.5 text-xs text-muted">
-                        Sent {formatKarachi(e.sentAt)}
-                        {e.repliedAt && <span className="text-success-fg"> · replied {formatKarachi(e.repliedAt)}</span>}
-                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <Mono className="block !text-xs whitespace-nowrap text-muted">{formatKarachi(e.sentAt)}</Mono>
+                      {e.repliedAt && (
+                        <Mono className="block !text-xs whitespace-nowrap text-text">
+                          <span className="font-sans text-muted">Replied </span>
+                          {formatKarachi(e.repliedAt)}
+                        </Mono>
+                      )}
                     </div>
                   </li>
                 ))}

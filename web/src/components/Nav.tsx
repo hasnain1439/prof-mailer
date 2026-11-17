@@ -22,7 +22,7 @@ const groups: { heading?: string; links: { href: string; label: string; icon: Re
     ],
   },
   {
-    heading: "Configure",
+    heading: "Setup",
     links: [
       { href: "/settings", label: "Settings", icon: <IconSettings /> },
       { href: "/gmail", label: "Gmail account", icon: <IconMail /> },
@@ -32,25 +32,24 @@ const groups: { heading?: string; links: { href: string; label: string; icon: Re
 
 export function NavLinks({ active, onNavigate }: { active: string | null; onNavigate?: () => void }) {
   return (
-    <nav className="space-y-6">
+    <nav className="space-y-4">
       {groups.map((g, gi) => (
         <div key={gi}>
-          {g.heading && <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">{g.heading}</p>}
-          <ul className="space-y-0.5">
+          {g.heading && <p className="mb-1 px-2 text-xs text-muted">{g.heading}</p>}
+          <ul className="space-y-px">
             {g.links.map((l) => {
-              const isActive =
-                active !== null && (l.href === "/" ? active === "/" : active === l.href || active.startsWith(l.href + "/"));
+              const isActive = active !== null && (l.href === "/" ? active === "/" : active === l.href || active.startsWith(l.href + "/"));
               return (
                 <li key={l.href}>
                   <Link
                     href={l.href}
                     onClick={onNavigate}
                     aria-current={isActive ? "page" : undefined}
-                    className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                      isActive ? "bg-primary-soft text-primary-text" : "text-fg-2 hover:bg-surface-3 hover:text-fg"
+                    className={`flex h-8 items-center gap-2 rounded-md px-2 text-[13px] transition-colors ${
+                      isActive ? "bg-bg font-medium text-text" : "text-muted hover:bg-bg hover:text-text"
                     }`}
                   >
-                    <span className={isActive ? "text-primary-text" : "text-subtle group-hover:text-fg-2"}>{l.icon}</span>
+                    <span className={isActive ? "text-accent" : ""}>{l.icon}</span>
                     {l.label}
                   </Link>
                 </li>

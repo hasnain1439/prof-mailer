@@ -11,18 +11,18 @@ import { EmailBody, HtmlBadge } from "@/components/EmailBody";
 import { IconClock, IconRefresh, IconUpload } from "@/components/icons";
 import {
   Avatar,
+  Button,
   EmailStatusBadge,
   EmptyCard,
   ErrorBox,
+  Mono,
   PageHeader,
+  Table,
   TableSkeleton,
+  Td,
+  Th,
   TypeChip,
   btnPrimary,
-  btnSecondary,
-  table,
-  tableWrap,
-  td,
-  th,
   tr,
 } from "@/components/ui";
 
@@ -47,22 +47,22 @@ export default function QueuePage() {
         title="Queue"
         description="Scheduled, sending and failed emails. Reschedule times are entered in Karachi time (PKT); failed emails can be retried by rescheduling."
       >
-        <button type="button" className={btnSecondary} onClick={reload} disabled={loading}>
-          <IconRefresh size={16} className={loading ? "animate-spin" : undefined} />
+        <Button onClick={reload} disabled={loading}>
+          <IconRefresh className={loading ? "animate-spin" : undefined} />
           Refresh
-        </button>
+        </Button>
       </PageHeader>
 
       <ErrorBox error={error} onRetry={reload} />
-      {loading && !data && <TableSkeleton cols={6} />}
+      {loading && !data && <TableSkeleton cols={5} />}
       {data &&
         (data.length === 0 ? (
           <EmptyCard
-            icon={<IconClock size={20} />}
+            icon={<IconClock />}
             title="The queue is empty"
             action={
               <Link href="/import" className={btnPrimary}>
-                <IconUpload size={16} />
+                <IconUpload />
                 Import &amp; schedule emails
               </Link>
             }
@@ -70,104 +70,102 @@ export default function QueuePage() {
             Nothing is waiting to be sent. Import professors with a scheduled time to fill the queue.
           </EmptyCard>
         ) : (
-          <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-line">
-            <div className="flex gap-1 border-b border-line px-3 py-2">
+          <div className="overflow-hidden rounded-md border border-border bg-surface">
+            <div role="tablist" aria-label="Filter queue" className="flex gap-5 border-b border-border px-4">
               {tabs.map((t) => (
                 <button
                   key={t.key}
                   type="button"
+                  role="tab"
+                  aria-selected={filter === t.key}
                   onClick={() => setFilter(t.key)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    filter === t.key ? "bg-surface-3 text-fg" : "text-muted hover:text-fg"
+                  className={`-mb-px inline-flex h-10 items-center gap-1.5 border-b-2 text-[13px] font-medium transition-colors ${
+                    filter === t.key ? "border-accent text-text" : "border-transparent text-muted hover:text-text"
                   }`}
                 >
                   {t.label}
-                  <span
-                    className={`rounded-full px-1.5 text-[11px] tabular-nums ${
-                      t.key === "FAILED" && t.n > 0 ? "bg-danger-soft text-danger-fg" : "bg-surface-3/70 text-fg-2"
-                    }`}
-                  >
-                    {t.n}
-                  </span>
+                  <Mono className={`!text-xs ${t.key === "FAILED" && t.n > 0 ? "text-failed-fg" : "text-muted"}`}>{t.n}</Mono>
                 </button>
               ))}
             </div>
             {rows && rows.length === 0 ? (
-              <p className="px-5 py-10 text-center text-sm text-muted">No {filter === "FAILED" ? "failed" : "scheduled"} emails.</p>
+              <p className="px-4 py-8 text-center text-[13px] text-muted">No {filter === "FAILED" ? "failed" : "scheduled"} emails.</p>
             ) : (
-              <div className={tableWrap}>
-                <table className={table}>
-                  <thead>
-                    <tr>
-                      <th className={th}>Professor</th>
-                      <th className={th}>Subject</th>
-                      <th className={th}>Scheduled</th>
-                      <th className={th}>Status</th>
-                      <th className={th}>Actions</th>
+              <Table
+                head={
+                  <>
+                    <Th>Professor</Th>
+                    <Th>Subject</Th>
+                    <Th>Scheduled</Th>
+                    <Th>Status</Th>
+                    <Th>Actions</Th>
+                  </>
+                }
+              >
+                {rows?.map((e) => (
+                  <Fragment key={e.id}>
+                    <tr className={tr}>
+                      <Td>
+                        <div className="flex items-center gap-2.5">
+                          <Avatar name={e.professor.name} size="sm" />
+                          <div className="min-w-0">
+                            <Link href={`/professors/${e.professor.id}`} className="font-medium text-text hover:text-accent">
+                              {e.professor.name}
+                            </Link>
+                            <Mono className="block truncate !text-xs text-muted">{e.professor.email}</Mono>
+                          </div>
+                        </div>
+                      </Td>
+                      <Td className="max-w-md">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <TypeChip followUpNo={e.followUpNo} />
+                          {e.isHtml && <HtmlBadge />}
+                          <span className="truncate text-text" title={e.subject}>
+                            {e.subject}
+                          </span>
+                        </div>
+                        {e.error && <p className="mt-1 text-xs break-words text-failed-fg">{e.error}</p>}
+                        <button
+                          type="button"
+                          className="mt-0.5 rounded-sm text-xs font-medium text-accent underline-offset-2 hover:underline"
+                          aria-expanded={open === e.id}
+                          onClick={() => setOpen(open === e.id ? null : e.id)}
+                        >
+                          {open === e.id ? "Hide email" : "View email"}
+                        </button>
+                      </Td>
+                      <Td className="whitespace-nowrap">
+                        <Mono className="!text-xs">{formatKarachi(e.scheduledAt)}</Mono>
+                      </Td>
+                      <Td>
+                        <EmailStatusBadge status={e.status} />
+                      </Td>
+                      <Td>
+                        {e.status === "SENDING" ? <span className="text-xs text-muted">Sending…</span> : <EmailActions email={e} onChanged={reload} />}
+                      </Td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {rows?.map((e) => (
-                      <Fragment key={e.id}>
-                      <tr className={`${tr} ${e.status === "FAILED" ? "bg-danger-soft/40" : ""}`}>
-                        <td className={td}>
-                          <div className="flex items-center gap-3">
-                            <Avatar name={e.professor.name} size="sm" />
-                            <div className="min-w-0">
-                              <Link href={`/professors/${e.professor.id}`} className="font-medium text-fg hover:text-primary-text">
-                                {e.professor.name}
-                              </Link>
-                              <div className="truncate text-xs text-muted">{e.professor.email}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className={`${td} max-w-sm`}>
-                          <div className="mb-1 flex flex-wrap gap-1.5">
-                            <TypeChip followUpNo={e.followUpNo} />
-                            {e.isHtml && <HtmlBadge />}
-                          </div>
-                          <div className="text-fg">{e.subject}</div>
-                          {e.error && <div className="mt-1 break-words text-xs text-danger-fg">{e.error}</div>}
-                          <button
-                            type="button"
-                            className="mt-1 text-xs font-medium text-primary-text hover:underline underline-offset-2"
-                            aria-expanded={open === e.id}
-                            onClick={() => setOpen(open === e.id ? null : e.id)}
-                          >
-                            {open === e.id ? "Hide email" : "View email"}
-                          </button>
-                        </td>
-                        <td className={`${td} whitespace-nowrap text-xs`}>{formatKarachi(e.scheduledAt)}</td>
-                        <td className={td}>
-                          <EmailStatusBadge status={e.status} />
-                        </td>
-                        <td className={td}>
-                          {e.status === "SENDING" ? (
-                            <span className="text-xs text-muted">Sending…</span>
+                    {open === e.id && (
+                      <tr>
+                        <td colSpan={5} className="border-b border-border bg-bg px-4 py-3">
+                          <p className="mb-2 text-xs text-muted">
+                            <span className="font-medium text-text">Subject:</span> {e.subject}
+                          </p>
+                          {e.isHtml ? (
+                            <EmailBody body={e.body} isHtml title={`Email: ${e.subject}`} />
                           ) : (
-                            <EmailActions email={e} onChanged={reload} />
+                            <EmailBody
+                              body={e.body}
+                              isHtml={false}
+                              className="max-h-96 overflow-y-auto rounded-md border border-border bg-surface p-4"
+                              textClassName="text-text"
+                            />
                           )}
                         </td>
                       </tr>
-                      {open === e.id && (
-                        <tr>
-                          <td colSpan={5} className="border-b border-line bg-surface-2/70 px-5 py-4">
-                            <p className="mb-2 text-xs text-muted">
-                              <span className="font-medium text-fg-2">Subject:</span> {e.subject}
-                            </p>
-                            {e.isHtml ? (
-                              <EmailBody body={e.body} isHtml title={`Email: ${e.subject}`} />
-                            ) : (
-                              <EmailBody body={e.body} isHtml={false} className="max-h-96 overflow-y-auto rounded-lg bg-surface p-4 ring-1 ring-line" textClassName="text-fg" />
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    )}
+                  </Fragment>
+                ))}
+              </Table>
             )}
           </div>
         ))}

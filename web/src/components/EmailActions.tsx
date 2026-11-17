@@ -65,7 +65,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
         <div className="flex flex-wrap items-center gap-1.5">
           <input
             type="datetime-local"
-            className={`${input} !w-auto !py-1 text-xs`}
+            className={`${input} !h-7 !w-auto font-mono !text-xs`}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             aria-label="New time (Karachi)"
@@ -79,7 +79,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
           </button>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {canReschedule && (
             <button type="button" className={`${btnSecondary} ${btnSmall}`} disabled={busy} onClick={startEdit}>
               <IconCalendar size={14} />
@@ -93,7 +93,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
           )}
         </div>
       )}
-      {error && <p className="text-xs text-danger-fg">{error}</p>}
+      {error && <p className="text-xs text-failed-fg">{error}</p>}
     </div>
   );
 }

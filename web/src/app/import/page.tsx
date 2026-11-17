@@ -6,49 +6,50 @@ import { api, errorMessage } from "@/lib/api";
 import type { ImportCommitResult, ImportPreview } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
-import { IconArrowRight, IconCheck, IconCheckCircle, IconDownload, IconFile, IconUpload, IconX } from "@/components/icons";
+import { IconArrowRight, IconCheck, IconDownload, IconFile, IconX } from "@/components/icons";
 import { EmailBody, HtmlBadge } from "@/components/EmailBody";
 import { useToast } from "@/components/Toast";
 import {
+  Badge,
+  Button,
   Card,
   ErrorBox,
+  Field,
+  Mono,
   Notice,
   PageHeader,
+  Select,
+  Table,
+  Td,
+  Th,
   btnPrimary,
   btnSecondary,
-  input,
-  label,
   link,
-  table,
-  tableWrap,
-  td,
-  th,
   tr,
 } from "@/components/ui";
 
 const ACCEPTED = [".csv", ".xlsx"];
 
+/** "1 Upload · 2 Preview · 3 Import" with the current step in accent. */
 function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
   const steps = ["Upload", "Preview", "Import"];
   return (
-    <ol className="mb-5 flex items-center gap-2 sm:gap-3">
+    <ol className="mb-4 flex flex-wrap items-center gap-x-2 text-[13px]" aria-label="Import steps">
       {steps.map((name, i) => {
         const n = i + 1;
         const done = step > n;
         const current = step === n;
         return (
-          <li key={name} className="flex items-center gap-2 sm:gap-3">
-            <span className="flex items-center gap-2">
-              <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-                  done ? "bg-primary text-primary-fg" : current ? "bg-surface text-primary-text ring-2 ring-primary" : "bg-surface text-subtle ring-1 ring-line-strong"
-                }`}
-              >
-                {done ? <IconCheck size={14} /> : n}
-              </span>
-              <span className={`text-sm font-medium ${current ? "text-fg" : done ? "text-fg-2" : "text-subtle"}`}>{name}</span>
+          <li key={name} className="flex items-center gap-2" aria-current={current ? "step" : undefined}>
+            <span className={current ? "font-semibold text-accent" : done ? "text-text" : "text-muted"}>
+              <span className="font-mono">{n}</span> {name}
+              {done && <IconCheck size={13} className="ml-1 inline-block align-[-2px] text-sent-fg" />}
             </span>
-            {n < steps.length && <span className={`h-px w-8 sm:w-16 ${done ? "bg-primary" : "bg-line-strong"}`} />}
+            {n < steps.length && (
+              <span className="text-muted" aria-hidden="true">
+                ·
+              </span>
+            )}
           </li>
         );
       })}
@@ -144,7 +145,7 @@ export default function ImportPage() {
     <div>
       <PageHeader title="Import" description="Upload a spreadsheet of professors and schedule an email to each one.">
         <a href={api.sampleCsvUrl} className={btnSecondary} download>
-          <IconDownload size={16} />
+          <IconDownload />
           Download sample CSV
         </a>
       </PageHeader>
@@ -154,43 +155,37 @@ export default function ImportPage() {
       <ErrorBox error={error} />
 
       {result && (
-        <Card>
-          <div className="flex flex-col items-center py-6 text-center">
-            <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success-fg">
-              <IconCheckCircle size={26} />
-            </span>
-            <p className="text-lg font-semibold text-fg">Import complete</p>
-            <div className="mt-4 grid w-full max-w-md grid-cols-3 gap-3">
-              {[
+        <Card title="Import complete">
+          <dl className="grid max-w-lg grid-cols-3 overflow-hidden rounded-md border border-border">
+            {(
+              [
                 ["Created", result.professorsCreated],
                 ["Updated", result.professorsUpdated],
                 ["Emails scheduled", result.emailsCreated],
-              ].map(([k, v]) => (
-                <div key={k} className="rounded-lg bg-surface-2 px-3 py-3 ring-1 ring-line">
-                  <p className="text-2xl font-semibold text-fg">{v}</p>
-                  <p className="text-xs text-muted">{k}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
-              <Link href="/queue" className={btnPrimary}>
-                View queue
-                <IconArrowRight size={16} />
-              </Link>
-              <Link href="/professors" className={btnSecondary}>
-                Professors
-              </Link>
-              <button type="button" className={btnSecondary} onClick={reset}>
-                Import another file
-              </button>
-            </div>
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="border-r border-border px-3 py-2 last:border-r-0">
+                <dt className="text-xs text-muted">{k}</dt>
+                <dd className="font-mono text-lg font-semibold tabular-nums text-text">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/queue" className={btnPrimary}>
+              View queue
+              <IconArrowRight />
+            </Link>
+            <Link href="/professors" className={btnSecondary}>
+              Professors
+            </Link>
+            <Button onClick={reset}>Import another file</Button>
           </div>
         </Card>
       )}
 
       {!result && (
-        <Card title="1. Upload your file" description="CSV or Excel (.xlsx), one professor per row">
-          <form onSubmit={runPreview} className="space-y-5">
+        <Card title="Upload file" description="CSV or Excel (.xlsx), one professor per row">
+          <form onSubmit={runPreview} className="space-y-4">
             <label
               htmlFor="imp-file"
               onDragOver={(e) => {
@@ -199,40 +194,37 @@ export default function ImportPage() {
               }}
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
-              className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors ${
-                dragging ? "border-primary bg-primary-soft" : file ? "border-line-strong bg-surface-2" : "border-line-strong hover:border-primary hover:bg-surface-2"
+              className={`flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-6 text-center transition-colors ${
+                dragging ? "border-accent bg-bg" : "border-border hover:border-accent hover:bg-bg"
               }`}
             >
               {file ? (
-                <span className="flex items-center gap-3 rounded-lg bg-surface px-4 py-3 text-left shadow-sm ring-1 ring-line">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary-text">
-                    <IconFile size={18} />
-                  </span>
+                <span className="flex items-center gap-2 text-left">
+                  <IconFile className="shrink-0 text-muted" />
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium text-fg">{file.name}</span>
-                    <span className="block text-xs text-muted">{formatSize(file.size)} · click or drop to replace</span>
+                    <span className="block truncate font-mono text-[13px] text-text">{file.name}</span>
+                    <span className="block text-xs text-muted">
+                      <Mono className="!text-xs">{formatSize(file.size)}</Mono> · click or drop to replace
+                    </span>
                   </span>
                   <button
                     type="button"
                     aria-label="Remove file"
-                    className="ml-2 rounded-md p-1 text-subtle hover:bg-surface-3 hover:text-fg-2"
+                    className="ml-2 rounded-md p-1 text-muted hover:bg-surface hover:text-text"
                     onClick={(e) => {
                       e.preventDefault();
                       chooseFile(null);
                     }}
                   >
-                    <IconX size={16} />
+                    <IconX />
                   </button>
                 </span>
               ) : (
                 <>
-                  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary-soft text-primary-text">
-                    <IconUpload size={20} />
+                  <span className="text-[13px] text-text">
+                    <span className="font-medium text-accent">Choose a file</span> or drag it here
                   </span>
-                  <span className="text-sm font-medium text-fg">
-                    <span className="text-primary-text">Click to choose a file</span> or drag and drop
-                  </span>
-                  <span className="mt-1 text-xs text-muted">.csv or .xlsx</span>
+                  <span className="mt-0.5 font-mono text-xs text-muted">.csv · .xlsx</span>
                 </>
               )}
               <input
@@ -245,46 +237,45 @@ export default function ImportPage() {
               />
             </label>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-              <div>
-                <label className={label} htmlFor="imp-template">
-                  Template (optional)
-                </label>
-                <select id="imp-template" className={input} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                  <option value="">None (use subject/body columns)</option>
-                  {(templates.data ?? []).map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-                {templates.error && <p className="mt-1.5 text-xs text-danger-fg">Could not load templates: {templates.error}</p>}
-                {templates.data && templates.data.length === 0 && (
-                  <p className="mt-1.5 text-xs text-muted">
-                    No initial templates yet.{" "}
-                    <Link href="/templates" className={link}>
-                      Create one
-                    </Link>{" "}
-                    or fill subject/body in the file.
-                  </p>
-                )}
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-full sm:w-80">
+                <Field label="Template (optional)" htmlFor="imp-template">
+                  <Select id="imp-template" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+                    <option value="">None (use subject/body columns)</option>
+                    {(templates.data ?? []).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
               </div>
-              <button type="submit" className={btnPrimary} disabled={!file || busy !== null}>
+              <Button type="submit" variant="primary" disabled={!file || busy !== null}>
                 {busy === "preview" ? "Reading file…" : "Preview"}
-                <IconArrowRight size={16} />
-              </button>
+                <IconArrowRight />
+              </Button>
             </div>
+            {templates.error && <p className="-mt-2 text-xs text-failed-fg">Could not load templates: {templates.error}</p>}
+            {templates.data && templates.data.length === 0 && (
+              <p className="-mt-2 text-xs text-muted">
+                No initial templates yet.{" "}
+                <Link href="/templates" className={link}>
+                  Create one
+                </Link>{" "}
+                or fill subject/body in the file.
+              </p>
+            )}
 
-            <details className="rounded-lg bg-surface-2 text-sm ring-1 ring-line">
-              <summary className="cursor-pointer select-none px-4 py-2.5 font-medium text-fg-2">File format</summary>
-              <div className="space-y-2 border-t border-line px-4 py-3 text-fg-2">
+            <details className="rounded-md border border-border text-[13px]">
+              <summary className="cursor-pointer px-3 py-2 font-medium text-text select-none">File format</summary>
+              <div className="space-y-1.5 border-t border-border px-3 py-2.5 text-muted">
                 <p>
                   Columns:{" "}
-                  <code className="font-mono text-xs">name, email, university, country, researchFocus, whyFits, profileUrl, subject, body, scheduledAt</code>
+                  <code className="font-mono text-xs text-text">name, email, university, country, researchFocus, whyFits, profileUrl, subject, body, scheduledAt</code>
                 </p>
                 <p>
-                  <code className="font-mono text-xs">scheduledAt</code> is Karachi time, <code className="font-mono text-xs">YYYY-MM-DD HH:mm</code>. Leave
-                  subject/body empty to use the selected template.
+                  <code className="font-mono text-xs text-text">scheduledAt</code> is Karachi time,{" "}
+                  <code className="font-mono text-xs text-text">YYYY-MM-DD HH:mm</code>. Leave subject/body empty to use the selected template.
                 </p>
               </div>
             </details>
@@ -294,111 +285,128 @@ export default function ImportPage() {
 
       {preview && (
         <Card
-          title="2. Review rows"
-          description={`${preview.rows.length} row${preview.rows.length === 1 ? "" : "s"} read from ${file?.name ?? "file"}`}
+          title="Preview rows"
+          description={
+            <>
+              <Mono className="!text-xs">{preview.rows.length}</Mono> row{preview.rows.length === 1 ? "" : "s"} read from{" "}
+              <span className="font-mono">{file?.name ?? "file"}</span>
+            </>
+          }
           flush
           actions={
             <>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success-fg ring-1 ring-inset ring-success-line">
-                {preview.validCount} valid
-              </span>
+              <Badge tone="sent">
+                <span className="mr-1 font-mono">{preview.validCount}</span> valid
+              </Badge>
               {preview.errorCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2.5 py-1 text-xs font-medium text-danger-fg ring-1 ring-inset ring-danger-line">
-                  {preview.errorCount} with errors
-                </span>
+                <Badge tone="failed">
+                  <span className="mr-1 font-mono">{preview.errorCount}</span> with errors
+                </Badge>
               )}
-              <button type="button" className={btnPrimary} disabled={validRows.length === 0 || busy !== null} onClick={commit}>
+              <Button variant="primary" disabled={validRows.length === 0 || busy !== null} onClick={commit}>
                 {busy === "commit" ? "Importing…" : `Import ${validRows.length} valid row${validRows.length === 1 ? "" : "s"}`}
-              </button>
+              </Button>
             </>
           }
         >
           {previewTemplateId !== templateId && (
-            <Notice tone="warning" className="m-4">
+            <Notice tone="warning" className="m-3">
               The template selection changed since this preview; import will use the template from the preview. Re-run Preview to update.
             </Notice>
           )}
-          {preview.errorCount > 0 && (
-            <p className="border-b border-line px-5 py-2.5 text-xs text-muted">Rows with errors are highlighted and will be skipped.</p>
-          )}
-          <div className={tableWrap}>
-            <table className={table}>
-              <thead>
-                <tr>
-                  <th className={th}>Row</th>
-                  <th className={th}>Professor</th>
-                  <th className={th}>University</th>
-                  <th className={th}>Scheduled (raw)</th>
-                  <th className={th}>Scheduled (PKT)</th>
-                  <th className={th}>Subject</th>
-                  <th className={th}>Check</th>
-                </tr>
-              </thead>
-              <tbody>
-                {preview.rows.map((r) => {
-                  const bad = r.errors.length > 0;
-                  return (
-                    <Fragment key={r.rowNumber}>
-                    <tr className={bad ? "bg-danger-soft/60" : tr}>
-                      <td className={`${td} tabular-nums text-subtle`}>{r.rowNumber}</td>
-                      <td className={td}>
-                        <div className="font-medium text-fg">{r.data.name || "—"}</div>
-                        <div className="text-xs text-muted">{r.data.email || "—"}</div>
-                        {r.professorExists && (
-                          <span className="mt-1 inline-block rounded-md bg-info-soft px-1.5 py-0.5 text-[11px] font-medium text-info-fg">Existing · will update</span>
-                        )}
-                      </td>
-                      <td className={td}>{r.data.university || "—"}</td>
-                      <td className={`${td} whitespace-nowrap font-mono text-xs`}>{r.data.scheduledAt || "—"}</td>
-                      <td className={`${td} whitespace-nowrap text-xs`}>{formatKarachi(r.scheduledAtUtc)}</td>
-                      <td className={`${td} max-w-xs`}>
-                        <div>{r.subject || "—"}</div>
-                        {r.body && (
-                          <div className="mt-1 flex items-center gap-2">
-                            <button
-                              type="button"
-                              className="text-xs font-medium text-primary-text hover:underline underline-offset-2"
-                              aria-expanded={openRow === r.rowNumber}
-                              onClick={() => setOpenRow(openRow === r.rowNumber ? null : r.rowNumber)}
-                            >
-                              {openRow === r.rowNumber ? "Hide body" : "View body"}
-                            </button>
-                            {r.isHtml && <HtmlBadge />}
-                          </div>
-                        )}
-                      </td>
-                      <td className={td}>
-                        {bad ? (
-                          <ul className="list-disc space-y-0.5 pl-4 text-xs text-danger-fg">
-                            {r.errors.map((err, i) => (
-                              <li key={i}>{err}</li>
-                            ))}
-                          </ul>
+          {preview.errorCount > 0 && <p className="border-b border-border px-4 py-2 text-xs text-muted">Rows with errors are highlighted and will be skipped.</p>}
+          <Table
+            head={
+              <>
+                <Th numeric>Row</Th>
+                <Th>Professor</Th>
+                <Th>Email</Th>
+                <Th>University</Th>
+                <Th>Scheduled (raw)</Th>
+                <Th>Scheduled (PKT)</Th>
+                <Th>Subject</Th>
+                <Th>Check</Th>
+              </>
+            }
+          >
+            {preview.rows.map((r) => {
+              const bad = r.errors.length > 0;
+              const open = openRow === r.rowNumber;
+              return (
+                <Fragment key={r.rowNumber}>
+                  <tr className={bad ? "bg-failed-bg" : tr}>
+                    <Td numeric className="text-muted">
+                      {r.rowNumber}
+                    </Td>
+                    <Td className="whitespace-nowrap">
+                      <span className="font-medium">{r.data.name || "—"}</span>
+                      {r.professorExists && (
+                        <Badge tone="scheduled" className="ml-2">
+                          Existing · will update
+                        </Badge>
+                      )}
+                    </Td>
+                    <Td className="whitespace-nowrap">
+                      <Mono className="text-muted">{r.data.email || "—"}</Mono>
+                    </Td>
+                    <Td>{r.data.university || "—"}</Td>
+                    <Td className="whitespace-nowrap">
+                      <Mono className="text-muted">{r.data.scheduledAt || "—"}</Mono>
+                    </Td>
+                    <Td className="whitespace-nowrap">
+                      <Mono>{formatKarachi(r.scheduledAtUtc)}</Mono>
+                    </Td>
+                    <Td className="max-w-xs">
+                      <div className="truncate">{r.subject || "—"}</div>
+                      {r.body && (
+                        <div className="mt-0.5 flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-accent underline-offset-2 hover:underline"
+                            aria-expanded={open}
+                            onClick={() => setOpenRow(open ? null : r.rowNumber)}
+                          >
+                            {open ? "Hide body" : "View body"}
+                          </button>
+                          {r.isHtml && <HtmlBadge />}
+                        </div>
+                      )}
+                    </Td>
+                    <Td>
+                      {bad ? (
+                        <ul className="list-disc space-y-0.5 pl-4 text-xs text-failed-fg">
+                          {r.errors.map((err, i) => (
+                            <li key={i}>{err}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-sent-fg">
+                          <IconCheck size={14} />
+                          OK
+                        </span>
+                      )}
+                    </Td>
+                  </tr>
+                  {open && (
+                    <tr>
+                      <td colSpan={8} className="border-b border-border bg-bg px-4 py-3">
+                        {r.isHtml ? (
+                          <EmailBody body={r.body} isHtml title={`Row ${r.rowNumber} email`} />
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-success-fg">
-                            <IconCheck size={14} />
-                            OK
-                          </span>
+                          <EmailBody
+                            body={r.body}
+                            isHtml={false}
+                            className="max-h-96 overflow-y-auto rounded-md border border-border bg-surface p-3"
+                            textClassName="text-text"
+                          />
                         )}
                       </td>
                     </tr>
-                    {openRow === r.rowNumber && (
-                      <tr>
-                        <td colSpan={7} className="border-b border-line bg-surface-2/70 px-5 py-4">
-                          {r.isHtml ? (
-                            <EmailBody body={r.body} isHtml title={`Row ${r.rowNumber} email`} />
-                          ) : (
-                            <EmailBody body={r.body} isHtml={false} className="max-h-96 overflow-y-auto rounded-lg bg-surface p-4 ring-1 ring-line" textClassName="text-fg" />
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </Fragment>
+              );
+            })}
+          </Table>
         </Card>
       )}
     </div>

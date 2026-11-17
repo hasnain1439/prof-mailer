@@ -1,167 +1,119 @@
 @import "tailwindcss";
-/* prof-mailer theme: semantic tokens below drive both light and dark mode. */
+/* prof-mailer design tokens: a calm work tool. Light = :root, dark = .dark (class set before paint in layout.tsx). */
 
-/* Class-based dark mode: <html class="dark"> (set before paint by the inline script in layout.tsx). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
- * Semantic colour tokens. Components use these (bg-surface, text-muted, bg-primary, text-success-fg, …)
- * instead of raw palette colours, so light/dark is handled here in one place.
- * All *-fg / muted / subtle text tokens meet WCAG AA (≥4.5:1) on surface and on their *-soft backgrounds.
- */
 :root {
-  --background: #f4f6f9;
+  --bg: #f7f6f3;
   --surface: #ffffff;
-  --surface-2: #f8fafc;
-  --surface-3: #eef1f5;
-  --line: #e2e7ee;
-  --line-strong: #c9d1dc;
-  --fg: #0f172a;
-  --fg-2: #334155;
-  --muted: #536074;
-  --subtle: #677487;
+  --border: #e4e2dd;
+  --text: #1c1b19;
+  --muted: #6b6862;
+  --accent: #1f5f4a;
+  --accent-hover: #174a3a;
+  --on-accent: #ffffff;
 
-  --primary: #2f4fd6;
-  --primary-hover: #2541b8;
-  --primary-fg: #ffffff;
-  --primary-text: #2b48c6;
-  --primary-soft: #edf1ff;
-  --primary-soft-fg: #2a3fae;
-  --primary-line: #c3cffb;
-  --ring: #4f6ef7;
-
-  --success: #059669;
-  --success-soft: #ecfdf5;
-  --success-fg: #047857;
-  --success-line: #a7e9cc;
-
-  --warning: #d97706;
-  --warning-soft: #fffaeb;
-  --warning-fg: #92400e;
-  --warning-line: #f6d78b;
-
-  --danger: #e11d48;
-  --danger-soft: #fff1f3;
-  --danger-fg: #be123c;
-  --danger-line: #fecdd6;
-
-  --info: #0284c7;
-  --info-soft: #f0f8ff;
-  --info-fg: #0369a1;
-  --info-line: #bae2fb;
-
-  --accent: #7c3aed;
-  --accent-soft: #f5f3ff;
-  --accent-fg: #6d28d9;
-  --accent-line: #ddd6fe;
+  /* Status colours (badge bg / text). Also used for notices: scheduled=info, sent=success, replied=warning, failed=danger. */
+  --scheduled-bg: #e8eef7;
+  --scheduled-fg: #2a4e80;
+  --sent-bg: #e6f1eb;
+  --sent-fg: #1f5f4a;
+  --replied-bg: #fbf0d9;
+  --replied-fg: #7a5512;
+  --failed-bg: #f9e4e1;
+  --failed-fg: #9b2c20;
+  --cancelled-bg: #eeedea;
+  --cancelled-fg: #5e5b55;
 
   color-scheme: light;
 }
 
 .dark {
-  --background: #0a101c;
-  --surface: #121a2a;
-  --surface-2: #162034;
-  --surface-3: #1e293d;
-  --line: #243149;
-  --line-strong: #34435c;
-  --fg: #e6eaf1;
-  --fg-2: #c5ccd8;
-  --muted: #9aa5b8;
-  --subtle: #8591a5;
+  --bg: #141413;
+  --surface: #1c1b1a;
+  --border: #2e2c2a;
+  --text: #eceae6;
+  --muted: #9c9890;
+  --accent: #6db596;
+  --accent-hover: #86c7ab;
+  --on-accent: #10201a;
 
-  --primary: #3b5bdb;
-  --primary-hover: #4867e6;
-  --primary-fg: #ffffff;
-  --primary-text: #9db0ff;
-  --primary-soft: #1b2850;
-  --primary-soft-fg: #bccaff;
-  --primary-line: #34478f;
-  --ring: #7088ff;
-
-  --success: #10b981;
-  --success-soft: #0d2a25;
-  --success-fg: #6ee7b7;
-  --success-line: #1c5c4a;
-
-  --warning: #f59e0b;
-  --warning-soft: #2b2213;
-  --warning-fg: #fcd34d;
-  --warning-line: #6a4d16;
-
-  --danger: #f43f5e;
-  --danger-soft: #331620;
-  --danger-fg: #fda4af;
-  --danger-line: #7a2639;
-
-  --info: #38bdf8;
-  --info-soft: #0d2536;
-  --info-fg: #7dd3fc;
-  --info-line: #1b4f6e;
-
-  --accent: #8b5cf6;
-  --accent-soft: #231b3d;
-  --accent-fg: #c4b5fd;
-  --accent-line: #4a3a85;
+  --scheduled-bg: #1e2a3a;
+  --scheduled-fg: #9db8e0;
+  --sent-bg: #1a2b23;
+  --sent-fg: #8ccbae;
+  --replied-bg: #2e2615;
+  --replied-fg: #e3c27a;
+  --failed-bg: #331c19;
+  --failed-fg: #ee9a8e;
+  --cancelled-bg: #262523;
+  --cancelled-fg: #a9a59d;
 
   color-scheme: dark;
 }
 
 @theme inline {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
 
-  --color-background: var(--background);
+  /* One radius everywhere (badges use rounded-sm = 4px). */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-xl: 6px;
+  --radius-2xl: 6px;
+  --radius-3xl: 6px;
+
+  /* Surfaces are separated by 1px borders; shadows are at most very subtle. */
+  --shadow-xs: 0 1px 0 rgb(0 0 0 / 0.03);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 2px 8px rgb(0 0 0 / 0.08);
+  --shadow-xl: 0 2px 8px rgb(0 0 0 / 0.08);
+  --shadow-2xl: 0 2px 8px rgb(0 0 0 / 0.08);
+
+  --color-bg: var(--bg);
   --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-surface-3: var(--surface-3);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  --color-fg: var(--fg);
-  --color-fg-2: var(--fg-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
   --color-muted: var(--muted);
-  --color-subtle: var(--subtle);
-
-  --color-primary: var(--primary);
-  --color-primary-hover: var(--primary-hover);
-  --color-primary-fg: var(--primary-fg);
-  --color-primary-text: var(--primary-text);
-  --color-primary-soft: var(--primary-soft);
-  --color-primary-soft-fg: var(--primary-soft-fg);
-  --color-primary-line: var(--primary-line);
-  --color-ring: var(--ring);
-
-  --color-success: var(--success);
-  --color-success-soft: var(--success-soft);
-  --color-success-fg: var(--success-fg);
-  --color-success-line: var(--success-line);
-  --color-warning: var(--warning);
-  --color-warning-soft: var(--warning-soft);
-  --color-warning-fg: var(--warning-fg);
-  --color-warning-line: var(--warning-line);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
-  --color-danger-fg: var(--danger-fg);
-  --color-danger-line: var(--danger-line);
-  --color-info: var(--info);
-  --color-info-soft: var(--info-soft);
-  --color-info-fg: var(--info-fg);
-  --color-info-line: var(--info-line);
   --color-accent: var(--accent);
-  --color-accent-soft: var(--accent-soft);
-  --color-accent-fg: var(--accent-fg);
-  --color-accent-line: var(--accent-line);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+
+  --color-scheduled-bg: var(--scheduled-bg);
+  --color-scheduled-fg: var(--scheduled-fg);
+  --color-sent-bg: var(--sent-bg);
+  --color-sent-fg: var(--sent-fg);
+  --color-replied-bg: var(--replied-bg);
+  --color-replied-fg: var(--replied-fg);
+  --color-failed-bg: var(--failed-bg);
+  --color-failed-fg: var(--failed-fg);
+  --color-cancelled-bg: var(--cancelled-bg);
+  --color-cancelled-fg: var(--cancelled-fg);
+}
+
+html {
+  font-size: 16px;
 }
 
 body {
-  background: var(--background);
-  color: var(--fg);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Visible keyboard focus in the accent colour everywhere. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -169,7 +121,7 @@ body {
   }
 }
 .toast-in {
-  animation: toast-in 180ms ease-out;
+  animation: toast-in 150ms ease-out;
 }
 
 @keyframes drawer-in {
@@ -181,5 +133,5 @@ body {
   }
 }
 .drawer-in {
-  animation: drawer-in 200ms ease-out;
+  animation: drawer-in 180ms ease-out;
 }

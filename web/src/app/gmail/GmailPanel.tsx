@@ -5,23 +5,22 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { API_URL, api, errorMessage } from "@/lib/api";
 import type { GmailStatus } from "@/lib/types";
 import { useGmailStatus } from "@/components/GmailStatus";
-import { IconCheck, IconCopy, IconExternal, IconInbox, IconMail, IconRefresh, IconSend } from "@/components/icons";
+import { IconCheck, IconCopy, IconExternal, IconRefresh, IconSend } from "@/components/icons";
 import { DryRunPill } from "@/components/SendingFrom";
 import { useToast } from "@/components/Toast";
-import { Card, ErrorBox, Notice, PageHeader, Skeleton, btnDanger, btnPrimary, btnSecondary, btnSmall, input, label, link } from "@/components/ui";
+import { Badge, Button, Card, ErrorBox, Field, Input, Loading, Mono, Notice, PageHeader, btnPrimary, btnSecondary, btnSmall, link } from "@/components/ui";
 
 const DEFAULT_REDIRECT = "http://localhost:4000/api/gmail/callback";
 
 function Code({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[0.8em] text-fg">{children}</code>;
+  return <code className="rounded-sm border border-border bg-bg px-1 py-px font-mono text-[0.85em] text-text">{children}</code>;
 }
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
-      type="button"
-      className={`${btnSecondary} ${btnSmall}`}
+    <Button
+      size="sm"
       onClick={() => {
         void navigator.clipboard?.writeText(text).then(() => {
           setCopied(true);
@@ -29,22 +28,20 @@ function CopyButton({ text }: { text: string }) {
         });
       }}
     >
-      {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
+      {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
       {copied ? "Copied" : "Copy"}
-    </button>
+    </Button>
   );
 }
 
-function Step({ n, title, children, last }: { n: number; title: string; children: ReactNode; last?: boolean }) {
+/** Plain numbered step: mono number, title, body. */
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
-    <li className={`relative flex gap-4 ${last ? "" : "pb-6"}`}>
-      {!last && <span aria-hidden="true" className="absolute top-8 bottom-1 left-[13.5px] w-px bg-line-strong" />}
-      <span className="z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-text ring-1 ring-primary-line">
-        {n}
-      </span>
-      <div className="min-w-0 flex-1 pt-0.5">
-        <p className="text-sm font-semibold text-fg">{title}</p>
-        <div className="mt-1 space-y-2 text-sm text-fg-2">{children}</div>
+    <li className="flex gap-3">
+      <span className="w-5 shrink-0 pt-px text-right font-mono text-[13px] text-muted">{n}.</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-medium text-text">{title}</p>
+        <div className="mt-1 space-y-2 text-[13px] text-muted">{children}</div>
       </div>
     </li>
   );
@@ -54,7 +51,7 @@ function SetupGuide({ configured, onRecheck }: { configured: boolean; onRecheck:
   const likelyRedirect = `${API_URL}/gmail/callback`;
   const differs = likelyRedirect !== DEFAULT_REDIRECT;
   return (
-    <ol>
+    <ol className="space-y-4">
       <Step n={1} title="Create a Google Cloud project">
         <p>
           Open the{" "}
@@ -66,25 +63,27 @@ function SetupGuide({ configured, onRecheck }: { configured: boolean; onRecheck:
       </Step>
       <Step n={2} title="Enable the Gmail API">
         <p>
-          In <em>APIs &amp; Services → Library</em>, search for <strong>Gmail API</strong> and click <strong>Enable</strong>.
+          In <em>APIs &amp; Services → Library</em>, search for <strong className="text-text">Gmail API</strong> and click{" "}
+          <strong className="text-text">Enable</strong>.
         </p>
       </Step>
       <Step n={3} title="Configure the OAuth consent screen">
         <p>
-          In <em>APIs &amp; Services → OAuth consent screen</em>, choose <strong>External</strong>, fill in the app name and your email, and under{" "}
-          <strong>Test users</strong> add the Gmail address you&apos;ll send from. (While the app is in “Testing”, only test users can connect.)
+          In <em>APIs &amp; Services → OAuth consent screen</em>, choose <strong className="text-text">External</strong>, fill in the app name and
+          your email, and under <strong className="text-text">Test users</strong> add the Gmail address you&apos;ll send from. (While the app is in
+          “Testing”, only test users can connect.)
         </p>
       </Step>
       <Step n={4} title="Create a Web OAuth client">
         <p>
-          In <em>Credentials → Create credentials → OAuth client ID</em>, pick <strong>Web application</strong> and add this{" "}
-          <strong>Authorized redirect URI</strong>:
+          In <em>Credentials → Create credentials → OAuth client ID</em>, pick <strong className="text-text">Web application</strong> and add
+          this <strong className="text-text">Authorized redirect URI</strong>:
         </p>
-        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 ring-1 ring-line">
-          <code className="min-w-0 flex-1 break-all font-mono text-xs text-fg">{DEFAULT_REDIRECT}</code>
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-bg px-3 py-1.5">
+          <code className="min-w-0 flex-1 font-mono text-xs break-all text-text">{DEFAULT_REDIRECT}</code>
           <CopyButton text={DEFAULT_REDIRECT} />
         </div>
-        <p className="text-xs text-muted">
+        <p className="text-xs">
           If you run the API on another port or host, the redirect URI must exactly match <Code>GOOGLE_REDIRECT_URI</Code> in{" "}
           <Code>api/.env</Code>.
           {differs && (
@@ -96,7 +95,7 @@ function SetupGuide({ configured, onRecheck }: { configured: boolean; onRecheck:
         </p>
       </Step>
       <Step n={5} title="Add the credentials to api/.env">
-        <pre className="overflow-x-auto rounded-lg bg-slate-900 p-3 ring-1 ring-line font-mono text-xs leading-relaxed text-slate-100">
+        <pre className="overflow-x-auto rounded-md border border-border bg-bg p-3 font-mono text-xs leading-relaxed text-text">
           {`GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=xxxxxxxx
 # only if not ${DEFAULT_REDIRECT}:
@@ -108,41 +107,41 @@ TEST_RECIPIENT=you@example.com`}
       <Step n={6} title="Restart the API">
         <p>Stop and start the API server so it picks up the new environment variables.</p>
         {!configured && (
-          <button type="button" className={`${btnSecondary} ${btnSmall}`} onClick={onRecheck}>
-            <IconRefresh size={13} />
+          <Button size="sm" onClick={onRecheck}>
+            <IconRefresh size={14} />
             Check again
-          </button>
+          </Button>
         )}
       </Step>
-      <Step n={7} title="Connect your Gmail account" last>
+      <Step n={7} title="Connect your Gmail account">
         <p>Click Connect Gmail and sign in with the test-user account. You&apos;ll be redirected back here.</p>
         {configured ? (
           <a href={api.gmailConnectUrl} className={`${btnPrimary} ${btnSmall}`}>
             Connect Gmail
           </a>
         ) : (
-          <button type="button" className={`${btnPrimary} ${btnSmall}`} disabled title="Finish steps 1–6 first">
+          <Button size="sm" variant="primary" disabled title="Finish steps 1–6 first">
             Connect Gmail
-          </button>
+          </Button>
         )}
       </Step>
     </ol>
   );
 }
 
-function StatusRow({ name, children }: { name: string; children: ReactNode }) {
+function StatusRow({ name, children }: { name: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
-      <dt className="text-muted">{name}</dt>
-      <dd className="text-right font-medium text-fg">{children}</dd>
+    <div className="flex items-center justify-between gap-4 py-2 text-[13px]">
+      <dt className="shrink-0 text-muted">{name}</dt>
+      <dd className="min-w-0 text-right text-text">{children}</dd>
     </div>
   );
 }
 
 function YesNo({ ok, yes = "Yes", no = "No" }: { ok: boolean; yes?: string; no?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 ${ok ? "text-success-fg" : "text-muted"}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-success" : "bg-line-strong"}`} />
+    <span className={`inline-flex items-center gap-1.5 ${ok ? "text-sent-fg" : "text-muted"}`}>
+      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-sent-fg" : "bg-border"}`} />
       {ok ? yes : no}
     </span>
   );
@@ -159,20 +158,7 @@ function Spinner() {
 
 function AuthTypeBadge({ authType }: { authType: GmailStatus["authType"] }) {
   if (!authType) return null;
-  return (
-    <span className="inline-flex items-center rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary-soft-fg ring-1 ring-inset ring-primary-line">
-      {authType === "APP_PASSWORD" ? "App Password" : "Google OAuth"}
-    </span>
-  );
-}
-
-function HelpStep({ n, children }: { n: number; children: ReactNode }) {
-  return (
-    <li className="flex gap-3">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-soft-fg">{n}</span>
-      <span className="pt-0.5">{children}</span>
-    </li>
-  );
+  return <Badge className="border border-border bg-surface text-muted">{authType === "APP_PASSWORD" ? "App password" : "Google OAuth"}</Badge>;
 }
 
 function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
@@ -199,104 +185,100 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
   }
 
   return (
-    <section className="mb-5 overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-primary-line">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
-        <h2 className="text-sm font-semibold text-fg">Option A — Gmail + App Password</h2>
-        <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success-fg ring-1 ring-inset ring-success-line">
-          Recommended · 2 minutes
+    <Card
+      title={
+        <span className="inline-flex flex-wrap items-center gap-2">
+          Option A: Gmail with an app password
+          <Badge tone="sent">Recommended</Badge>
         </span>
-      </div>
-      <div className="grid grid-cols-1 gap-6 p-4 sm:p-5 lg:grid-cols-2">
-        <form onSubmit={submit} className="space-y-4" autoComplete="off">
-          <div>
-            <label className={label} htmlFor="ap-email">
-              Gmail address
-            </label>
-            <input
+      }
+      description="Takes about two minutes. Sends over SMTP and checks replies over IMAP."
+    >
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <form onSubmit={submit} className="space-y-3" autoComplete="off">
+          <Field label="Gmail address" htmlFor="ap-email">
+            <Input
               id="ap-email"
               type="email"
               required
               autoComplete="email"
               placeholder="you@gmail.com"
-              className={input}
+              className="font-mono"
               value={email}
               disabled={busy}
               onChange={(e) => setEmail(e.target.value)}
             />
-          </div>
-          <div>
-            <label className={label} htmlFor="ap-password">
-              App password
-            </label>
-            <input
+          </Field>
+          <Field label="App password" htmlFor="ap-password">
+            <Input
               id="ap-password"
               type="password"
               required
               autoComplete="off"
               spellCheck={false}
               placeholder="abcd efgh ijkl mnop"
-              className={`${input} font-mono tracking-wider`}
+              className="font-mono tracking-wider"
               value={password}
               disabled={busy}
               onChange={(e) => setPassword(e.target.value)}
             />
-          </div>
+          </Field>
           {error && (
-            <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-fg ring-1 ring-inset ring-danger-line">
+            <Notice tone="error" className="">
               {error}
-            </p>
+            </Notice>
           )}
           <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" className={btnPrimary} disabled={busy || !email.trim() || !password.trim()}>
+            <Button type="submit" variant="primary" disabled={busy || !email.trim() || !password.trim()}>
               {busy && <Spinner />}
               {busy ? "Verifying with Gmail…" : "Connect"}
-            </button>
+            </Button>
             {busy && <span className="text-xs text-muted">This can take up to 30 seconds. No email is sent.</span>}
           </div>
         </form>
 
-        <div className="space-y-4 text-sm text-fg-2">
-          <ol className="space-y-3">
-            <HelpStep n={1}>
-              Turn on <strong className="text-fg">2-Step Verification</strong> at{" "}
+        <div className="space-y-3 text-[13px] text-muted lg:border-l lg:border-border lg:pl-6">
+          <ol className="list-decimal space-y-1.5 pl-5 marker:font-mono marker:text-muted">
+            <li>
+              Turn on <strong className="font-medium text-text">2-Step Verification</strong> at{" "}
               <a href="https://myaccount.google.com/security" target="_blank" rel="noreferrer" className={link}>
                 myaccount.google.com/security <IconExternal size={12} className="inline" />
               </a>
               .
-            </HelpStep>
-            <HelpStep n={2}>
+            </li>
+            <li>
               Open{" "}
               <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className={link}>
                 myaccount.google.com/apppasswords <IconExternal size={12} className="inline" />
               </a>{" "}
               and create one named <Code>prof-mailer</Code>.
-            </HelpStep>
-            <HelpStep n={3}>Paste the 16-letter password here and click Connect.</HelpStep>
+            </li>
+            <li>Paste the 16-letter password here and click Connect.</li>
           </ol>
-          <ul className="space-y-1.5 rounded-lg bg-surface-2 p-3 text-xs text-muted ring-1 ring-line">
-            <li>• Your normal Gmail password won&apos;t work; it must be an App Password.</li>
-            <li>• Google Workspace (university/company) accounts may have App Passwords disabled by the admin.</li>
-            <li>• The password is stored encrypted on your own server.</li>
+          <ul className="list-disc space-y-1 border-t border-border pt-3 pl-5 text-xs">
+            <li>Your normal Gmail password won&apos;t work; it must be an app password.</li>
+            <li>Google Workspace (university/company) accounts may have app passwords disabled by the admin.</li>
+            <li>The password is stored encrypted on your own server.</li>
           </ul>
         </div>
       </div>
-    </section>
+    </Card>
   );
 }
 
 function OAuthOption({ data, onRecheck }: { data: GmailStatus; onRecheck: () => void }) {
   return (
-    <details className="group mb-5 overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-line">
-      <summary className="flex cursor-pointer select-none flex-wrap items-center gap-2 px-4 py-3 text-sm hover:bg-surface-2 sm:px-5">
-        <span className="font-semibold text-fg">Option B — Sign in with Google (OAuth)</span>
-        <span className="text-xs text-muted">{data.oauthConfigured ? "Google OAuth client is configured" : "requires Google Cloud setup (~10 minutes)"}</span>
+    <details className="group mb-4 rounded-md border border-border bg-surface">
+      <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-2.5 select-none hover:bg-bg">
+        <span className="text-sm font-semibold text-text">Option B: Sign in with Google (OAuth)</span>
+        <span className="text-xs text-muted">{data.oauthConfigured ? "Google OAuth client is configured" : "Requires Google Cloud setup, about 10 minutes"}</span>
         <span className="ml-auto text-xs text-muted group-open:hidden">Show</span>
         <span className="ml-auto hidden text-xs text-muted group-open:inline">Hide</span>
       </summary>
-      <div className="border-t border-line p-4 sm:p-5">
+      <div className="border-t border-border p-4">
         {data.oauthConfigured ? (
           <div className="flex flex-wrap items-center gap-4">
-            <p className="min-w-0 flex-1 text-sm text-fg-2">
+            <p className="min-w-0 flex-1 text-[13px] text-muted">
               Sign in with the Google account you added as a test user on the OAuth consent screen. You&apos;ll be redirected back here.
             </p>
             <a href={api.gmailConnectUrl} className={btnSecondary}>
@@ -311,7 +293,7 @@ function OAuthOption({ data, onRecheck }: { data: GmailStatus; onRecheck: () => 
   );
 }
 
-function ConnectedHero({
+function ConnectedCard({
   data,
   busy,
   switching,
@@ -327,44 +309,36 @@ function ConnectedHero({
   onTestSend: () => void;
 }) {
   return (
-    <section className="mb-5 overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-line">
-      <div className="bg-gradient-to-br from-success-soft via-surface to-surface px-5 py-5 sm:px-7">
-        <div className="flex flex-wrap items-center gap-5">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-success text-white shadow-sm">
-            <IconMail size={26} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wider text-success-fg">Sending from</p>
-            <p className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-fg">{data.email ?? "Connected account"}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success-fg ring-1 ring-inset ring-success-line">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                Connected
-              </span>
-              <AuthTypeBadge authType={data.authType} />
-              {data.dryRun && <DryRunPill />}
-            </div>
-          </div>
+    <section className="mb-4 rounded-md border border-border bg-surface">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted">Sending from</p>
+          <p className="truncate font-mono text-[15px] font-medium text-text">{data.email ?? "Connected account"}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge tone="sent">Connected</Badge>
+          <AuthTypeBadge authType={data.authType} />
+          {data.dryRun && <DryRunPill />}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-line bg-surface-2/60 px-5 py-3.5 sm:px-7">
+      <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
         {data.testRecipientSet ? (
-          <button type="button" className={btnPrimary} onClick={onTestSend} disabled={busy}>
-            <IconSend size={16} />
+          <Button variant="primary" onClick={onTestSend} disabled={busy}>
+            <IconSend />
             {busy ? "Working…" : "Send test email to TEST_RECIPIENT"}
-          </button>
+          </Button>
         ) : (
           <span className="text-xs text-muted">
             Set <Code>TEST_RECIPIENT</Code> in <Code>api/.env</Code> to enable the test-send button.
           </span>
         )}
         <div className="ml-auto flex gap-2">
-          <button type="button" className={btnSecondary} onClick={onToggleSwitch} aria-expanded={switching}>
+          <Button onClick={onToggleSwitch} aria-expanded={switching}>
             {switching ? "Cancel switch" : "Switch account"}
-          </button>
-          <button type="button" className={btnDanger} onClick={onDisconnect} disabled={busy}>
+          </Button>
+          <Button variant="danger" onClick={onDisconnect} disabled={busy}>
             Disconnect
-          </button>
+          </Button>
         </div>
       </div>
     </section>
@@ -374,38 +348,23 @@ function ConnectedHero({
 function HowItWorks({ data }: { data: GmailStatus }) {
   return (
     <Card title="How sending works">
-      <ul className="space-y-4 text-sm text-fg-2">
-        <li className="flex gap-3">
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-text">
-            <IconSend size={15} />
-          </span>
-          <span>
-            <strong className="text-fg">Every email goes out from this one account</strong>
-            {data.email ? (
-              <>
-                {" "}
-                (<span className="font-medium text-fg">{data.email}</span>)
-              </>
-            ) : null}
-            : initial emails and follow-ups alike, and they appear in its Sent folder.
-          </span>
+      <ul className="list-disc space-y-2 pl-5 text-[13px] text-muted marker:text-border">
+        <li>
+          <strong className="font-medium text-text">Every email goes out from this one account</strong>
+          {data.email ? (
+            <>
+              {" "}
+              (<Mono className="text-text">{data.email}</Mono>)
+            </>
+          ) : null}
+          : initial emails and follow-ups alike, and they appear in its Sent folder.
         </li>
-        <li className="flex gap-3">
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success-fg">
-            <IconInbox size={15} />
-          </span>
-          <span>
-            <strong className="text-fg">Replies are read from the same inbox.</strong> When a professor replies in the thread, the email is marked
-            replied and further follow-ups stop.
-          </span>
+        <li>
+          <strong className="font-medium text-text">Replies are read from the same inbox.</strong> When a professor replies in the thread, the email
+          is marked replied and further follow-ups stop.
         </li>
-        <li className="flex gap-3">
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-warning-soft text-warning-fg">
-            <IconMail size={15} />
-          </span>
-          <span>
-            To use a different address, click <em>Switch account</em>. Connecting again replaces the current connection.
-          </span>
+        <li>
+          To use a different address, click <em>Switch account</em>. Connecting again replaces the current connection.
         </li>
       </ul>
     </Card>
@@ -468,10 +427,10 @@ export function GmailPanel() {
   return (
     <div>
       <PageHeader title="Gmail account" description="The Gmail account every email is sent from, and whose inbox is checked for replies.">
-        <button type="button" className={btnSecondary} onClick={reload} disabled={loading}>
-          <IconRefresh size={16} className={loading ? "animate-spin" : undefined} />
+        <Button onClick={reload} disabled={loading}>
+          <IconRefresh className={loading ? "animate-spin" : undefined} />
           Refresh
-        </button>
+        </Button>
       </PageHeader>
 
       {connectedParam && <Notice tone="success">Gmail connected successfully.</Notice>}
@@ -481,9 +440,9 @@ export function GmailPanel() {
           tone="error"
           title="API offline"
           action={
-            <button type="button" className={`${btnSecondary} ${btnSmall}`} onClick={reload}>
+            <Button size="sm" onClick={reload}>
               Retry
-            </button>
+            </Button>
           }
         >
           {error}
@@ -497,13 +456,13 @@ export function GmailPanel() {
         </Notice>
       )}
 
-      {loading && !data && <Skeleton className="mb-5 h-36 w-full rounded-xl" />}
+      {loading && !data && <Loading rows={3} />}
 
       {data && (
-        <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1fr_20rem]">
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
           <div>
             {data.connected ? (
-              <ConnectedHero
+              <ConnectedCard
                 data={data}
                 busy={busy}
                 switching={switching}
@@ -512,7 +471,7 @@ export function GmailPanel() {
                 onTestSend={testSend}
               />
             ) : (
-              <Notice tone="warning" title="No Gmail account connected" className="mb-5">
+              <Notice tone="warning" title="No Gmail account connected">
                 Connect the Gmail account you&apos;ll send from. Option A takes about two minutes.
               </Notice>
             )}
@@ -520,9 +479,7 @@ export function GmailPanel() {
             {showOptions && (
               <>
                 {data.connected && (
-                  <Notice tone="info" className="mb-5">
-                    Connecting another account replaces the current connection ({data.email ?? "current account"}).
-                  </Notice>
+                  <Notice tone="info">Connecting another account replaces the current connection ({data.email ?? "current account"}).</Notice>
                 )}
                 <AppPasswordCard onConnected={onConnected} />
                 <OAuthOption data={data} onRecheck={reload} />
@@ -534,19 +491,19 @@ export function GmailPanel() {
 
           <div>
             <Card title="Status">
-              <dl className="-my-2.5 divide-y divide-line">
+              <dl className="-my-2 divide-y divide-border">
                 <StatusRow name="Account connected">
                   <YesNo ok={data.connected} />
                 </StatusRow>
                 <StatusRow name="Account">
-                  <span className="break-all">{data.email ?? "—"}</span>
+                  <Mono className="break-all">{data.email ?? "—"}</Mono>
                 </StatusRow>
                 <StatusRow name="Connected via">{data.authType ? <AuthTypeBadge authType={data.authType} /> : "—"}</StatusRow>
                 <StatusRow name="OAuth client configured">
                   <YesNo ok={data.oauthConfigured} />
                 </StatusRow>
-                <StatusRow name="DRY_RUN">
-                  {data.dryRun ? <span className="text-warning-fg">ON (logged only)</span> : <span className="text-success-fg">OFF (real sends)</span>}
+                <StatusRow name={<Mono className="!text-xs">DRY_RUN</Mono>}>
+                  {data.dryRun ? <Badge tone="replied">On: logged only</Badge> : <Badge tone="sent">Off: real sends</Badge>}
                 </StatusRow>
                 <StatusRow name="Test recipient set">
                   <YesNo ok={data.testRecipientSet} />
@@ -554,7 +511,7 @@ export function GmailPanel() {
               </dl>
             </Card>
             {data.dryRun && (
-              <Notice tone="warning" title="DRY RUN is on">
+              <Notice tone="warning" title="Dry run is on">
                 Emails are only logged, never sent. Set <Code>DRY_RUN=false</Code> in <Code>api/.env</Code> and restart the API to send for real.
               </Notice>
             )}

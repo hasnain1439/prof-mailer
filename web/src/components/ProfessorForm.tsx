@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { PROFESSOR_STATUSES, type Professor, type ProfessorInput, type ProfessorStatus } from "@/lib/types";
-import { ErrorBox, btnPrimary, btnSecondary, input, label, professorStatusLabel } from "./ui";
+import { Button, ErrorBox, Field, Input, Select, Textarea, professorStatusLabel } from "./ui";
 
 type FormState = Required<{ [K in keyof ProfessorInput]: K extends "status" ? ProfessorStatus : string }>;
 
@@ -51,65 +51,69 @@ export function ProfessorForm({
     }
   }
 
-  const text = (k: Exclude<keyof FormState, "status">, title: string, opts: { required?: boolean; type?: string } = {}) => (
-    <div>
-      <label className={label} htmlFor={`pf-${k}`}>
-        {title}
-        {opts.required && " *"}
-      </label>
-      <input
+  const text = (
+    k: Exclude<keyof FormState, "status">,
+    title: string,
+    opts: { required?: boolean; type?: string; mono?: boolean } = {},
+  ) => (
+    <Field
+      htmlFor={`pf-${k}`}
+      label={
+        <>
+          {title}
+          {opts.required && (
+            <span className="text-failed-fg" aria-hidden="true">
+              {" "}
+              *
+            </span>
+          )}
+        </>
+      }
+    >
+      <Input
         id={`pf-${k}`}
         type={opts.type ?? "text"}
         required={opts.required}
-        className={input}
+        className={opts.mono ? "font-mono" : ""}
         value={form[k]}
         onChange={(e) => set(k, e.target.value)}
       />
-    </div>
+    </Field>
   );
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} className="space-y-3">
       <ErrorBox error={error} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {text("name", "Name", { required: true })}
-        {text("email", "Email", { required: true, type: "email" })}
+        {text("email", "Email", { required: true, type: "email", mono: true })}
         {text("university", "University", { required: true })}
         {text("country", "Country")}
-        {text("profileUrl", "Profile URL", { type: "url" })}
-        <div>
-          <label className={label} htmlFor="pf-status">
-            Status
-          </label>
-          <select id="pf-status" className={input} value={form.status} onChange={(e) => set("status", e.target.value as ProfessorStatus)}>
+        {text("profileUrl", "Profile URL", { type: "url", mono: true })}
+        <Field label="Status" htmlFor="pf-status">
+          <Select id="pf-status" value={form.status} onChange={(e) => set("status", e.target.value as ProfessorStatus)}>
             {PROFESSOR_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {professorStatusLabel(s)}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </Field>
       </div>
       {text("researchFocus", "Research focus")}
-      <div>
-        <label className={label} htmlFor="pf-whyFits">
-          Why I fit
-        </label>
-        <textarea id="pf-whyFits" rows={3} className={input} value={form.whyFits} onChange={(e) => set("whyFits", e.target.value)} />
-      </div>
-      <div>
-        <label className={label} htmlFor="pf-notes">
-          Notes
-        </label>
-        <textarea id="pf-notes" rows={2} className={input} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
-      </div>
-      <div className="-mx-6 -mb-6 mt-2 flex justify-end gap-2 border-t border-line bg-surface-2 px-6 py-4">
-        <button type="button" className={btnSecondary} onClick={onCancel} disabled={busy}>
+      <Field label="Why I fit" htmlFor="pf-whyFits">
+        <Textarea id="pf-whyFits" rows={3} value={form.whyFits} onChange={(e) => set("whyFits", e.target.value)} />
+      </Field>
+      <Field label="Notes" htmlFor="pf-notes">
+        <Textarea id="pf-notes" rows={2} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+      </Field>
+      <div className="-mx-4 -mb-4 mt-4 flex justify-end gap-2 border-t border-border bg-bg px-4 py-3">
+        <Button onClick={onCancel} disabled={busy}>
           Cancel
-        </button>
-        <button type="submit" className={btnPrimary} disabled={busy}>
+        </Button>
+        <Button type="submit" variant="primary" disabled={busy}>
           {busy ? "Saving…" : professor ? "Save changes" : "Create professor"}
-        </button>
+        </Button>
       </div>
     </form>
   );

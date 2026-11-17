@@ -3,6 +3,7 @@
 /**
  * Renders an email body. HTML bodies go into a fully sandboxed iframe
  * (sandbox="" => no scripts, no same-origin, no forms, no top navigation).
+ * The iframe always stays white: emails are designed for light backgrounds.
  */
 export function EmailBody({
   body,
@@ -26,16 +27,16 @@ export function EmailBody({
         sandbox=""
         srcDoc={body}
         referrerPolicy="no-referrer"
-        className={`block w-full rounded-lg bg-white ring-1 ring-line ${className}`}
+        className={`block w-full rounded-md border border-border bg-white ${className}`}
         style={{ height, colorScheme: "light", background: "#fff" }}
       />
     );
   }
-  return <pre className={`whitespace-pre-wrap break-words font-sans text-sm leading-relaxed ${textClassName} ${className}`}>{body}</pre>;
+  return <pre className={`font-sans text-sm leading-relaxed break-words whitespace-pre-wrap text-text ${textClassName} ${className}`}>{body}</pre>;
 }
 
 export function HtmlBadge() {
   return (
-    <span className="rounded-full bg-warning-soft px-2 py-0.5 font-mono text-[10px] font-semibold text-warning-fg ring-1 ring-inset ring-warning-line">HTML</span>
+    <span className="inline-flex h-5 items-center rounded-sm border border-border bg-surface px-1.5 font-mono text-[11px] font-medium text-muted">HTML</span>
   );
 }
