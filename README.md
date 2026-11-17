@@ -103,6 +103,7 @@ The repo has a Blueprint at `render.yaml`. It runs the API from `api/` on the fr
    - `DATABASE_URL`, `DIRECT_URL` (Neon)
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (section 2)
    - `ENCRYPTION_KEY`, `CRON_SECRET` (random, see the command above)
+   - `API_PROXY_SECRET`: another long random string. Put the **same value** on Vercel. It lets the API trust the browser IP that Vercel forwards (used for rate limits); without it, everyone behind Vercel shares one rate-limit bucket.
    - `PUBLIC_URL` = your Vercel URL, for example `https://prof-mailer.vercel.app` (no trailing slash)
 3. The plain values are preset: `NODE_ENV=production`, `DRY_RUN=true`, `SCHEDULER_ENABLED=true`.
 
@@ -113,7 +114,9 @@ Notes:
 ## 4. Deploy the web app on Vercel
 
 1. Vercel → **Add New → Project** → import this repository and set **Root Directory** to `web`.
-2. Environment variable: `API_ORIGIN` = your Render URL, for example `https://prof-mailer-api.onrender.com`. It is read at build time, so redeploy after changing it.
+2. Environment variables:
+   - `API_ORIGIN` = your Render URL, for example `https://prof-mailer-api.onrender.com`. It is read at build time, so redeploy after changing it.
+   - `API_PROXY_SECRET` = the same value as on Render.
 3. Deploy, then make sure `PUBLIC_URL` on Render is exactly this Vercel URL. Verification and reset links use it.
 
 Mutating requests must come from `PUBLIC_URL` (the API checks the `Origin` header), so use the production Vercel URL, not a preview URL.

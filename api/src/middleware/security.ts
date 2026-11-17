@@ -1,4 +1,5 @@
-import type { RequestHandler } from "express";
+import { timingSafeEqual } from "node:crypto";
+import type { RequestHandler, Request } from "express";
 import { env } from "../lib/env.js";
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -36,6 +37,28 @@ export const csrfGuard: RequestHandler = (req, res, next) => {
 };
 
 /** Simple in-memory token bucket per client IP (resets on restart; fine for a single instance). */
+/**
+ * Client IP for rate limits. Only the web proxy (Vercel / next dev) knows the real browser IP; it sends
+ * x-pm-client-ip together with x-pm-proxy-secret = API_PROXY_SECRET. Without a valid secret the header is
+ * ignored and req.ip is used (trust proxy = TRUST_PROXY_HOPS, i.e. the address that reached Render), so a
+ * client-supplied X-Forwarded-For can never pick its own rate-limit bucket.
+ */
+export function clientIp(req: Request): string {
+  const secret = env.API_PROXY_SECRET;
+  const given = req.get("x-pm-proxy-secret");
+  if (secret && given && safeEqual(given, secret)) {
+    const ip = (req.get("x-pm-client-ip") ?? "").trim();
+    if (/^[0-9a-fA-F:.]{2,45}$/.test(ip)) return ip;
+  }
+  return req.ip ?? "unknown";
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
 export function rateLimit(opts: { capacity: number; refillPerMinute: number }): RequestHandler {
   const buckets = new Map<string, { tokens: number; at: number }>();
   let lastPrune = Date.now();
@@ -45,7 +68,7 @@ export function rateLimit(opts: { capacity: number; refillPerMinute: number }): 
       for (const [k, b] of buckets) if (now - b.at > 60 * 60 * 1000) buckets.delete(k);
       lastPrune = now;
     }
-    const key = req.ip ?? "unknown";
+    const key = clientIp(req);
     const b = buckets.get(key) ?? { tokens: opts.capacity, at: now };
     b.tokens = Math.min(opts.capacity, b.tokens + ((now - b.at) / 60_000) * opts.refillPerMinute);
     b.at = now;

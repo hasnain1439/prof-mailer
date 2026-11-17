@@ -7,13 +7,13 @@
 import { randomBytes } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
-import { AUTH_USER_SELECT, createSession, destroySession, publicUser, revokeAllSessions } from "../lib/auth.js";
+import { AUTH_USER_SELECT, hashToken, createSession, destroySession, publicUser, revokeAllSessions } from "../lib/auth.js";
 import { consumeAuthToken, issueAuthToken, RESET_TTL_MS, VERIFY_TTL_MS, webLink } from "../lib/authTokens.js";
 import { env } from "../lib/env.js";
 import { HttpError, validateBody } from "../lib/http.js";
 import { dummyVerify, hashPassword, PASSWORD_MAX, PASSWORD_MIN, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
-import { AttemptCounter, rateLimit } from "../middleware/security.js";
+import { AttemptCounter, rateLimit, clientIp } from "../middleware/security.js";
 import {
   sendAlreadyRegisteredEmail,
   sendPasswordResetEmail,
@@ -65,8 +65,11 @@ async function startVerification(user: { id: string; email: string; name: string
 
 // The password is NOT chosen at signup. It is set on the verification page, so only the person who controls
 // the mailbox can ever set it (prevents pre-verification account takeover).
+const nameField = z.string().trim().min(1, "Name is required").max(100);
+
+// Name and password are both chosen on the verification page (by the mailbox owner).
 const signupSchema = z.object({
-  name: z.string().trim().min(1, "Name is required").max(100),
+  name: nameField.optional(),
   email: emailField,
 });
 
@@ -77,7 +80,7 @@ authRouter.post("/signup", strictLimiter, validateBody(signupSchema), async (req
   if (!existing) {
     try {
       const user = await prisma.user.create({
-        data: { email: body.email, name: body.name, passwordHash: null },
+        data: { email: body.email, name: null, passwordHash: null },
         select: { id: true, email: true, name: true },
       });
       await startVerification(user);
@@ -99,19 +102,20 @@ authRouter.post("/signup", strictLimiter, validateBody(signupSchema), async (req
 // ---------------------------------------------------------------------------------------------
 // verify email + set password (signs in)
 
-const verifySchema = z.object({ token: tokenField, password: passwordField });
+const verifySchema = z.object({ token: tokenField, name: nameField, password: passwordField });
 
 authRouter.post("/verify-email", validateBody(verifySchema), async (req, res) => {
-  const { token, password } = req.body as z.infer<typeof verifySchema>;
-  const passwordHash = await hashPassword(password);
+  const { token, name, password } = req.body as z.infer<typeof verifySchema>;
+  // Check the token before the (deliberately slow) password hash, so junk requests are cheap.
   const userId = await consumeAuthToken(token, "VERIFY_EMAIL");
   if (!userId) throw new HttpError(400, "This link is invalid or has expired. Request a new one.");
+  const passwordHash = await hashPassword(password);
   const user = await prisma.user.findUnique({ where: { id: userId }, select: AUTH_USER_SELECT });
   if (!user) throw new HttpError(400, "This link is invalid or has expired. Request a new one.");
   // The link proves control of the mailbox: this is the only place (besides reset) a password is set.
   const verified = await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash, emailVerifiedAt: user.emailVerifiedAt ?? new Date() },
+    data: { name, passwordHash, emailVerifiedAt: user.emailVerifiedAt ?? new Date() },
     select: AUTH_USER_SELECT,
   });
   await prisma.authToken.deleteMany({ where: { userId, type: "VERIFY_EMAIL" } });
@@ -119,6 +123,14 @@ authRouter.post("/verify-email", validateBody(verifySchema), async (req, res) =>
   await destroySession(req, res);
   await createSession(req, res, userId);
   res.json({ ok: true, user: publicUser(verified) });
+});
+
+/** Lets the verify page tell a dead link apart before the user types a password. Does not consume. */
+authRouter.get("/verify-email/check", async (req, res) => {
+  const raw = typeof req.query.token === "string" ? req.query.token : "";
+  if (raw.length < 20 || raw.length > 200) return void res.json({ valid: false });
+  const row = await prisma.authToken.findUnique({ where: { id: hashToken(raw) }, select: { type: true, usedAt: true, expiresAt: true } });
+  res.json({ valid: !!row && row.type === "VERIFY_EMAIL" && !row.usedAt && row.expiresAt > new Date() });
 });
 
 const emailOnlySchema = z.object({ email: emailField });
@@ -142,20 +154,20 @@ const INVALID_LOGIN = "Invalid email or password";
 
 authRouter.post("/login", strictLimiter, validateBody(loginSchema), async (req, res) => {
   const { email, password } = req.body as z.infer<typeof loginSchema>;
-  if (loginFailures.isBlocked(failureKey(email, req.ip)) || loginFailuresPerAccount.isBlocked(email)) {
+  if (loginFailures.isBlocked(failureKey(email, clientIp(req))) || loginFailuresPerAccount.isBlocked(email)) {
     throw new HttpError(429, "Too many failed sign-in attempts. Try again in 15 minutes or reset your password.");
   }
   const user = await prisma.user.findUnique({ where: { email }, select: { ...AUTH_USER_SELECT, passwordHash: true } });
   const ok = user?.passwordHash ? await verifyPassword(password, user.passwordHash) : await dummyVerify(password);
   if (!user || !ok) {
-    loginFailures.hit(failureKey(email, req.ip));
+    loginFailures.hit(failureKey(email, clientIp(req)));
     loginFailuresPerAccount.hit(email);
     throw new HttpError(401, INVALID_LOGIN);
   }
   if (!user.emailVerifiedAt) {
     throw new HttpError(403, "Please verify your email address first. Check your inbox for the link.", undefined, "EMAIL_NOT_VERIFIED");
   }
-  loginFailures.reset(failureKey(email, req.ip));
+  loginFailures.reset(failureKey(email, clientIp(req)));
   loginFailuresPerAccount.reset(email);
   await destroySession(req, res);
   await createSession(req, res, user.id);

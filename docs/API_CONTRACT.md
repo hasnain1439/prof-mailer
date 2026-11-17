@@ -241,3 +241,9 @@ Tokens are 32 random bytes; the DB stores only their sha256. Passwords are hashe
 - Login failures are limited per (email, IP) (10 / 15 min) and per email overall (50 / 15 min).
 - `/auth/me` and `/auth/logout` are not rate limited. `TRUST_PROXY_HOPS` (default 1; 2 on Render behind the Vercel rewrite) sets how many proxies to trust for the client IP.
 - All error responses may include a machine-readable `code`.
+
+## v3.2: hardening after QA round 4
+- `POST /auth/signup` takes `{ email }` (a `name` is accepted and ignored). `POST /auth/verify-email` takes `{ token, name, password }`: the mailbox owner chooses both. The token is checked before the password is hashed.
+- `GET /auth/verify-email/check?token=…` → `{ valid: boolean }` (does not consume). The verify page calls it on load.
+- System emails never include user-supplied names ("Hi,").
+- Client IP for rate limits: the web proxy (`web/src/proxy.ts`, runs before the `/api` rewrite) strips any client `x-pm-*` headers and, on Vercel, sends `x-pm-client-ip` + `x-pm-proxy-secret`. The API trusts `x-pm-client-ip` only when `x-pm-proxy-secret` equals `API_PROXY_SECRET` (same value on Vercel and Render). Otherwise it uses `req.ip` with `TRUST_PROXY_HOPS=1`, i.e. the address that reached Render, so a spoofed `X-Forwarded-For` can't choose a rate-limit bucket.

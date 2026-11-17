@@ -1,18 +1,18 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { AuthCard, AuthLink, AuthLinks, PasswordInput, ResendVerification } from "@/components/AuthCard";
 import { Button, Field, Input, Notice } from "@/components/ui";
 
 const MIN_PASSWORD = 8;
 
-type State = { kind: "form" } | { kind: "done" } | { kind: "failed"; error: string };
+type State = { kind: "checking" } | { kind: "form" } | { kind: "done" } | { kind: "failed"; error: string };
 
 /** Shown while the token is read from the URL. */
 export function VerifyingCard() {
-  return <AuthCard title="Confirm your email" description="Loading…" />;
+  return <AuthCard title="Confirm your email" description="Checking your link…" />;
 }
 
 function ResendForm() {
@@ -41,7 +41,19 @@ function ResendForm() {
 export function VerifyEmailPanel() {
   const params = useSearchParams();
   const token = params.get("token") ?? "";
-  const [state, setState] = useState<State>(token ? { kind: "form" } : { kind: "failed", error: "This link is missing its token." });
+  const [state, setState] = useState<State>(token ? { kind: "checking" } : { kind: "failed", error: "This link is missing its token." });
+  const [name, setName] = useState("");
+  const checked = useRef(false);
+
+  // Tell a dead link apart before the user types anything (does not use up the link).
+  useEffect(() => {
+    if (!token || checked.current) return;
+    checked.current = true;
+    api.checkVerifyToken(token).then(
+      (r) => setState(r.valid ? { kind: "form" } : { kind: "failed", error: "This link is invalid or has expired." }),
+      () => setState({ kind: "form" }), // can't check right now: let the submit report it
+    );
+  }, [token]);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,12 +64,13 @@ export function VerifyEmailPanel() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!name.trim()) return setError("Please enter your name.");
     if (password.length < MIN_PASSWORD) return setError(`Password must be at least ${MIN_PASSWORD} characters.`);
-    if (password !== confirm) return setError("Passwords don't match.");
+    if (password !== confirm) return; // the field hint already says so
     setBusy(true);
     setError(null);
     try {
-      await api.verifyEmail(token, password);
+      await api.verifyEmail(token, name.trim(), password);
       setState({ kind: "done" });
       // Full reload (not router.push) so the new session cookie is picked up by AuthProvider.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
@@ -73,6 +86,8 @@ export function VerifyEmailPanel() {
       setConfirm("");
     }
   }
+
+  if (state.kind === "checking") return <VerifyingCard />;
 
   if (state.kind === "done") {
     return (
@@ -99,8 +114,20 @@ export function VerifyEmailPanel() {
   }
 
   return (
-    <AuthCard title="Choose your password" description="Confirm your email by setting the password you'll use to sign in.">
+    <AuthCard title="Finish creating your account" description="Confirm your email by choosing your name and the password you'll use to sign in.">
       <form onSubmit={submit} className="space-y-3">
+        <Field label="Name" htmlFor="verify-name">
+          <Input
+            id="verify-name"
+            required
+            maxLength={100}
+            autoComplete="name"
+            placeholder="Your full name"
+            value={name}
+            disabled={busy}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Field>
         <Field
           label="Password"
           htmlFor="verify-password"
@@ -137,7 +164,7 @@ export function VerifyEmailPanel() {
           </Notice>
         )}
 
-        <Button type="submit" variant="primary" className="w-full" disabled={busy || password.length < MIN_PASSWORD || password !== confirm}>
+        <Button type="submit" variant="primary" className="w-full" disabled={busy || !name.trim() || password.length < MIN_PASSWORD || password !== confirm}>
           {busy ? "Saving…" : "Confirm email and sign in"}
         </Button>
       </form>

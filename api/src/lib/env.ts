@@ -58,6 +58,8 @@ export const env = {
   NODE_ENV,
   IS_PROD,
   TRUST_PROXY_HOPS: int("TRUST_PROXY_HOPS", 1),
+  /** Shared secret the web proxy sends so its x-pm-client-ip header is trusted (see middleware/security.ts). */
+  API_PROXY_SECRET: (process.env.API_PROXY_SECRET ?? "").trim(),
   PORT: int("PORT", 4100),
   PUBLIC_URL,
   DATABASE_URL: required("DATABASE_URL"),

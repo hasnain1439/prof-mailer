@@ -73,14 +73,15 @@ async function deliver(msg: SystemMessage, kind: string): Promise<boolean> {
   }
 }
 
-function greeting(name: string | null): string {
-  return name ? `Hi ${name},` : "Hi,";
+/** Names are user-supplied (anyone can sign up with any address), so they never go into system mail. */
+function greeting(_name: string | null): string {
+  return "Hi,";
 }
 
 export function sendVerificationEmail(to: string, name: string | null, url: string): Promise<boolean> {
   const lines = [
     greeting(name),
-    `Thanks for signing up for ${APP_NAME}. Open the link below to confirm your email address and choose your password.`,
+    `Thanks for signing up for ${APP_NAME}. Open the link below to confirm your email address and choose your name and password.`,
     "This link expires in 24 hours. If you did not sign up, you can ignore this email.",
   ];
   return deliver(

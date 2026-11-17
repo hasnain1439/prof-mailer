@@ -12,8 +12,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: TRUST_PROXY_HOPS # Vercel rewrite + Render proxy; verify req.ip after deploy
-        value: "2"
+      - key: TRUST_PROXY_HOPS
+        value: "1"
       - key: DRY_RUN
         value: "true"
       - key: SCHEDULER_ENABLED
@@ -35,6 +35,8 @@ services:
       - key: ENCRYPTION_KEY
         sync: false
       - key: CRON_SECRET
+        sync: false
+      - key: API_PROXY_SECRET # same value as API_PROXY_SECRET on Vercel
         sync: false
       - key: PUBLIC_URL
         sync: false

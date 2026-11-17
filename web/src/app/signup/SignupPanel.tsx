@@ -10,7 +10,6 @@ import { Button, Field, Input, Notice } from "@/components/ui";
 export function SignupPanel() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +26,7 @@ export function SignupPanel() {
     setError(null);
     const addr = email.trim();
     try {
-      await api.signup({ name: name.trim(), email: addr });
+      await api.signup({ email: addr });
       setSentTo(addr);
     } catch (err) {
       setError(errorMessage(err));
@@ -56,17 +55,6 @@ export function SignupPanel() {
   return (
     <AuthCard title="Create an account" description="Schedule and track your Master's admissions emails to professors.">
       <form onSubmit={submit} className="space-y-3">
-        <Field label="Name" htmlFor="signup-name">
-          <Input
-            id="signup-name"
-            required
-            autoComplete="name"
-            placeholder="Your full name"
-            value={name}
-            disabled={busy}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </Field>
         <Field label="Email" htmlFor="signup-email">
           <Input
             id="signup-email"
@@ -79,7 +67,7 @@ export function SignupPanel() {
             onChange={(e) => setEmail(e.target.value)}
           />
         </Field>
-        <p className="text-xs text-muted">We&apos;ll email you a link to confirm your address and choose a password.</p>
+        <p className="text-xs text-muted">We&apos;ll email you a link to confirm your address, then you choose your name and password.</p>
 
         {error && (
           <Notice tone="error" className="">
@@ -91,7 +79,7 @@ export function SignupPanel() {
           type="submit"
           variant="primary"
           className="w-full"
-          disabled={busy || !name.trim() || !email.trim()}
+          disabled={busy || !email.trim()}
         >
           {busy ? "Creating account…" : "Create account"}
         </Button>
