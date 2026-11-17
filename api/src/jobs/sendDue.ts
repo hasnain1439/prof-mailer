@@ -118,6 +118,7 @@ export async function runSendDue(now: Date = new Date()): Promise<SendDueResult>
           to: email.professor.email,
           subject: email.subject,
           body: email.body,
+          isHtml: email.isHtml,
           ...threading,
         });
         await prisma.email.update({

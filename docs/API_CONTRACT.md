@@ -26,11 +26,12 @@ interface ProfessorListItem extends Professor {
 }
 interface Template {
   id: string; name: string; subject: string; body: string; isFollowUp: boolean;
+  isHtml: boolean;                 // body is HTML (sent as multipart/alternative with auto text part)
   createdAt: string; updatedAt: string;
 }
 interface Email {
   id: string; professorId: string; templateId: string | null;
-  subject: string; body: string; status: EmailStatus;
+  subject: string; body: string; isHtml: boolean; status: EmailStatus;
   scheduledAt: string; sentAt: string | null; repliedAt: string | null; error: string | null;
   gmailThreadId: string | null; gmailMessageId: string | null; messageIdHeader: string | null;
   followUpNo: number; parentId: string | null; createdAt: string; updatedAt: string;
@@ -63,10 +64,10 @@ Emails are normalised to lowercase and trimmed.
 |---|---|---|---|
 | GET | `/templates` | `?isFollowUp=true\|false` | `Template[]` ordered by name |
 | GET | `/templates/:id` | | `Template` |
-| POST | `/templates` | `{ name, subject, body, isFollowUp? }` | 201 `Template`. 400 if unknown `{{placeholders}}` |
+| POST | `/templates` | `{ name, subject, body, isFollowUp?, isHtml? }` | 201 `Template`. 400 if unknown `{{placeholders}}` |
 | PATCH | `/templates/:id` | subset | `Template` |
 | DELETE | `/templates/:id` | | 204 |
-| POST | `/templates/:id/preview` | `{ professorId }` | `{ subject, body }` rendered |
+| POST | `/templates/:id/preview` | `{ professorId }` | `{ subject, body, isHtml }` rendered (values HTML-escaped when isHtml) |
 
 Placeholders: `{{name}} {{university}} {{researchFocus}} {{whyFits}}`. Use `renderTemplate` from `src/lib/template.ts`.
 
@@ -88,6 +89,7 @@ interface ImportPreviewRow {
   data: ImportRowData;          // raw trimmed strings ("" when missing)
   scheduledAtUtc: string | null;
   subject: string; body: string; // final rendered values (row values, or the template when empty)
+  isHtml: boolean;              // true when body came from an HTML template
   errors: string[];             // empty = valid
   professorExists: boolean;
 }

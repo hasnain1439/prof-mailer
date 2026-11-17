@@ -52,7 +52,7 @@ const uploadFile: RequestHandler = (req, res, next) => {
 
 async function loadTemplate(templateId: string | undefined): Promise<ImportTemplate | null> {
   if (!templateId) return null;
-  const t = await prisma.template.findUnique({ where: { id: templateId }, select: { subject: true, body: true } });
+  const t = await prisma.template.findUnique({ where: { id: templateId }, select: { subject: true, body: true, isHtml: true } });
   if (!t) throw new HttpError(400, "Template not found", { templateId });
   return t;
 }
@@ -186,6 +186,7 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
             templateId,
             subject: row.subject,
             body: row.body,
+            isHtml: row.isHtml,
             status: "SCHEDULED",
             scheduledAt: new Date(row.scheduledAtUtc!),
             followUpNo: 0,

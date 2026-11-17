@@ -10,7 +10,10 @@ export interface MimeInput {
   from: string;
   to: string;
   subject: string;
+  /** Plain-text body (always sent). */
   body: string;
+  /** Optional HTML body; when set the message is multipart/alternative (text + html). */
+  html?: string | null;
   messageId: string;
   date?: Date;
   inReplyTo?: string | null;
@@ -102,12 +105,21 @@ export function buildMimeMessage(input: MimeInput): string {
   if (input.inReplyTo) headers.push(`In-Reply-To: ${sanitizeHeaderValue(input.inReplyTo)}`);
   const refs = (input.references ?? []).map(sanitizeHeaderValue).filter(Boolean);
   if (refs.length) headers.push(`References: ${refs.join(`${CRLF} `)}`);
-  headers.push(
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
+  headers.push("MIME-Version: 1.0");
+  if (!input.html) {
+    headers.push("Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64");
+    return headers.join(CRLF) + CRLF + CRLF + base64Wrapped(toCrlf(input.body)) + CRLF;
+  }
+  const boundary = `=_pm_${randomUUID().replace(/-/g, "")}`;
+  headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+  const part = (type: string, content: string) =>
+    [`--${boundary}`, `Content-Type: ${type}; charset=UTF-8`, "Content-Transfer-Encoding: base64", "", base64Wrapped(toCrlf(content))].join(CRLF);
+  return (
+    headers.join(CRLF) + CRLF + CRLF +
+    part("text/plain", input.body) + CRLF +
+    part("text/html", input.html) + CRLF +
+    `--${boundary}--` + CRLF
   );
-  return headers.join(CRLF) + CRLF + CRLF + base64Wrapped(toCrlf(input.body)) + CRLF;
 }
 
 /** base64url (no padding) as required by gmail users.messages.send `raw`. */

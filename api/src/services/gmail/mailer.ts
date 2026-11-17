@@ -8,6 +8,7 @@ import { randomBytes } from "node:crypto";
 import { google } from "googleapis";
 import { env } from "../../lib/env.js";
 import { HttpError } from "../../lib/http.js";
+import { htmlToText } from "../../lib/template.js";
 import { appendDryRunMessage, getDryRunThread } from "./dryRunStore.js";
 import { buildMimeMessage, generateMessageId, isSingleAddress, toBase64Url } from "./mime.js";
 import { getAuthorizedClient, getGmailAccount } from "./oauth.js";
@@ -16,6 +17,8 @@ export interface SendEmailInput {
   to: string;
   subject: string;
   body: string;
+  /** body is HTML: send multipart/alternative with an auto-generated text part. */
+  isHtml?: boolean;
   threadId?: string | null;
   inReplyTo?: string | null;
   references?: string[] | null;
@@ -60,7 +63,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     const from = account?.email ?? DRY_FROM_FALLBACK;
     const gmailThreadId = input.threadId || `dry-thread-${rand()}`;
     const messageIdHeader = `<dry-${rand()}@prof-mailer.local>`;
-    const preview = input.body.replace(/\s+/g, " ").trim().slice(0, 80);
+    const preview = (input.isHtml ? htmlToText(input.body) : input.body).replace(/\s+/g, " ").trim().slice(0, 80);
     console.log(
       `[DRY_RUN] would send to=${to} subject=${JSON.stringify(input.subject)} threadId=${input.threadId ?? "(new)"} ` +
         `body="${preview}${input.body.length > 80 ? "…" : ""}"`,
@@ -85,7 +88,8 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     from: auth.email,
     to,
     subject: input.subject,
-    body: input.body,
+    body: input.isHtml ? htmlToText(input.body) : input.body,
+    html: input.isHtml ? input.body : null,
     messageId: generatedId,
     date: new Date(),
     inReplyTo: input.inReplyTo ?? null,

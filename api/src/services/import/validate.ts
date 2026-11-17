@@ -11,6 +11,8 @@ export interface ImportPreviewRow {
   scheduledAtUtc: string | null;
   subject: string;
   body: string;
+  /** true when the body came from an HTML template */
+  isHtml: boolean;
   errors: string[];
   professorExists: boolean;
 }
@@ -18,6 +20,7 @@ export interface ImportPreviewRow {
 export interface ImportTemplate {
   subject: string;
   body: string;
+  isHtml: boolean;
 }
 
 const emailSchema = z.email();
@@ -62,6 +65,7 @@ export function validateImportRows(
 
     const rawSubject = data.subject || template?.subject || "";
     const rawBody = data.body || template?.body || "";
+    const isHtml = !data.body && !!template?.isHtml;
     if (!rawSubject) errors.push(template ? "subject is empty (row and template)" : "subject is required (or choose a template)");
     if (!rawBody) errors.push(template ? "body is empty (row and template)" : "body is required (or choose a template)");
 
@@ -80,7 +84,8 @@ export function validateImportRows(
       data,
       scheduledAtUtc,
       subject: renderTemplate(rawSubject, vars),
-      body: renderTemplate(rawBody, vars),
+      body: renderTemplate(rawBody, vars, { html: isHtml }),
+      isHtml,
       errors,
       professorExists: email !== "" && existingEmails.has(email),
     };

@@ -34,6 +34,7 @@ const createSchema = z.object({
   subject: reqStr,
   body: bodyStr,
   isFollowUp: z.boolean().optional(),
+  isHtml: z.boolean().optional(),
 });
 const patchSchema = createSchema.partial();
 
@@ -81,5 +82,9 @@ templatesRouter.post("/:id/preview", validateBody(previewSchema), async (req, re
   ]);
   if (!t) throw new HttpError(404, "Template not found");
   if (!p) throw new HttpError(404, "Professor not found");
-  res.json({ subject: renderTemplate(t.subject, p), body: renderTemplate(t.body, p) });
+  res.json({
+    subject: renderTemplate(t.subject, p),
+    body: renderTemplate(t.body, p, { html: t.isHtml }),
+    isHtml: t.isHtml,
+  });
 });

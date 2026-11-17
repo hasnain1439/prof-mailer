@@ -127,13 +127,14 @@ export async function runCheckReplies(now: Date = new Date()): Promise<CheckRepl
           university: professor.university,
           researchFocus: professor.researchFocus,
           whyFits: professor.whyFits,
-        });
+        }, { html: template.isHtml });
         await prisma.email.create({
           data: {
             professorId: professor.id,
             templateId: template.id,
             subject: followUpSubject(root.subject),
             body,
+            isHtml: template.isHtml,
             status: "SCHEDULED",
             scheduledAt: now,
             followUpNo: head.followUpNo + 1,
