@@ -13,6 +13,8 @@ export interface DryRunMessage {
   subject?: string;
   date: string; // ISO
   messageIdHeader?: string;
+  inReplyTo?: string | null;
+  references?: string[];
 }
 
 interface StoreShape {

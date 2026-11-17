@@ -3,6 +3,7 @@ import multer from "multer";
 import Papa from "papaparse";
 import { z } from "zod";
 import { uid } from "../lib/auth.js";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { HttpError, validateBody } from "../lib/http.js";
 import {
@@ -13,7 +14,12 @@ import {
   type ImportRowData,
   type ParsedRow,
 } from "../services/import/parse.js";
-import { normalizeEmail, validateImportRows, type ImportTemplate } from "../services/import/validate.js";
+import {
+  normalizeEmail,
+  validateImportRows,
+  type ExistingProfessorInfo,
+  type ImportTemplate,
+} from "../services/import/validate.js";
 
 export const importRouter = Router();
 
@@ -58,11 +64,44 @@ async function loadTemplate(userId: string, templateId: string | undefined): Pro
   return t;
 }
 
-async function existingEmailSet(userId: string, rows: ParsedRow[]): Promise<Set<string>> {
+/**
+ * Existing professors for the file's emails, with what the re-import rules need: status, whether an
+ * email is already SCHEDULED/SENDING, and when the first email (followUpNo 0) was SENT.
+ */
+async function existingProfessors(
+  db: Prisma.TransactionClient,
+  userId: string,
+  rows: ParsedRow[],
+): Promise<Map<string, ExistingProfessorInfo>> {
   const emails = [...new Set(rows.map((r) => normalizeEmail(r.data.email)).filter(Boolean))];
-  if (emails.length === 0) return new Set();
-  const found = await prisma.professor.findMany({ where: { userId, email: { in: emails } }, select: { email: true } });
-  return new Set(found.map((p) => p.email));
+  if (emails.length === 0) return new Map();
+  const found = await db.professor.findMany({
+    where: { userId, email: { in: emails } },
+    select: {
+      email: true,
+      status: true,
+      emails: {
+        where: { OR: [{ status: { in: ["SCHEDULED", "SENDING"] } }, { status: "SENT", followUpNo: 0 }] },
+        select: { status: true, sentAt: true },
+      },
+    },
+  });
+  return new Map(
+    found.map((p) => {
+      const firstSent = p.emails
+        .filter((e) => e.status === "SENT" && e.sentAt)
+        .map((e) => e.sentAt!)
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+      return [
+        p.email,
+        {
+          status: p.status,
+          hasPendingEmail: p.emails.some((e) => e.status === "SCHEDULED" || e.status === "SENDING"),
+          firstSentAt: firstSent ?? null,
+        },
+      ];
+    }),
+  );
 }
 
 // ---- GET /import/sample.csv ----
@@ -128,7 +167,7 @@ importRouter.post("/preview", uploadFile, async (req, res) => {
     if (e instanceof ImportParseError) throw new HttpError(400, e.message);
     throw e;
   }
-  const rows = validateImportRows(parsed, template, await existingEmailSet(userId, parsed));
+  const rows = validateImportRows(parsed, template, await existingProfessors(prisma, userId, parsed));
   const errorCount = rows.filter((r) => r.errors.length > 0).length;
   res.json({ rows, validCount: rows.length - errorCount, errorCount });
 });
@@ -154,12 +193,13 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
   const template = await loadTemplate(userId, body.templateId || undefined);
 
   const parsed: ParsedRow[] = body.rows.map((data, i) => ({ rowNumber: i + 2, data }));
-  const existing = await existingEmailSet(userId, parsed);
-  const valid = validateImportRows(parsed, template, existing).filter((r) => r.errors.length === 0);
   const templateId = body.templateId || null;
 
   const result = await prisma.$transaction(
     async (tx) => {
+      // Re-validate against the DB inside the transaction (same rules as the preview, incl. re-import errors).
+      const existing = await existingProfessors(tx, userId, parsed);
+      const valid = validateImportRows(parsed, template, existing).filter((r) => r.errors.length === 0);
       let professorsCreated = 0;
       let professorsUpdated = 0;
       let emailsCreated = 0;

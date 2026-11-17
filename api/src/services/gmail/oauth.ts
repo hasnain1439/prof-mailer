@@ -1,8 +1,12 @@
 /**
  * Google OAuth2: sign-in (openid email profile) and per-user Gmail access (gmail.send + gmail.readonly).
  * One OAuth "Web application" client serves both. Never log tokens, auth codes or the client secret.
+ *
+ * GmailAccount.refreshToken / accessToken are encrypted at rest (lib/crypto.ts). Reads tolerate legacy
+ * plaintext values, which are re-encrypted on the next write.
  */
 import { google } from "googleapis";
+import { decryptSecretOrPlain, encryptSecret, isEncryptedSecret } from "../../lib/crypto.js";
 import { env } from "../../lib/env.js";
 import { prisma } from "../../lib/prisma.js";
 
@@ -101,16 +105,19 @@ export async function handleGmailCallback(userId: string, code: string): Promise
 
   const existing = await prisma.gmailAccount.findUnique({ where: { userId } });
   // Google may omit refresh_token on re-consent; keep the old one only if it is the same account.
-  const refreshToken =
-    tokens.refresh_token ?? (existing?.authType === "OAUTH" && existing.email === email ? existing.refreshToken : null);
+  const previous =
+    existing?.authType === "OAUTH" && existing.email === email && existing.refreshToken
+      ? readToken(existing.refreshToken)
+      : null;
+  const refreshToken = tokens.refresh_token ?? previous;
   if (!refreshToken) throw new Error("Google did not return a refresh token");
 
   const data = {
     email,
     authType: "OAUTH" as const,
     appPasswordEnc: null,
-    refreshToken,
-    accessToken: tokens.access_token ?? null,
+    refreshToken: encryptSecret(refreshToken),
+    accessToken: tokens.access_token ? encryptSecret(tokens.access_token) : null,
     expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
   };
   await prisma.gmailAccount.upsert({
@@ -119,6 +126,16 @@ export async function handleGmailCallback(userId: string, code: string): Promise
     create: { userId, ...data },
   });
   return email;
+}
+
+/** Decrypt a stored token; legacy plaintext is returned as-is. Null when it cannot be decrypted. */
+function readToken(stored: string): string | null {
+  try {
+    return decryptSecretOrPlain(stored);
+  } catch {
+    console.warn("[gmail] a stored OAuth token could not be decrypted; reconnect Gmail");
+    return null;
+  }
 }
 
 export async function getGmailAccount(userId: string) {
@@ -133,18 +150,25 @@ export async function getAuthorizedClient(userId: string): Promise<{ client: OAu
   if (!isGoogleConfigured()) return null;
   const account = await getGmailAccount(userId);
   if (!account || account.authType !== "OAUTH" || !account.refreshToken) return null;
+  const refreshToken = readToken(account.refreshToken);
+  if (!refreshToken) return null;
+  // An undecryptable access token is just dropped; the client refreshes it.
+  const accessToken = account.accessToken ? readToken(account.accessToken) : null;
+  // Legacy plaintext refresh token: re-encrypt it on the next write.
+  const legacyRefresh = !isEncryptedSecret(account.refreshToken);
   const client = googleClient(env.GMAIL_REDIRECT_URI);
   client.setCredentials({
-    refresh_token: account.refreshToken,
-    access_token: account.accessToken ?? null,
+    refresh_token: refreshToken,
+    access_token: accessToken,
     expiry_date: account.expiryDate ? account.expiryDate.getTime() : null,
   });
   const accountId = account.id;
   client.on("tokens", (t) => {
     const update: { accessToken?: string; expiryDate?: Date | null; refreshToken?: string } = {};
-    if (t.access_token) update.accessToken = t.access_token;
+    if (t.access_token) update.accessToken = encryptSecret(t.access_token);
     if (t.expiry_date !== undefined) update.expiryDate = t.expiry_date ? new Date(t.expiry_date) : null;
-    if (t.refresh_token) update.refreshToken = t.refresh_token;
+    if (t.refresh_token) update.refreshToken = encryptSecret(t.refresh_token);
+    else if (legacyRefresh && Object.keys(update).length > 0) update.refreshToken = encryptSecret(refreshToken);
     if (Object.keys(update).length === 0) return;
     prisma.gmailAccount
       .updateMany({ where: { id: accountId, userId }, data: update })
@@ -159,7 +183,8 @@ export async function disconnectGmail(userId: string): Promise<void> {
   // App-password accounts have nothing to revoke (the user deletes the app password in their Google account).
   if (account?.authType === "OAUTH" && account.refreshToken && isGoogleConfigured()) {
     try {
-      await googleClient(env.GMAIL_REDIRECT_URI).revokeToken(account.refreshToken);
+      const token = readToken(account.refreshToken);
+      if (token) await googleClient(env.GMAIL_REDIRECT_URI).revokeToken(token);
     } catch {
       console.warn("[gmail] token revoke failed (ignored)");
     }

@@ -1,5 +1,5 @@
 /**
- * AES-256-GCM encryption for small secrets stored in the database (the Gmail app password).
+ * AES-256-GCM encryption for small secrets stored in the database (Gmail app password, OAuth tokens).
  *
  * Key: env ENCRYPTION_KEY (32 bytes as 64 hex chars or base64) when set; otherwise a random key is
  * generated once into api/.data/secret.key (gitignored). Losing that file means stored secrets can
@@ -77,6 +77,19 @@ export function encryptSecret(plaintext: string): string {
   return `v1:${iv.toString("base64")}:${tag.toString("base64")}:${data.toString("base64")}`;
 }
 
+/** True when `value` looks like encryptSecret output ("v1:<iv>:<tag>:<data>"). */
+export function isEncryptedSecret(value: string): boolean {
+  return /^v1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]*$/.test(value);
+}
+
+/**
+ * Decrypt a value that may still be legacy plaintext (stored before encryption at rest):
+ * encrypted values are decrypted, anything else is returned as-is (and re-encrypted on the next write).
+ */
+export function decryptSecretOrPlain(value: string): string {
+  return isEncryptedSecret(value) ? decryptSecret(value) : value;
+}
+
 export function decryptSecret(payload: string): string {
   const parts = payload.split(":");
   if (parts.length !== 4 || parts[0] !== "v1") throw new Error("Unsupported encrypted secret format");
@@ -87,6 +100,6 @@ export function decryptSecret(payload: string): string {
     return Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]).toString("utf8");
   } catch {
     // Wrong key (e.g. .data/secret.key deleted or ENCRYPTION_KEY changed) or tampered data.
-    throw new Error("Could not decrypt the stored Gmail app password; reconnect Gmail");
+    throw new Error("Could not decrypt a stored Gmail credential; reconnect Gmail");
   }
 }

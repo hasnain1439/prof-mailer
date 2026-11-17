@@ -1,7 +1,7 @@
 import { env } from "../lib/env.js";
 import { prisma } from "../lib/prisma.js";
 import { MAX_DAILY_SEND_LIMIT, getSettings } from "../lib/settings.js";
-import { startOfKarachiDay } from "../lib/time.js";
+import { karachiDayRange } from "../lib/time.js";
 import { GmailNotConnectedError, isGmailConnected, sendEmail } from "../services/gmail/mailer.js";
 import { randomDelayMs, safeErrorMessage } from "./util.js";
 
@@ -66,7 +66,7 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
   const dueWhere = { userId, status: "SCHEDULED" as const, scheduledAt: { lte: now } };
   const [settings, sentToday, dueCount] = await Promise.all([
     getSettings(userId),
-    prisma.email.count({ where: { userId, status: "SENT", sentAt: { gte: startOfKarachiDay(now) } } }),
+    prisma.email.count({ where: { userId, status: "SENT", sentAt: karachiDayRange(now) } }),
     prisma.email.count({ where: dueWhere }),
   ]);
   if (dueCount === 0) return;
@@ -106,25 +106,32 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
 
     // Fresh professor status (may have changed since the query).
     const prof = await prisma.professor.findFirst({ where: { id: email.professorId, userId }, select: { status: true } });
-    if (email.followUpNo > 0 && (!prof || STOP_STATUSES.has(prof.status))) {
-      await prisma.email.update({ where: { id: email.id }, data: { status: "CANCELLED" } });
+    // Hold back first emails AND follow-ups once the professor replied / was marked INTERESTED or DECLINED.
+    if (!prof || STOP_STATUSES.has(prof.status)) {
+      await prisma.email.update({
+        where: { id: email.id },
+        data: { status: "CANCELLED", error: prof ? "Professor already replied" : "Professor not found" },
+      });
       continue;
     }
 
     try {
       const threading = await threadingFor(email);
+      // Same clock for the DB sentAt and the DRY_RUN thread store, so daily counts and reply checks agree.
+      const sendTime = clock();
       const sent = await sendEmail(userId, {
         to: email.professor.email,
         subject: email.subject,
         body: email.body,
         isHtml: email.isHtml,
+        sentAt: sendTime,
         ...threading,
       });
       await prisma.email.update({
         where: { id: email.id },
         data: {
           status: "SENT",
-          sentAt: clock(),
+          sentAt: sendTime,
           error: null,
           gmailMessageId: sent.gmailMessageId,
           gmailThreadId: sent.gmailThreadId,

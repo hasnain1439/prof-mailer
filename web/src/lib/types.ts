@@ -122,7 +122,10 @@ export interface ImportPreviewRow {
   scheduledAtUtc: string | null;
   subject: string;
   body: string;
+  /** blocking: the row is skipped on import */
   errors: string[];
+  /** non-blocking notes (e.g. professor already contacted); the row is still imported */
+  warnings: string[];
   professorExists: boolean;
   isHtml: boolean;
 }

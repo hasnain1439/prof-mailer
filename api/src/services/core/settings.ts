@@ -1,10 +1,11 @@
 import { env } from "../../lib/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { MAX_DAILY_SEND_LIMIT, getSettings } from "../../lib/settings.js";
-import { APP_TIMEZONE, startOfKarachiDay } from "../../lib/time.js";
+import { APP_TIMEZONE, karachiDayRange } from "../../lib/time.js";
 
-export function countSentToday(userId: string) {
-  return prisma.email.count({ where: { userId, status: "SENT", sentAt: { gte: startOfKarachiDay() } } });
+/** SENT emails with sentAt in [start of the Karachi day, +24h). */
+export function countSentToday(userId: string, now: Date = new Date()) {
+  return prisma.email.count({ where: { userId, status: "SENT", sentAt: karachiDayRange(now) } });
 }
 
 /** Build the SettingsResponse for one user. */

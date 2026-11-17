@@ -15,12 +15,11 @@ settingsRouter.get("/", async (req, res) => {
 const putSchema = z.object({
   followUpAfterDays: z.number().int().min(1).max(60),
   maxFollowUps: z.number().int().min(0).max(10),
-  // Accepts up to 500 (older clients) but is capped server-side at MAX_DAILY_SEND_LIMIT (50).
+  // Any positive integer is accepted and capped server-side at MAX_DAILY_SEND_LIMIT (50).
   dailySendLimit: z
     .number()
     .int()
     .min(1)
-    .max(500)
     .transform((n) => Math.min(n, MAX_DAILY_SEND_LIMIT)),
   followUpTemplateId: z
     .string()

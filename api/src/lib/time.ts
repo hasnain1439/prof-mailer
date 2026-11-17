@@ -41,3 +41,9 @@ export function startOfKarachiDay(now: Date = new Date()): Date {
   const k = new Date(now.getTime() + OFFSET_MS);
   return new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()) - OFFSET_MS);
 }
+
+/** [start, end) of the Karachi calendar day containing `now`, as a Prisma-style date range. */
+export function karachiDayRange(now: Date = new Date()): { gte: Date; lt: Date } {
+  const start = startOfKarachiDay(now);
+  return { gte: start, lt: new Date(start.getTime() + 24 * 60 * 60 * 1000) };
+}

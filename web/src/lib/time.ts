@@ -29,6 +29,8 @@ export function karachiInputToUtcIso(value: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value.trim());
   if (!m) throw new Error(`Invalid date/time: "${value}"`);
   const [y, mo, d, h, mi, s] = [m[1], m[2], m[3], m[4], m[5], m[6] ?? "0"].map(Number);
+  // Date.UTC would silently roll 10:61 over to 11:01; reject out-of-range clock fields instead.
+  if (h > 23 || mi > 59 || s > 59) throw new Error(`Invalid time: "${value}"`);
   const ms = Date.UTC(y, mo - 1, d, h, mi, s) - KARACHI_OFFSET_MS;
   const check = new Date(ms + KARACHI_OFFSET_MS);
   if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== d) {

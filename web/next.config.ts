@@ -12,6 +12,17 @@ const nextConfig: NextConfig = {
   devIndicators: { position: "bottom-right" },
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // Only validate segments that explicitly export `instant`. Every page here is a Client Component
+    // behind the client-side AuthGate (AppShell renders a skeleton until /auth/me resolves), so no page
+    // segment renders on the server and the default validation reports each one as "dropped from
+    // rendering" ("Could not validate that a segment in your UI has instant navigation"). Pages can't
+    // export `instant = false` themselves ("use client"), so opt out here instead.
+    // See node_modules/next/dist/docs/01-app/02-guides/instant-navigation.md#validate-instant-navigation
+    instantInsights: {
+      validationLevel: "manual-warning",
+    },
+  },
   async rewrites() {
     return [
       {

@@ -90,7 +90,8 @@ interface ImportPreviewRow {
   scheduledAtUtc: string | null;
   subject: string; body: string; // final rendered values (row values, or the template when empty)
   isHtml: boolean;              // true when body came from an HTML template
-  errors: string[];             // empty = valid
+  errors: string[];             // empty = valid (rows with errors are skipped on commit)
+  warnings: string[];           // non-blocking notes; the row is still imported (see "Import re-validation (v2.1)")
   professorExists: boolean;
 }
 interface ImportPreview { rows: ImportPreviewRow[]; validCount: number; errorCount: number; }
@@ -107,9 +108,9 @@ Validation: required name, email (valid), university, scheduledAt (valid Karachi
 ## Settings (agent A)
 | GET | `/settings` | | `SettingsResponse` |
 |---|---|---|---|
-| PUT | `/settings` | `{ followUpAfterDays: int 1..60, maxFollowUps: int 0..10, dailySendLimit: int 1..500, followUpTemplateId: string \| null }` | `SettingsResponse` |
+| PUT | `/settings` | `{ followUpAfterDays: int 1..60, maxFollowUps: int 0..10, dailySendLimit: int >= 1 (capped to 50), followUpTemplateId: string \| null }` | `SettingsResponse` |
 
-Use `getSettings()` from `src/lib/settings.ts`. Use `startOfKarachiDay()` for `sentToday`.
+Use `getSettings()` from `src/lib/settings.ts`. `sentToday` counts SENT emails with sentAt in [`startOfKarachiDay()`, +24h).
 
 ## Dashboard (agent A)
 `GET /dashboard` returns
@@ -181,3 +182,17 @@ Accessing another user's id returns 404.
 - Each user has their own Settings row (defaults 3 / 2 / 20). `dailySendLimit` is capped at 50 server-side.
 - Spacing: at most one send per user per scheduler tick, and only if ≥ a random 30–120 s has passed since that user's last send (no long sleeps inside a request).
 - The daily limit uses the Karachi day, as before.
+
+## Import re-validation and send safety (v2.1)
+`ImportPreviewRow.warnings: string[]` (non-blocking; the row is still imported). For a professor that already exists for this user:
+- status REPLIED / INTERESTED / DECLINED → **error** `Professor already replied; not scheduling another first email` (or `Professor already marked INTERESTED|DECLINED; …`).
+- has a SCHEDULED or SENDING email → **error** `Already has a scheduled email`.
+- otherwise, if a first email (followUpNo 0) was already SENT → **warning** `Already contacted on <YYYY-MM-DD HH:mm, Karachi>; this schedules another first email`.
+
+Commit re-validates the same way inside its transaction; rows with errors are skipped.
+
+- Send-due cancels due **first emails as well as follow-ups** whose professor is REPLIED / INTERESTED / DECLINED: status CANCELLED, `error: "Professor already replied"`.
+- Daily limit and `sentToday` count SENT emails with sentAt in [start of the Karachi day, +24h).
+- `PUT /settings`: `dailySendLimit` accepts any positive integer and is capped to 50.
+- Gmail OAuth `refreshToken` / `accessToken` are stored encrypted (AES-256-GCM, same key as the app password); legacy plaintext is read as-is and re-encrypted on the next write.
+- In-process scheduler: check-replies is polled every 10 min and runs only when ≥ 60 min have passed since `lastReplyCheckAt` (shared with `/jobs/tick`). Expired sessions are pruned hourly.

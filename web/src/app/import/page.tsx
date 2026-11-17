@@ -6,7 +6,7 @@ import { api, errorMessage } from "@/lib/api";
 import type { ImportCommitResult, ImportPreview } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
-import { IconArrowRight, IconCheck, IconDownload, IconFile, IconX } from "@/components/icons";
+import { IconAlert, IconArrowRight, IconCheck, IconDownload, IconFile, IconX } from "@/components/icons";
 import { EmailBody, HtmlBadge } from "@/components/EmailBody";
 import { useToast } from "@/components/Toast";
 import {
@@ -79,6 +79,7 @@ export default function ImportPage() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const validRows = preview?.rows.filter((r) => r.errors.length === 0) ?? [];
+  const warningCount = validRows.filter((r) => (r.warnings?.length ?? 0) > 0).length;
   const step: 1 | 2 | 3 | 4 = result ? 4 : preview ? (busy === "commit" ? 3 : 2) : 1;
 
   function chooseFile(f: File | null) {
@@ -298,6 +299,11 @@ export default function ImportPage() {
               <Badge tone="sent">
                 <span className="mr-1 font-mono">{preview.validCount}</span> valid
               </Badge>
+              {warningCount > 0 && (
+                <Badge tone="replied">
+                  <span className="mr-1 font-mono">{warningCount}</span> with warnings
+                </Badge>
+              )}
               {preview.errorCount > 0 && (
                 <Badge tone="failed">
                   <span className="mr-1 font-mono">{preview.errorCount}</span> with errors
@@ -315,6 +321,11 @@ export default function ImportPage() {
             </Notice>
           )}
           {preview.errorCount > 0 && <p className="border-b border-border px-4 py-2 text-xs text-muted">Rows with errors are highlighted and will be skipped.</p>}
+          {warningCount > 0 && (
+            <p className="border-b border-border px-4 py-2 text-xs text-muted">
+              Rows with warnings (amber) will still be imported. Check them before you import.
+            </p>
+          )}
           <Table
             head={
               <>
@@ -331,10 +342,11 @@ export default function ImportPage() {
           >
             {preview.rows.map((r) => {
               const bad = r.errors.length > 0;
+              const warnings = r.warnings ?? [];
               const open = openRow === r.rowNumber;
               return (
                 <Fragment key={r.rowNumber}>
-                  <tr className={bad ? "bg-failed-bg" : tr}>
+                  <tr className={bad ? "bg-failed-bg" : warnings.length > 0 ? "bg-replied-bg" : tr}>
                     <Td numeric className="text-muted">
                       {r.rowNumber}
                     </Td>
@@ -377,6 +389,15 @@ export default function ImportPage() {
                         <ul className="list-disc space-y-0.5 pl-4 text-xs text-failed-fg">
                           {r.errors.map((err, i) => (
                             <li key={i}>{err}</li>
+                          ))}
+                        </ul>
+                      ) : warnings.length > 0 ? (
+                        <ul className="space-y-0.5 text-xs text-replied-fg">
+                          {warnings.map((w, i) => (
+                            <li key={i} className="flex items-start gap-1">
+                              <IconAlert size={14} className="mt-px shrink-0" />
+                              <span>{w}</span>
+                            </li>
                           ))}
                         </ul>
                       ) : (

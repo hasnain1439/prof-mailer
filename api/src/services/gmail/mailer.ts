@@ -25,6 +25,8 @@ export interface SendEmailInput {
   threadId?: string | null;
   inReplyTo?: string | null;
   references?: string[] | null;
+  /** Send time recorded in the DRY_RUN thread store (defaults to now); callers pass the same value they store as sentAt. */
+  sentAt?: Date;
 }
 
 export interface SendEmailResult {
@@ -70,17 +72,23 @@ export async function sendEmail(userId: string, input: SendEmailInput): Promise<
     const gmailThreadId = input.threadId || `dry-thread-${rand()}`;
     const messageIdHeader = `<dry-${rand()}@prof-mailer.local>`;
     const preview = (input.isHtml ? htmlToText(input.body) : input.body).replace(/\s+/g, " ").trim().slice(0, 80);
+    const inReplyTo = input.inReplyTo ?? null;
+    const references = (input.references ?? []).filter(Boolean);
     console.log(
       `[DRY_RUN] user=${userId} would send to=${to} subject=${JSON.stringify(input.subject)} ` +
-        `threadId=${input.threadId ?? "(new)"} body="${preview}${input.body.length > 80 ? "…" : ""}"`,
+        `threadId=${input.threadId ?? "(new)"} inReplyTo=${inReplyTo ?? "(none)"} ` +
+        `references=${references.length ? references.join(" ") : "(none)"} ` +
+        `body="${preview}${input.body.length > 80 ? "…" : ""}"`,
     );
     await appendDryRunMessage(gmailThreadId, {
       direction: "outbound",
       from,
       to,
       subject: input.subject,
-      date: new Date().toISOString(),
+      date: (input.sentAt ?? new Date()).toISOString(),
       messageIdHeader,
+      inReplyTo,
+      references,
     });
     return { gmailMessageId: `dry-msg-${rand()}`, gmailThreadId, messageIdHeader, dryRun: true };
   }

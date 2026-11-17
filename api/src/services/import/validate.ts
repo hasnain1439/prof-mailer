@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseKarachiLocal } from "../../lib/time.js";
+import { formatKarachi, parseKarachiLocal } from "../../lib/time.js";
 import { renderTemplate, unknownPlaceholders, type TemplateVars } from "../../lib/template.js";
 import type { ImportRowData, ParsedRow } from "./parse.js";
 
@@ -13,8 +13,37 @@ export interface ImportPreviewRow {
   body: string;
   /** true when the body came from an HTML template */
   isHtml: boolean;
+  /** blocking: the row is skipped on commit */
   errors: string[];
+  /** non-blocking: the row is imported, but the user should know */
+  warnings: string[];
   professorExists: boolean;
+}
+
+/** What the DB already knows about a professor in the file (keyed by lowercase email). */
+export interface ExistingProfessorInfo {
+  status: string;
+  /** has a SCHEDULED or SENDING email */
+  hasPendingEmail: boolean;
+  /** sentAt of the earliest SENT first email (followUpNo 0), or null */
+  firstSentAt: Date | null;
+}
+
+const STOP_STATUSES = new Set(["REPLIED", "INTERESTED", "DECLINED"]);
+
+/** Re-import rules for an existing professor: errors block the row, warnings don't. */
+function existingProfessorChecks(info: ExistingProfessorInfo | undefined, errors: string[], warnings: string[]): void {
+  if (!info) return;
+  if (STOP_STATUSES.has(info.status)) {
+    const what = info.status === "REPLIED" ? "already replied" : `already marked ${info.status}`;
+    errors.push(`Professor ${what}; not scheduling another first email`);
+  }
+  if (info.hasPendingEmail) errors.push("Already has a scheduled email");
+  if (info.firstSentAt && errors.length === 0) {
+    warnings.push(
+      `Already contacted on ${formatKarachi(info.firstSentAt)}; this schedules another first email`,
+    );
+  }
 }
 
 export interface ImportTemplate {
@@ -32,17 +61,18 @@ export function normalizeEmail(email: string): string {
 /**
  * Validate rows and render final subject/body.
  * @param template the selected template (null when none was given)
- * @param existingEmails lowercase emails of professors already in the DB
+ * @param existing professors already in the DB, keyed by lowercase email
  */
 export function validateImportRows(
   rows: ParsedRow[],
   template: ImportTemplate | null,
-  existingEmails: ReadonlySet<string>,
+  existing: ReadonlyMap<string, ExistingProfessorInfo>,
 ): ImportPreviewRow[] {
   const seen = new Map<string, number>(); // email → first rowNumber
 
   return rows.map(({ rowNumber, data }) => {
     const errors: string[] = [];
+    const warnings: string[] = [];
     if (!data.name) errors.push("name is required");
     if (!data.university) errors.push("university is required");
 
@@ -72,6 +102,8 @@ export function validateImportRows(
     const unknown = [...new Set([...unknownPlaceholders(rawSubject), ...unknownPlaceholders(rawBody)])];
     if (unknown.length) errors.push(`unknown placeholder(s): ${unknown.map((u) => `{{${u}}}`).join(", ")}`);
 
+    existingProfessorChecks(email ? existing.get(email) : undefined, errors, warnings);
+
     const vars: TemplateVars = {
       name: data.name,
       university: data.university,
@@ -87,7 +119,8 @@ export function validateImportRows(
       body: renderTemplate(rawBody, vars, { html: isHtml }),
       isHtml,
       errors,
-      professorExists: email !== "" && existingEmails.has(email),
+      warnings,
+      professorExists: email !== "" && existing.has(email),
     };
   });
 }

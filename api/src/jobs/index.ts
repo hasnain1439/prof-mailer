@@ -59,23 +59,33 @@ export function startScheduler(): void {
     { name: "send-due", noOverlap: true },
   );
 
+  // Polled every 10 min but gated on the persisted lastReplyCheckAt (same 60-min gate as /jobs/tick),
+  // so a manual or tick run delays the next check by at most ~10 min past the hour, not a full extra hour.
   cron.schedule(
-    "0 * * * *",
+    "*/10 * * * *",
     async () => {
       try {
-        // Slightly under an hour so a /jobs/tick run a few minutes earlier doesn't push this to the next hour.
-        logCheckReplies(await maybeRunCheckReplies(50 * 60 * 1000));
+        // 30 s slack: lastReplyCheckAt is written a moment after the cron fires, so an exact 60-min gate
+        // would just miss the next poll and slip the cadence by 10 min every hour.
+        logCheckReplies(await maybeRunCheckReplies(HOUR_MS - 30_000));
       } catch (err) {
         console.error(`[check-replies] run failed: ${safeErrorMessage(err)}`);
       }
+    },
+    { name: "check-replies", noOverlap: true },
+  );
+
+  cron.schedule(
+    "0 * * * *",
+    async () => {
       try {
         await pruneExpiredSessions();
       } catch (err) {
         console.error(`[scheduler] session prune failed: ${safeErrorMessage(err)}`);
       }
     },
-    { name: "check-replies", noOverlap: true },
+    { name: "session-prune", noOverlap: true },
   );
 
-  console.log("[scheduler] started: send-due every minute, check-replies hourly");
+  console.log("[scheduler] started: send-due every minute, check-replies when >= 60 min since the last check (polled every 10 min)");
 }
