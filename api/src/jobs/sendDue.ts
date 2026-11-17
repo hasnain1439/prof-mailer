@@ -18,6 +18,10 @@ const STOP_STATUSES = new Set(["REPLIED", "INTERESTED", "DECLINED"]);
 /** Due follow-ups of stopped professors are cancelled while looking for the one email to send. */
 const MAX_CANDIDATES_PER_USER = 20;
 
+function stopReason(status: string): string {
+  return status === "REPLIED" ? "Professor already replied" : `Professor marked ${status.toLowerCase()}`;
+}
+
 let running = false;
 /** Users already warned about (due emails but no Gmail), so the log isn't spammed every minute. */
 const loggedNotConnected = new Set<string>();
@@ -64,6 +68,13 @@ async function threadingFor(email: {
  */
 async function sendDueForUser(userId: string, now: Date, clock: () => Date, result: SendDueResult): Promise<void> {
   const dueWhere = { userId, status: "SCHEDULED" as const, scheduledAt: { lte: now } };
+  // Cancel due emails for stopped professors first, so they leave the queue even when the user has no capacity left.
+  for (const status of STOP_STATUSES) {
+    await prisma.email.updateMany({
+      where: { ...dueWhere, professor: { status: status as "REPLIED" | "INTERESTED" | "DECLINED" } },
+      data: { status: "CANCELLED", error: stopReason(status) },
+    });
+  }
   const [settings, sentToday, dueCount] = await Promise.all([
     getSettings(userId),
     prisma.email.count({ where: { userId, status: "SENT", sentAt: karachiDayRange(now) } }),
@@ -110,7 +121,7 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
     if (!prof || STOP_STATUSES.has(prof.status)) {
       await prisma.email.update({
         where: { id: email.id },
-        data: { status: "CANCELLED", error: prof ? "Professor already replied" : "Professor not found" },
+        data: { status: "CANCELLED", error: prof ? stopReason(prof.status) : "Professor not found" },
       });
       continue;
     }

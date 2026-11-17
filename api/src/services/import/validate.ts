@@ -41,7 +41,7 @@ function existingProfessorChecks(info: ExistingProfessorInfo | undefined, errors
   if (info.hasPendingEmail) errors.push("Already has a scheduled email");
   if (info.firstSentAt && errors.length === 0) {
     warnings.push(
-      `Already contacted on ${formatKarachi(info.firstSentAt)}; this schedules another first email`,
+      `Already contacted on ${formatKarachi(info.firstSentAt)} PKT; this schedules another first email`,
     );
   }
 }
