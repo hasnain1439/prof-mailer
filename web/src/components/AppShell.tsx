@@ -95,7 +95,7 @@ function Shell({ children }: { children: ReactNode }) {
         )}
 
         <main className="flex-1">
-          <div className="mx-auto w-full max-w-[1200px] p-6">{children}</div>
+          <div className="w-full p-6">{children}</div>
         </main>
       </div>
     </div>
