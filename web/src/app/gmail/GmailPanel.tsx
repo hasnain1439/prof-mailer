@@ -13,7 +13,7 @@ import { Card, ErrorBox, Notice, PageHeader, Skeleton, btnDanger, btnPrimary, bt
 const DEFAULT_REDIRECT = "http://localhost:4000/api/gmail/callback";
 
 function Code({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.8em] text-slate-800">{children}</code>;
+  return <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[0.8em] text-fg">{children}</code>;
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -38,13 +38,13 @@ function CopyButton({ text }: { text: string }) {
 function Step({ n, title, children, last }: { n: number; title: string; children: ReactNode; last?: boolean }) {
   return (
     <li className={`relative flex gap-4 ${last ? "" : "pb-6"}`}>
-      {!last && <span aria-hidden="true" className="absolute top-8 bottom-1 left-[13.5px] w-px bg-slate-300" />}
-      <span className="z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
+      {!last && <span aria-hidden="true" className="absolute top-8 bottom-1 left-[13.5px] w-px bg-line-strong" />}
+      <span className="z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary-text ring-1 ring-primary-line">
         {n}
       </span>
       <div className="min-w-0 flex-1 pt-0.5">
-        <p className="text-sm font-semibold text-slate-900">{title}</p>
-        <div className="mt-1 space-y-2 text-sm text-slate-600">{children}</div>
+        <p className="text-sm font-semibold text-fg">{title}</p>
+        <div className="mt-1 space-y-2 text-sm text-fg-2">{children}</div>
       </div>
     </li>
   );
@@ -80,11 +80,11 @@ function SetupGuide({ configured, onRecheck }: { configured: boolean; onRecheck:
           In <em>Credentials → Create credentials → OAuth client ID</em>, pick <strong>Web application</strong> and add this{" "}
           <strong>Authorized redirect URI</strong>:
         </p>
-        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
-          <code className="min-w-0 flex-1 break-all font-mono text-xs text-slate-800">{DEFAULT_REDIRECT}</code>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 ring-1 ring-line">
+          <code className="min-w-0 flex-1 break-all font-mono text-xs text-fg">{DEFAULT_REDIRECT}</code>
           <CopyButton text={DEFAULT_REDIRECT} />
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted">
           If you run the API on another port or host, the redirect URI must exactly match <Code>GOOGLE_REDIRECT_URI</Code> in{" "}
           <Code>api/.env</Code>.
           {differs && (
@@ -96,7 +96,7 @@ function SetupGuide({ configured, onRecheck }: { configured: boolean; onRecheck:
         </p>
       </Step>
       <Step n={5} title="Add the credentials to api/.env">
-        <pre className="overflow-x-auto rounded-lg bg-slate-900 p-3 font-mono text-xs leading-relaxed text-slate-100">
+        <pre className="overflow-x-auto rounded-lg bg-slate-900 p-3 ring-1 ring-line font-mono text-xs leading-relaxed text-slate-100">
           {`GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=xxxxxxxx
 # only if not ${DEFAULT_REDIRECT}:
@@ -133,16 +133,16 @@ TEST_RECIPIENT=you@example.com`}
 function StatusRow({ name, children }: { name: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
-      <dt className="text-slate-500">{name}</dt>
-      <dd className="text-right font-medium text-slate-900">{children}</dd>
+      <dt className="text-muted">{name}</dt>
+      <dd className="text-right font-medium text-fg">{children}</dd>
     </div>
   );
 }
 
 function YesNo({ ok, yes = "Yes", no = "No" }: { ok: boolean; yes?: string; no?: string }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 ${ok ? "text-emerald-700" : "text-slate-500"}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-emerald-500" : "bg-slate-300"}`} />
+    <span className={`inline-flex items-center gap-1.5 ${ok ? "text-success-fg" : "text-muted"}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-success" : "bg-line-strong"}`} />
       {ok ? yes : no}
     </span>
   );
@@ -161,18 +161,18 @@ function StatusHero({
 }) {
   if (data.connected) {
     return (
-      <section className="mb-6 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
-        <div className="bg-gradient-to-br from-emerald-50 via-white to-white px-6 py-6 sm:px-8">
+      <section className="mb-5 overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-line">
+        <div className="bg-gradient-to-br from-success-soft via-surface to-surface px-6 py-6 sm:px-8">
           <div className="flex flex-wrap items-center gap-5">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-sm">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-success text-white shadow-sm">
               <IconMail size={26} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Sending from</p>
-              <p className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-slate-900">{data.email ?? "Connected account"}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-success-fg">Sending from</p>
+              <p className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-fg">{data.email ?? "Connected account"}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success-fg">
+                  <span className="h-1.5 w-1.5 rounded-full bg-success" />
                   Connected
                 </span>
                 {data.dryRun && <DryRunPill />}
@@ -180,14 +180,14 @@ function StatusHero({
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:px-8">
+        <div className="flex flex-wrap items-center gap-2 border-t border-line bg-surface-2/60 px-6 py-4 sm:px-8">
           {data.testRecipientSet ? (
             <button type="button" className={btnPrimary} onClick={onTestSend} disabled={busy}>
               <IconSend size={16} />
               {busy ? "Working…" : "Send test email to TEST_RECIPIENT"}
             </button>
           ) : (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-muted">
               Set <Code>TEST_RECIPIENT</Code> in <Code>api/.env</Code> to enable the test-send button.
             </span>
           )}
@@ -208,15 +208,15 @@ function StatusHero({
 
   if (data.configured) {
     return (
-      <section className="mb-6 rounded-xl bg-white px-6 py-6 shadow-sm ring-1 ring-amber-200 sm:px-8">
+      <section className="mb-5 rounded-xl bg-surface px-6 py-6 shadow-sm ring-1 ring-warning-line sm:px-8">
         <div className="flex flex-wrap items-center gap-5">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-warning-soft text-warning-fg">
             <IconMail size={26} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Not connected</p>
-            <p className="mt-0.5 text-xl font-semibold tracking-tight text-slate-900">Connect the Gmail account you&apos;ll send from</p>
-            <p className="mt-1 text-sm text-slate-500">Google OAuth is configured. Sign in with the account you added as a test user.</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-warning-fg">Not connected</p>
+            <p className="mt-0.5 text-xl font-semibold tracking-tight text-fg">Connect the Gmail account you&apos;ll send from</p>
+            <p className="mt-1 text-sm text-muted">Google OAuth is configured. Sign in with the account you added as a test user.</p>
             {data.dryRun && <DryRunPill className="mt-2" />}
           </div>
           <a href={api.gmailConnectUrl} className={btnPrimary}>
@@ -228,15 +228,15 @@ function StatusHero({
   }
 
   return (
-    <section className="mb-6 rounded-xl bg-white px-6 py-6 shadow-sm ring-1 ring-amber-200 sm:px-8">
+    <section className="mb-5 rounded-xl bg-surface px-6 py-6 shadow-sm ring-1 ring-warning-line sm:px-8">
       <div className="flex flex-wrap items-center gap-5">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-warning-soft text-warning-fg">
           <IconMail size={26} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Setup required</p>
-          <p className="mt-0.5 text-xl font-semibold tracking-tight text-slate-900">Gmail isn&apos;t set up yet</p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-wider text-warning-fg">Setup required</p>
+          <p className="mt-0.5 text-xl font-semibold tracking-tight text-fg">Gmail isn&apos;t set up yet</p>
+          <p className="mt-1 text-sm text-muted">
             The API has no Google OAuth client. Follow the steps below once (about 10 minutes), then connect your account.
           </p>
           {data.dryRun && <DryRunPill className="mt-2" />}
@@ -321,13 +321,13 @@ export function GmailPanel() {
         </Notice>
       )}
 
-      {loading && !data && <Skeleton className="mb-6 h-36 w-full rounded-xl" />}
+      {loading && !data && <Skeleton className="mb-5 h-36 w-full rounded-xl" />}
 
       {data && (
         <>
           <StatusHero data={data} busy={busy} onDisconnect={disconnect} onTestSend={testSend} />
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_20rem]">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_20rem]">
             <div>
               {!data.configured ? (
                 <Card title="Setup guide" description="One-time Google Cloud setup">
@@ -335,33 +335,33 @@ export function GmailPanel() {
                 </Card>
               ) : (
                 <Card title="How sending works">
-                  <ul className="space-y-4 text-sm text-slate-600">
+                  <ul className="space-y-4 text-sm text-fg-2">
                     <li className="flex gap-3">
-                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-text">
                         <IconSend size={15} />
                       </span>
                       <span>
-                        <strong className="text-slate-900">Every email goes out from this one account</strong>
+                        <strong className="text-fg">Every email goes out from this one account</strong>
                         {data.connected && data.email ? (
                           <>
                             {" "}
-                            (<span className="font-medium text-slate-900">{data.email}</span>)
+                            (<span className="font-medium text-fg">{data.email}</span>)
                           </>
                         ) : null}
                         : initial emails and follow-ups alike, and they appear in its Sent folder.
                       </span>
                     </li>
                     <li className="flex gap-3">
-                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success-fg">
                         <IconInbox size={15} />
                       </span>
                       <span>
-                        <strong className="text-slate-900">Replies are read from the same inbox.</strong> When a professor replies in the thread, the
+                        <strong className="text-fg">Replies are read from the same inbox.</strong> When a professor replies in the thread, the
                         email is marked replied and further follow-ups stop.
                       </span>
                     </li>
                     <li className="flex gap-3">
-                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-warning-soft text-warning-fg">
                         <IconMail size={15} />
                       </span>
                       <span>
@@ -370,11 +370,11 @@ export function GmailPanel() {
                       </span>
                     </li>
                   </ul>
-                  <details className="mt-6 rounded-lg ring-1 ring-slate-200">
-                    <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                  <details className="mt-6 rounded-lg ring-1 ring-line">
+                    <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-fg-2 hover:bg-surface-2">
                       Google Cloud setup guide (reference)
                     </summary>
-                    <div className="border-t border-slate-100 p-4">
+                    <div className="border-t border-line p-4">
                       <SetupGuide configured={data.configured} onRecheck={reload} />
                     </div>
                   </details>
@@ -384,7 +384,7 @@ export function GmailPanel() {
 
             <div>
               <Card title="Status">
-                <dl className="-my-2.5 divide-y divide-slate-100">
+                <dl className="-my-2.5 divide-y divide-line">
                   <StatusRow name="OAuth client configured">
                     <YesNo ok={data.configured} />
                   </StatusRow>
@@ -395,7 +395,7 @@ export function GmailPanel() {
                     <span className="break-all">{data.email ?? "—"}</span>
                   </StatusRow>
                   <StatusRow name="DRY_RUN">
-                    {data.dryRun ? <span className="text-amber-700">ON (logged only)</span> : <span className="text-emerald-700">OFF (real sends)</span>}
+                    {data.dryRun ? <span className="text-warning-fg">ON (logged only)</span> : <span className="text-success-fg">OFF (real sends)</span>}
                   </StatusRow>
                   <StatusRow name="Test recipient set">
                     <YesNo ok={data.testRecipientSet} />

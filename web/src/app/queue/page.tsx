@@ -70,21 +70,21 @@ export default function QueuePage() {
             Nothing is waiting to be sent. Import professors with a scheduled time to fill the queue.
           </EmptyCard>
         ) : (
-          <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
-            <div className="flex gap-1 border-b border-slate-100 px-3 py-2">
+          <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-line">
+            <div className="flex gap-1 border-b border-line px-3 py-2">
               {tabs.map((t) => (
                 <button
                   key={t.key}
                   type="button"
                   onClick={() => setFilter(t.key)}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    filter === t.key ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:text-slate-800"
+                    filter === t.key ? "bg-surface-3 text-fg" : "text-muted hover:text-fg"
                   }`}
                 >
                   {t.label}
                   <span
                     className={`rounded-full px-1.5 text-[11px] tabular-nums ${
-                      t.key === "FAILED" && t.n > 0 ? "bg-red-100 text-red-700" : "bg-slate-200/70 text-slate-600"
+                      t.key === "FAILED" && t.n > 0 ? "bg-danger-soft text-danger-fg" : "bg-surface-3/70 text-fg-2"
                     }`}
                   >
                     {t.n}
@@ -93,7 +93,7 @@ export default function QueuePage() {
               ))}
             </div>
             {rows && rows.length === 0 ? (
-              <p className="px-5 py-10 text-center text-sm text-slate-500">No {filter === "FAILED" ? "failed" : "scheduled"} emails.</p>
+              <p className="px-5 py-10 text-center text-sm text-muted">No {filter === "FAILED" ? "failed" : "scheduled"} emails.</p>
             ) : (
               <div className={tableWrap}>
                 <table className={table}>
@@ -109,15 +109,15 @@ export default function QueuePage() {
                   <tbody>
                     {rows?.map((e) => (
                       <Fragment key={e.id}>
-                      <tr className={`${tr} ${e.status === "FAILED" ? "bg-red-50/40" : ""}`}>
+                      <tr className={`${tr} ${e.status === "FAILED" ? "bg-danger-soft/40" : ""}`}>
                         <td className={td}>
                           <div className="flex items-center gap-3">
                             <Avatar name={e.professor.name} size="sm" />
                             <div className="min-w-0">
-                              <Link href={`/professors/${e.professor.id}`} className="font-medium text-slate-900 hover:text-indigo-600">
+                              <Link href={`/professors/${e.professor.id}`} className="font-medium text-fg hover:text-primary-text">
                                 {e.professor.name}
                               </Link>
-                              <div className="truncate text-xs text-slate-500">{e.professor.email}</div>
+                              <div className="truncate text-xs text-muted">{e.professor.email}</div>
                             </div>
                           </div>
                         </td>
@@ -126,11 +126,11 @@ export default function QueuePage() {
                             <TypeChip followUpNo={e.followUpNo} />
                             {e.isHtml && <HtmlBadge />}
                           </div>
-                          <div className="text-slate-800">{e.subject}</div>
-                          {e.error && <div className="mt-1 break-words text-xs text-red-600">{e.error}</div>}
+                          <div className="text-fg">{e.subject}</div>
+                          {e.error && <div className="mt-1 break-words text-xs text-danger-fg">{e.error}</div>}
                           <button
                             type="button"
-                            className="mt-1 text-xs font-medium text-indigo-600 hover:text-indigo-500"
+                            className="mt-1 text-xs font-medium text-primary-text hover:underline underline-offset-2"
                             aria-expanded={open === e.id}
                             onClick={() => setOpen(open === e.id ? null : e.id)}
                           >
@@ -143,7 +143,7 @@ export default function QueuePage() {
                         </td>
                         <td className={td}>
                           {e.status === "SENDING" ? (
-                            <span className="text-xs text-slate-500">Sending…</span>
+                            <span className="text-xs text-muted">Sending…</span>
                           ) : (
                             <EmailActions email={e} onChanged={reload} />
                           )}
@@ -151,14 +151,14 @@ export default function QueuePage() {
                       </tr>
                       {open === e.id && (
                         <tr>
-                          <td colSpan={5} className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
-                            <p className="mb-2 text-xs text-slate-500">
-                              <span className="font-medium text-slate-700">Subject:</span> {e.subject}
+                          <td colSpan={5} className="border-b border-line bg-surface-2/70 px-5 py-4">
+                            <p className="mb-2 text-xs text-muted">
+                              <span className="font-medium text-fg-2">Subject:</span> {e.subject}
                             </p>
                             {e.isHtml ? (
                               <EmailBody body={e.body} isHtml title={`Email: ${e.subject}`} />
                             ) : (
-                              <EmailBody body={e.body} isHtml={false} className="max-h-96 overflow-y-auto rounded-lg bg-white p-4 ring-1 ring-slate-200" textClassName="text-slate-800" />
+                              <EmailBody body={e.body} isHtml={false} className="max-h-96 overflow-y-auto rounded-lg bg-surface p-4 ring-1 ring-line" textClassName="text-fg" />
                             )}
                           </td>
                         </tr>

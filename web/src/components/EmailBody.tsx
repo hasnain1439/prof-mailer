@@ -26,8 +26,8 @@ export function EmailBody({
         sandbox=""
         srcDoc={body}
         referrerPolicy="no-referrer"
-        className={`block w-full rounded-lg bg-white ring-1 ring-slate-200 ${className}`}
-        style={{ height }}
+        className={`block w-full rounded-lg bg-white ring-1 ring-line ${className}`}
+        style={{ height, colorScheme: "light", background: "#fff" }}
       />
     );
   }
@@ -36,6 +36,6 @@ export function EmailBody({
 
 export function HtmlBadge() {
   return (
-    <span className="rounded-full bg-amber-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-600/20">HTML</span>
+    <span className="rounded-full bg-warning-soft px-2 py-0.5 font-mono text-[10px] font-semibold text-warning-fg ring-1 ring-inset ring-warning-line">HTML</span>
   );
 }

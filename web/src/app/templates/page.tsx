@@ -125,10 +125,10 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
           </label>
           <input id="t-name" required className={input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </div>
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 ring-1 ring-inset ring-slate-300 has-[:checked]:bg-violet-50 has-[:checked]:text-violet-800 has-[:checked]:ring-violet-300">
+        <label className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg-2 ring-1 ring-inset ring-line-strong has-[:checked]:bg-accent-soft has-[:checked]:text-accent-fg has-[:checked]:ring-accent-line">
           <input
             type="checkbox"
-            className="h-4 w-4 accent-violet-600"
+            className="h-4 w-4 accent-accent"
             checked={form.isFollowUp}
             onChange={(e) => setForm({ ...form, isFollowUp: e.target.checked })}
           />
@@ -149,10 +149,10 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
           onChange={(e) => setForm({ ...form, subject: e.target.value })}
         />
       </div>
-      <div className="rounded-lg bg-slate-50/70 p-3 ring-1 ring-slate-200">
+      <div className="rounded-lg bg-surface-2/70 p-3 ring-1 ring-line">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-slate-600">Format</span>
-          <div className="flex rounded-lg bg-slate-200/70 p-0.5" role="radiogroup" aria-label="Body format">
+          <span className="text-xs font-medium text-fg-2">Format</span>
+          <div className="flex rounded-lg bg-surface-3/70 p-0.5" role="radiogroup" aria-label="Body format">
             {[
               { v: false, l: "Plain text" },
               { v: true, l: "HTML" },
@@ -164,7 +164,7 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
                 aria-checked={form.isHtml === o.v}
                 onClick={() => setForm((f) => ({ ...f, isHtml: o.v }))}
                 className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                  form.isHtml === o.v ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                  form.isHtml === o.v ? "bg-surface text-fg shadow-sm" : "text-fg-2 hover:text-fg"
                 }`}
               >
                 {o.l}
@@ -191,10 +191,10 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
             />
           </div>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-muted">
           Tip: for professors, a simple, personal-looking email usually gets more replies than a heavily designed one — keep the HTML light.
         </p>
-        {fileNote && <p className="mt-1 text-xs text-emerald-700">{fileNote}</p>}
+        {fileNote && <p className="mt-1 text-xs text-success-fg">{fileNote}</p>}
       </div>
       <div className={form.isHtml ? "grid grid-cols-1 gap-4 xl:grid-cols-2" : ""}>
         <div>
@@ -220,8 +220,8 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
           </div>
         )}
       </div>
-      <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
-        <p className="mb-2 text-xs text-slate-600">Placeholders: click to insert at the cursor in the subject or body.</p>
+      <div className="rounded-lg bg-surface-2 p-3 ring-1 ring-line">
+        <p className="mb-2 text-xs text-fg-2">Placeholders: click to insert at the cursor in the subject or body.</p>
         <div className="flex flex-wrap gap-2">
           {PLACEHOLDERS.map((p) => (
             <button
@@ -274,7 +274,7 @@ function TemplatePreview({ template }: { template: Template }) {
     <div className="space-y-4">
       <ErrorBox error={professors.error} onRetry={professors.reload} />
       {professors.data && professors.data.length === 0 && (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted">
           Add or{" "}
           <Link href="/import" className={link}>
             import
@@ -303,13 +303,13 @@ function TemplatePreview({ template }: { template: Template }) {
       </div>
       <ErrorBox error={error} />
       {result && (
-        <div className="overflow-hidden rounded-lg ring-1 ring-slate-200">
-          <div className="border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-sm">
-            <span className="text-slate-500">Subject: </span>
-            <span className="font-medium text-slate-900">{result.subject}</span>
+        <div className="overflow-hidden rounded-lg ring-1 ring-line">
+          <div className="border-b border-line bg-surface-2 px-4 py-2.5 text-sm">
+            <span className="text-muted">Subject: </span>
+            <span className="font-medium text-fg">{result.subject}</span>
           </div>
           <div className={result.isHtml ? "p-2" : "p-4"}>
-            <EmailBody body={result.body} isHtml={!!result.isHtml} textClassName="text-slate-800" title="Rendered email preview" />
+            <EmailBody body={result.body} isHtml={!!result.isHtml} textClassName="text-fg" title="Rendered email preview" />
           </div>
         </div>
       )}
@@ -351,22 +351,22 @@ export default function TemplatesPage() {
   const followUps = data?.filter((t) => t.isFollowUp) ?? [];
 
   const renderTemplate = (t: Template) => (
-    <div key={t.id} className="flex flex-col rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5 transition hover:shadow-md">
+    <div key={t.id} className="flex flex-col rounded-xl bg-surface shadow-sm ring-1 ring-line transition hover:shadow-md">
       <div className="px-5 pt-4">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="truncate font-semibold text-slate-900">{t.name}</h3>
+          <h3 className="truncate font-semibold text-fg">{t.name}</h3>
           {t.isFollowUp ? (
-            <span className={`${pill} bg-violet-50 text-violet-700 ring-violet-600/20`}>Follow-up</span>
+            <span className={`${pill} bg-accent-soft text-accent-fg ring-accent-line`}>Follow-up</span>
           ) : (
-            <span className={`${pill} bg-slate-100 text-slate-600 ring-slate-500/15`}>Initial</span>
+            <span className={`${pill} bg-surface-3 text-fg-2 ring-line-strong`}>Initial</span>
           )}
           {t.isHtml && <HtmlBadge />}
           {t.isFollowUp && t.id === followUpId && (
-            <span className={`${pill} bg-emerald-50 text-emerald-700 ring-emerald-600/20`}>Used for follow-ups</span>
+            <span className={`${pill} bg-success-soft text-success-fg ring-success-line`}>Used for follow-ups</span>
           )}
         </div>
-        <p className="mt-1 truncate text-sm text-slate-600" title={t.subject}>
-          <span className="text-slate-400">Subject:</span> {t.subject}
+        <p className="mt-1 truncate text-sm text-fg-2" title={t.subject}>
+          <span className="text-subtle">Subject:</span> {t.subject}
         </p>
       </div>
       {t.isHtml ? (
@@ -374,11 +374,11 @@ export default function TemplatesPage() {
           <EmailBody body={t.body} isHtml height={144} title={`${t.name} preview`} />
         </div>
       ) : (
-        <pre className="mx-5 mt-3 max-h-36 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-3 font-sans text-xs leading-relaxed text-slate-600">
+        <pre className="mx-5 mt-3 max-h-36 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface-2 p-3 font-sans text-xs leading-relaxed text-fg-2">
           {t.body}
         </pre>
       )}
-      <div className="mt-3 flex items-center gap-1 border-t border-slate-100 px-3 py-2">
+      <div className="mt-3 flex items-center gap-1 border-t border-line px-3 py-2">
         <button
           type="button"
           className={`${btnGhost} !text-xs`}
@@ -401,7 +401,7 @@ export default function TemplatesPage() {
           <IconPencil size={14} />
           Edit
         </button>
-        <button type="button" className={`${btnGhost} ml-auto !text-xs !text-red-600 hover:!bg-red-50`} onClick={() => remove(t)}>
+        <button type="button" className={`${btnGhost} ml-auto !text-xs !text-danger-fg hover:!bg-danger-soft`} onClick={() => remove(t)}>
           <IconTrash size={14} />
           Delete
         </button>
@@ -484,11 +484,11 @@ export default function TemplatesPage() {
             </EmptyCard>
           )
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             <section>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Initial emails ({initial.length})</h2>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Initial emails ({initial.length})</h2>
               {initial.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-slate-300 px-5 py-6 text-center text-sm text-slate-500">
+                <p className="rounded-xl border border-dashed border-line-strong px-5 py-6 text-center text-sm text-muted">
                   No initial templates.{" "}
                   <button type="button" className={link} onClick={() => startNew(false)}>
                     Create one
@@ -499,9 +499,9 @@ export default function TemplatesPage() {
               )}
             </section>
             <section>
-              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Follow-ups ({followUps.length})</h2>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Follow-ups ({followUps.length})</h2>
               {followUps.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-slate-300 px-5 py-6 text-center text-sm text-slate-500">
+                <p className="rounded-xl border border-dashed border-line-strong px-5 py-6 text-center text-sm text-muted">
                   No follow-up templates.{" "}
                   <button type="button" className={link} onClick={() => startNew(true)}>
                     Create one
@@ -511,7 +511,7 @@ export default function TemplatesPage() {
               ) : (
                 <>
                   {settings.data && !followUps.some((t) => t.id === followUpId) && (
-                    <p className="mb-3 text-xs text-amber-700">
+                    <p className="mb-3 text-xs text-warning-fg">
                       None of these is selected for follow-ups yet.{" "}
                       <Link href="/settings" className={link}>
                         Choose one in Settings

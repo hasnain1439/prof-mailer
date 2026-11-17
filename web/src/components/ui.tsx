@@ -7,34 +7,34 @@ import { IconAlert, IconCheckCircle, IconInfo, IconX } from "./icons";
 /* ---------- class strings ---------- */
 
 export const btn =
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-50";
-export const btnPrimary = `${btn} bg-indigo-600 text-white hover:bg-indigo-500 disabled:hover:bg-indigo-600`;
-export const btnSecondary = `${btn} bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50`;
-export const btnDanger = `${btn} bg-white text-red-600 ring-1 ring-inset ring-red-200 hover:bg-red-50`;
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium shadow-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50";
+export const btnPrimary = `${btn} bg-primary text-primary-fg hover:bg-primary-hover disabled:hover:bg-primary`;
+export const btnSecondary = `${btn} bg-surface text-fg-2 ring-1 ring-inset ring-line-strong hover:bg-surface-2`;
+export const btnDanger = `${btn} bg-surface text-danger-fg ring-1 ring-inset ring-danger-line hover:bg-danger-soft`;
 export const btnGhost =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-surface-3 hover:text-fg disabled:cursor-not-allowed disabled:opacity-50";
 export const btnSmall = "!gap-1 !rounded-md !px-2.5 !py-1 !text-xs";
 export const input =
-  "block w-full rounded-lg border-0 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500";
-export const label = "mb-1.5 block text-xs font-medium text-slate-600";
-export const link = "font-medium text-indigo-600 hover:text-indigo-500";
+  "block w-full rounded-lg border-0 bg-surface px-3 py-2 text-sm text-fg shadow-xs ring-1 ring-inset ring-line-strong placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ring";
+export const label = "mb-1.5 block text-xs font-medium text-fg-2";
+export const link = "font-medium text-primary-text hover:underline underline-offset-2";
 
 /** Scroll container for tables; sticky headers stick to its top. */
 export const tableWrap = "max-h-[70vh] overflow-auto";
 export const table = "w-full border-separate border-spacing-0 text-sm";
 export const th =
-  "sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 backdrop-blur first:pl-5 last:pr-5";
-export const td = "border-b border-slate-100 px-4 py-3 align-top text-slate-700 first:pl-5 last:pr-5";
-export const tr = "transition-colors hover:bg-slate-50/80";
+  "sticky top-0 z-10 border-b border-line bg-surface-2/95 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted backdrop-blur first:pl-5 last:pr-5";
+export const td = "border-b border-line px-4 py-3 align-top text-fg-2 first:pl-5 last:pr-5";
+export const tr = "transition-colors hover:bg-surface-2/80";
 
 /* ---------- layout ---------- */
 
 export function PageHeader({ title, description, children }: { title: ReactNode; description?: ReactNode; children?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{title}</h1>
-        {description && <p className="mt-1 max-w-2xl text-sm text-slate-500">{description}</p>}
+        <h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">{title}</h1>
+        {description && <p className="mt-1 max-w-2xl text-sm text-muted">{description}</p>}
       </div>
       {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
@@ -58,17 +58,17 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`mb-6 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5 ${className}`}>
+    <section className={`mb-5 overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-line ${className}`}>
       {(title || actions) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            {title && <h2 className="text-sm font-semibold text-slate-900">{title}</h2>}
-            {description && <p className="mt-0.5 text-xs text-slate-500">{description}</p>}
+            {title && <h2 className="text-sm font-semibold text-fg">{title}</h2>}
+            {description && <p className="mt-0.5 text-xs text-muted">{description}</p>}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
       )}
-      <div className={flush ? "" : "p-5"}>{children}</div>
+      <div className={flush ? "" : "p-4 sm:p-5"}>{children}</div>
     </section>
   );
 }
@@ -77,10 +77,10 @@ export function Card({
 
 type Tone = "error" | "success" | "warning" | "info";
 const noticeTone: Record<Tone, { box: string; icon: ReactNode }> = {
-  error: { box: "bg-red-50 text-red-800 ring-red-200", icon: <IconAlert size={18} className="text-red-500" /> },
-  success: { box: "bg-emerald-50 text-emerald-800 ring-emerald-200", icon: <IconCheckCircle size={18} className="text-emerald-500" /> },
-  warning: { box: "bg-amber-50 text-amber-900 ring-amber-200", icon: <IconAlert size={18} className="text-amber-500" /> },
-  info: { box: "bg-indigo-50 text-indigo-900 ring-indigo-200", icon: <IconInfo size={18} className="text-indigo-500" /> },
+  error: { box: "bg-danger-soft text-danger-fg ring-danger-line", icon: <IconAlert size={18} className="text-danger" /> },
+  success: { box: "bg-success-soft text-success-fg ring-success-line", icon: <IconCheckCircle size={18} className="text-success" /> },
+  warning: { box: "bg-warning-soft text-warning-fg ring-warning-line", icon: <IconAlert size={18} className="text-warning" /> },
+  info: { box: "bg-primary-soft text-primary-soft-fg ring-primary-line", icon: <IconInfo size={18} className="text-primary-text" /> },
 };
 
 export function Notice({
@@ -141,13 +141,13 @@ export function SuccessBox({ children }: { children: ReactNode }) {
 /* ---------- loading skeletons ---------- */
 
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-slate-200/70 ${className}`} />;
+  return <div className={`animate-pulse rounded-md bg-surface-3/70 ${className}`} />;
 }
 
 /** Generic block of skeleton rows (kept as `Loading` for existing callers). */
 export function Loading({ rows = 4 }: { rows?: number; text?: string }) {
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5" aria-busy="true" aria-label="Loading">
+    <div className="rounded-xl bg-surface p-5 shadow-sm ring-1 ring-line" aria-busy="true" aria-label="Loading">
       <div className="space-y-4">
         {Array.from({ length: rows }, (_, i) => (
           <div key={i} className="flex items-center gap-3">
@@ -165,14 +165,14 @@ export function Loading({ rows = 4 }: { rows?: number; text?: string }) {
 
 export function TableSkeleton({ rows = 6, cols = 5 }: { rows?: number; cols?: number }) {
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5" aria-busy="true" aria-label="Loading">
-      <div className="flex gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3">
+    <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-line" aria-busy="true" aria-label="Loading">
+      <div className="flex gap-4 border-b border-line bg-surface-2 px-5 py-3">
         {Array.from({ length: cols }, (_, i) => (
           <Skeleton key={i} className="h-3 flex-1" />
         ))}
       </div>
       {Array.from({ length: rows }, (_, r) => (
-        <div key={r} className="flex items-center gap-4 border-b border-slate-100 px-5 py-4 last:border-0">
+        <div key={r} className="flex items-center gap-4 border-b border-line px-5 py-4 last:border-0">
           {Array.from({ length: cols }, (_, c) => (
             <Skeleton key={c} className={`h-3 flex-1 ${c === 0 ? "max-w-48" : ""}`} />
           ))}
@@ -198,10 +198,10 @@ export function EmptyState({
   compact?: boolean;
 }) {
   return (
-    <div className={`flex flex-col items-center text-center ${compact ? "px-4 py-8" : "px-6 py-14"}`}>
-      {icon && <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500">{icon}</div>}
-      <p className="text-sm font-semibold text-slate-900">{title}</p>
-      {children && <p className="mt-1 max-w-sm text-sm text-slate-500">{children}</p>}
+    <div className={`flex flex-col items-center text-center ${compact ? "px-4 py-7" : "px-6 py-10"}`}>
+      {icon && <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-surface-3 text-muted">{icon}</div>}
+      <p className="text-sm font-semibold text-fg">{title}</p>
+      {children && <p className="mt-1 max-w-sm text-sm text-muted">{children}</p>}
       {action && <div className="mt-4 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
   );
@@ -210,32 +210,32 @@ export function EmptyState({
 /** Wraps EmptyState in a card-like box (for use where no Card surrounds it). */
 export function EmptyCard(props: Parameters<typeof EmptyState>[0]) {
   return (
-    <div className="rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
+    <div className="rounded-xl bg-surface shadow-sm ring-1 ring-line">
       <EmptyState {...props} />
     </div>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-6 text-center text-sm text-slate-500">{children}</p>;
+  return <p className="py-6 text-center text-sm text-muted">{children}</p>;
 }
 
 /* ---------- badges ---------- */
 
 const emailStatusStyles: Record<EmailStatus, { cls: string; dot: string; label: string }> = {
-  SCHEDULED: { cls: "bg-indigo-50 text-indigo-700 ring-indigo-600/15", dot: "bg-indigo-500", label: "Scheduled" },
-  SENDING: { cls: "bg-amber-50 text-amber-800 ring-amber-600/20", dot: "bg-amber-500 animate-pulse", label: "Sending" },
-  SENT: { cls: "bg-sky-50 text-sky-700 ring-sky-600/15", dot: "bg-sky-500", label: "Sent" },
-  FAILED: { cls: "bg-red-50 text-red-700 ring-red-600/15", dot: "bg-red-500", label: "Failed" },
-  CANCELLED: { cls: "bg-slate-100 text-slate-600 ring-slate-500/15", dot: "bg-slate-400", label: "Cancelled" },
+  SCHEDULED: { cls: "bg-primary-soft text-primary-text ring-primary-line", dot: "bg-primary", label: "Scheduled" },
+  SENDING: { cls: "bg-warning-soft text-warning-fg ring-warning-line", dot: "bg-warning animate-pulse", label: "Sending" },
+  SENT: { cls: "bg-info-soft text-info-fg ring-info-line", dot: "bg-info", label: "Sent" },
+  FAILED: { cls: "bg-danger-soft text-danger-fg ring-danger-line", dot: "bg-danger", label: "Failed" },
+  CANCELLED: { cls: "bg-surface-3 text-fg-2 ring-line-strong", dot: "bg-subtle", label: "Cancelled" },
 };
 
 export const profStatusStyles: Record<ProfessorStatus, { cls: string; dot: string; label: string }> = {
-  NOT_SENT: { cls: "bg-slate-100 text-slate-700 ring-slate-500/15", dot: "bg-slate-400", label: "Not sent" },
-  SENT: { cls: "bg-sky-50 text-sky-700 ring-sky-600/15", dot: "bg-sky-500", label: "Sent" },
-  REPLIED: { cls: "bg-emerald-50 text-emerald-700 ring-emerald-600/20", dot: "bg-emerald-500", label: "Replied" },
-  INTERESTED: { cls: "bg-violet-50 text-violet-700 ring-violet-600/20", dot: "bg-violet-500", label: "Interested" },
-  DECLINED: { cls: "bg-rose-50 text-rose-700 ring-rose-600/15", dot: "bg-rose-500", label: "Declined" },
+  NOT_SENT: { cls: "bg-surface-3 text-fg-2 ring-line-strong", dot: "bg-subtle", label: "Not sent" },
+  SENT: { cls: "bg-info-soft text-info-fg ring-info-line", dot: "bg-info", label: "Sent" },
+  REPLIED: { cls: "bg-success-soft text-success-fg ring-success-line", dot: "bg-success", label: "Replied" },
+  INTERESTED: { cls: "bg-accent-soft text-accent-fg ring-accent-line", dot: "bg-accent", label: "Interested" },
+  DECLINED: { cls: "bg-danger-soft text-danger-fg ring-danger-line", dot: "bg-danger", label: "Declined" },
 };
 
 export function Badge({ className, dot, children }: { className: string; dot?: string; children: ReactNode }) {
@@ -273,7 +273,7 @@ export function TypeChip({ followUpNo }: { followUpNo: number }) {
   return (
     <span
       className={`inline-flex whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
-        followUpNo === 0 ? "bg-slate-100 text-slate-600" : "bg-violet-50 text-violet-700"
+        followUpNo === 0 ? "bg-surface-3 text-fg-2" : "bg-accent-soft text-accent-fg"
       }`}
     >
       {followUpLabel(followUpNo)}
@@ -288,13 +288,13 @@ export function followUpLabel(n: number): string {
 /* ---------- avatar ---------- */
 
 const avatarColors = [
-  "bg-indigo-100 text-indigo-700",
-  "bg-sky-100 text-sky-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-amber-100 text-amber-800",
-  "bg-rose-100 text-rose-700",
-  "bg-violet-100 text-violet-700",
-  "bg-teal-100 text-teal-700",
+  "bg-primary-soft text-primary-text",
+  "bg-info-soft text-info-fg",
+  "bg-success-soft text-success-fg",
+  "bg-warning-soft text-warning-fg",
+  "bg-danger-soft text-danger-fg",
+  "bg-accent-soft text-accent-fg",
+  "bg-info-soft text-info-fg",
 ];
 
 export function initials(name: string): string {
@@ -345,12 +345,12 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`w-full ${wide ? "max-w-3xl" : "max-w-xl"} overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10`}
+        className={`w-full ${wide ? "max-w-3xl" : "max-w-xl"} overflow-hidden rounded-2xl bg-surface shadow-2xl ring-1 ring-line`}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-          <button type="button" aria-label="Close" className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={onClose}>
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+          <h2 className="text-base font-semibold text-fg">{title}</h2>
+          <button type="button" aria-label="Close" className="rounded-md p-1 text-subtle hover:bg-surface-3 hover:text-fg-2" onClick={onClose}>
             <IconX size={18} />
           </button>
         </div>

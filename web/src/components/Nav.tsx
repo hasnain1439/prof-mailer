@@ -35,7 +35,7 @@ export function NavLinks({ active, onNavigate }: { active: string | null; onNavi
     <nav className="space-y-6">
       {groups.map((g, gi) => (
         <div key={gi}>
-          {g.heading && <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.heading}</p>}
+          {g.heading && <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-subtle">{g.heading}</p>}
           <ul className="space-y-0.5">
             {g.links.map((l) => {
               const isActive =
@@ -47,10 +47,10 @@ export function NavLinks({ active, onNavigate }: { active: string | null; onNavi
                     onClick={onNavigate}
                     aria-current={isActive ? "page" : undefined}
                     className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                      isActive ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      isActive ? "bg-primary-soft text-primary-text" : "text-fg-2 hover:bg-surface-3 hover:text-fg"
                     }`}
                   >
-                    <span className={isActive ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600"}>{l.icon}</span>
+                    <span className={isActive ? "text-primary-text" : "text-subtle group-hover:text-fg-2"}>{l.icon}</span>
                     {l.label}
                   </Link>
                 </li>

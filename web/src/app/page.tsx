@@ -47,13 +47,13 @@ function StatCard({
   children?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+    <div className="rounded-xl bg-surface p-4 shadow-sm ring-1 ring-line">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">{value}</p>
+          <p className="text-sm font-medium text-muted">{label}</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight text-fg tabular-nums">{value}</p>
         </div>
-        <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconClass}`}>{icon}</span>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${iconClass}`}>{icon}</span>
       </div>
       {children}
     </div>
@@ -62,9 +62,9 @@ function StatCard({
 
 function StatSkeleton() {
   return (
-    <div className="rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-900/5">
+    <div className="rounded-xl bg-surface p-4 shadow-sm ring-1 ring-line">
       <Skeleton className="h-3 w-20" />
-      <Skeleton className="mt-4 h-7 w-14" />
+      <Skeleton className="mt-3 h-7 w-14" />
     </div>
   );
 }
@@ -74,21 +74,21 @@ function SendingFromBanner() {
   const { data, error } = useGmailStatus();
   if (error && !data) {
     return (
-      <div className="mb-6 flex items-center gap-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-600 shadow-sm ring-1 ring-slate-900/5">
-        <span className="h-2 w-2 rounded-full bg-slate-400" />
+      <div className="mb-5 flex items-center gap-3 rounded-xl bg-surface px-4 py-3 text-sm text-fg-2 shadow-sm ring-1 ring-line">
+        <span className="h-2 w-2 rounded-full bg-subtle" />
         API offline: can&apos;t tell which Gmail account is connected.
       </div>
     );
   }
-  if (!data) return <Skeleton className="mb-6 h-12 w-full rounded-xl" />;
+  if (!data) return <Skeleton className="mb-5 h-12 w-full rounded-xl" />;
   if (data.connected) {
     return (
-      <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-white px-4 py-3 text-sm shadow-sm ring-1 ring-slate-900/5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+      <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-surface px-4 py-3 text-sm shadow-sm ring-1 ring-line">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-success-soft text-success-fg">
           <IconMail size={16} />
         </span>
-        <span className="text-slate-600">
-          Emails are sent from <strong className="font-semibold text-slate-900">{data.email ?? "your connected account"}</strong>
+        <span className="text-fg-2">
+          Emails are sent from <strong className="font-semibold text-fg">{data.email ?? "your connected account"}</strong>
         </span>
         {data.dryRun && <DryRunPill />}
         <Link href="/gmail" className={`ml-auto text-sm ${link}`}>
@@ -98,8 +98,8 @@ function SendingFromBanner() {
     );
   }
   return (
-    <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
-      <IconAlert size={18} className="text-amber-500" />
+    <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-fg ring-1 ring-warning-line">
+      <IconAlert size={18} className="text-warning" />
       <span>
         <strong className="font-semibold">No Gmail account connected.</strong> Scheduled emails can&apos;t be sent until you connect one.
       </span>
@@ -160,25 +160,25 @@ function GettingStarted() {
       title="Getting started"
       description={`${doneCount} of ${items.length} steps complete`}
       actions={
-        <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${(doneCount / items.length) * 100}%` }} />
+        <div className="h-1.5 w-32 overflow-hidden rounded-full bg-surface-3">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(doneCount / items.length) * 100}%` }} />
         </div>
       }
       flush
     >
-      <ol className="divide-y divide-slate-100">
+      <ol className="divide-y divide-line">
         {items.map((item, i) => (
-          <li key={item.title} className="flex items-center gap-4 px-5 py-3.5">
+          <li key={item.title} className="flex items-center gap-3 px-4 py-2.5 sm:px-5">
             <span
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                item.done ? "bg-emerald-500 text-white" : "bg-white text-slate-500 ring-1 ring-slate-300"
+                item.done ? "bg-success text-white" : "bg-surface text-muted ring-1 ring-line-strong"
               }`}
             >
               {item.done ? <IconCheck size={14} /> : i + 1}
             </span>
             <div className="min-w-0 flex-1">
-              <p className={`text-sm font-medium ${item.done ? "text-slate-400 line-through" : "text-slate-900"}`}>{item.title}</p>
-              <p className="text-xs text-slate-500">{item.help}</p>
+              <p className={`text-sm font-medium ${item.done ? "text-subtle line-through" : "text-fg"}`}>{item.title}</p>
+              <p className="text-xs text-muted">{item.help}</p>
             </div>
             {!item.done && (
               <Link href={item.href} className={`${btnSecondary} ${btnSmall}`}>
@@ -209,7 +209,7 @@ export default function DashboardPage() {
       <SendingFromBanner />
       <ErrorBox error={error} onRetry={reload} />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {!data ? (
           <>
             <StatSkeleton />
@@ -219,28 +219,28 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
-            <StatCard label="Scheduled" value={data.counts.scheduled} icon={<IconClock size={20} />} iconClass="bg-indigo-50 text-indigo-600" />
+            <StatCard label="Scheduled" value={data.counts.scheduled} icon={<IconClock size={20} />} iconClass="bg-primary-soft text-primary-text" />
             <StatCard
               label="Sent today"
               value={
                 <>
                   {data.counts.sentToday}
-                  <span className="text-lg font-medium text-slate-400"> / {data.dailySendLimit}</span>
+                  <span className="text-base font-medium text-subtle"> / {data.dailySendLimit}</span>
                 </>
               }
               icon={<IconSend size={20} />}
-              iconClass="bg-sky-50 text-sky-600"
+              iconClass="bg-info-soft text-info-fg"
             >
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100" title={`${Math.round(sentPct)}% of daily limit`}>
-                <div className={`h-full rounded-full ${sentPct >= 100 ? "bg-amber-500" : "bg-sky-500"}`} style={{ width: `${sentPct}%` }} />
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-3" title={`${Math.round(sentPct)}% of daily limit`}>
+                <div className={`h-full rounded-full ${sentPct >= 100 ? "bg-warning" : "bg-info"}`} style={{ width: `${sentPct}%` }} />
               </div>
             </StatCard>
-            <StatCard label="Replied" value={data.counts.replied} icon={<IconReply size={20} />} iconClass="bg-emerald-50 text-emerald-600" />
+            <StatCard label="Replied" value={data.counts.replied} icon={<IconReply size={20} />} iconClass="bg-success-soft text-success-fg" />
             <StatCard
               label="Failed"
-              value={<span className={data.counts.failed > 0 ? "text-red-600" : undefined}>{data.counts.failed}</span>}
+              value={<span className={data.counts.failed > 0 ? "text-danger-fg" : undefined}>{data.counts.failed}</span>}
               icon={<IconAlert size={20} />}
-              iconClass={data.counts.failed > 0 ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-500"}
+              iconClass={data.counts.failed > 0 ? "bg-danger-soft text-danger-fg" : "bg-surface-3 text-muted"}
             >
               {data.counts.failed > 0 && (
                 <Link href="/queue" className={`mt-3 inline-block text-xs ${link}`}>
@@ -255,14 +255,14 @@ export default function DashboardPage() {
       <GettingStarted />
 
       {loading && !data && (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Skeleton className="h-64 rounded-xl" />
           <Skeleton className="h-64 rounded-xl" />
         </div>
       )}
 
       {data && (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Card
             title="Upcoming"
             description="Next 10 scheduled emails"
@@ -288,24 +288,24 @@ export default function DashboardPage() {
                 Import a list of professors to schedule your first emails.
               </EmptyState>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-line">
                 {data.upcoming.map((e) => (
-                  <li key={e.id} className="flex gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/70">
+                  <li key={e.id} className="flex gap-3 px-4 py-3 transition-colors sm:px-5 hover:bg-surface-2/70">
                     <Avatar name={e.professor.name} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <Link href={`/professors/${e.professor.id}`} className="truncate text-sm font-medium text-slate-900 hover:text-indigo-600">
+                        <Link href={`/professors/${e.professor.id}`} className="truncate text-sm font-medium text-fg hover:text-primary-text">
                           {e.professor.name}
                         </Link>
                         <TypeChip followUpNo={e.followUpNo} />
                       </div>
-                      <p className="truncate text-sm text-slate-600" title={e.subject}>
+                      <p className="truncate text-sm text-fg-2" title={e.subject}>
                         {e.subject}
                       </p>
-                      <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
                         <IconClock size={12} />
                         {formatKarachi(e.scheduledAt)}
-                        <span className="text-slate-300">·</span>
+                        <span className="text-subtle">·</span>
                         <span className="truncate">{e.professor.university}</span>
                       </p>
                       <div className="mt-2">
@@ -334,29 +334,29 @@ export default function DashboardPage() {
                 Sent emails and replies will appear here.
               </EmptyState>
             ) : (
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-line">
                 {data.recentSent.map((e) => (
-                  <li key={e.id} className="flex gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/70">
+                  <li key={e.id} className="flex gap-3 px-4 py-3 transition-colors sm:px-5 hover:bg-surface-2/70">
                     <Avatar name={e.professor.name} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <Link href={`/professors/${e.professor.id}`} className="truncate text-sm font-medium text-slate-900 hover:text-indigo-600">
+                        <Link href={`/professors/${e.professor.id}`} className="truncate text-sm font-medium text-fg hover:text-primary-text">
                           {e.professor.name}
                         </Link>
                         <TypeChip followUpNo={e.followUpNo} />
                         {e.repliedAt && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success-fg ring-1 ring-inset ring-success-line">
                             <IconReply size={11} />
                             Replied
                           </span>
                         )}
                       </div>
-                      <p className="truncate text-sm text-slate-600" title={e.subject}>
+                      <p className="truncate text-sm text-fg-2" title={e.subject}>
                         {e.subject}
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-muted">
                         Sent {formatKarachi(e.sentAt)}
-                        {e.repliedAt && <span className="text-emerald-700"> · replied {formatKarachi(e.repliedAt)}</span>}
+                        {e.repliedAt && <span className="text-success-fg"> · replied {formatKarachi(e.repliedAt)}</span>}
                       </p>
                     </div>
                   </li>

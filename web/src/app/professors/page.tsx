@@ -84,13 +84,13 @@ export default function ProfessorsPage() {
         </button>
       </PageHeader>
 
-      <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-900/5 sm:grid-cols-[2fr_1fr_1fr]">
+      <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl bg-surface p-4 shadow-sm ring-1 ring-line sm:grid-cols-[2fr_1fr_1fr]">
         <div>
           <label className={label} htmlFor="f-q">
             Search
           </label>
           <div className="relative">
-            <IconSearch size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-slate-400" />
+            <IconSearch size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-subtle" />
             <input id="f-q" className={`${input} pl-9`} placeholder="Name, email or university" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
         </div>
@@ -168,8 +168,8 @@ export default function ProfessorsPage() {
             </EmptyCard>
           )
         ) : (
-          <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
-            <div className="border-b border-slate-100 px-5 py-2.5 text-xs text-slate-500">
+          <div className="overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-line">
+            <div className="border-b border-line px-5 py-2.5 text-xs text-muted">
               {list.data.length} professor{list.data.length === 1 ? "" : "s"}
               {filtered && " matching filters"}
             </div>
@@ -195,21 +195,21 @@ export default function ProfessorsPage() {
                         <div className="flex items-center gap-3">
                           <Avatar name={p.name} size="sm" />
                           <div className="min-w-0">
-                            <Link href={`/professors/${p.id}`} className="font-medium text-slate-900 hover:text-indigo-600">
+                            <Link href={`/professors/${p.id}`} className="font-medium text-fg hover:text-primary-text">
                               {p.name}
                             </Link>
-                            <div className="truncate text-xs text-slate-500">{p.email}</div>
+                            <div className="truncate text-xs text-muted">{p.email}</div>
                           </div>
                         </div>
                       </td>
                       <td className={td}>
-                        <div className="text-slate-800">{p.university}</div>
-                        {p.country && <div className="text-xs text-slate-500">{p.country}</div>}
+                        <div className="text-fg">{p.university}</div>
+                        {p.country && <div className="text-xs text-muted">{p.country}</div>}
                       </td>
                       <td className={td}>
                         <select
                           aria-label={`Status for ${p.name}`}
-                          className={`cursor-pointer rounded-full border-0 py-0.5 pr-7 pl-2.5 text-xs font-medium ring-1 ring-inset focus:ring-2 focus:ring-indigo-500 focus:outline-none ${profStatusStyles[p.status].cls}`}
+                          className={`cursor-pointer rounded-full border-0 py-0.5 pr-7 pl-2.5 text-xs font-medium ring-1 ring-inset focus:ring-2 focus:ring-ring focus:outline-none ${profStatusStyles[p.status].cls}`}
                           value={p.status}
                           onChange={(e) => changeStatus(p, e.target.value as ProfessorStatus)}
                         >

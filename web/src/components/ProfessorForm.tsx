@@ -103,7 +103,7 @@ export function ProfessorForm({
         </label>
         <textarea id="pf-notes" rows={2} className={input} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
       </div>
-      <div className="-mx-6 -mb-6 mt-2 flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
+      <div className="-mx-6 -mb-6 mt-2 flex justify-end gap-2 border-t border-line bg-surface-2 px-6 py-4">
         <button type="button" className={btnSecondary} onClick={onCancel} disabled={busy}>
           Cancel
         </button>

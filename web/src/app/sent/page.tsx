@@ -24,14 +24,14 @@ export default function SentPage() {
         title={tab === "SENT" ? "Sent" : "Cancelled"}
         description={tab === "SENT" ? "Emails that have gone out, and whether the professor replied." : "Emails you cancelled. You can reschedule them."}
       >
-        <div className="flex rounded-lg bg-slate-200/60 p-0.5">
+        <div className="flex rounded-lg bg-surface-3/60 p-0.5">
           {(["SENT", "CANCELLED"] as Tab[]).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                tab === t ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                tab === t ? "bg-surface text-fg shadow-sm" : "text-fg-2 hover:text-fg"
               }`}
             >
               {t === "SENT" ? "Sent" : "Cancelled"}
@@ -55,7 +55,7 @@ export default function SentPage() {
               : "Emails you cancel from the queue will appear here."}
           </EmptyCard>
         ) : (
-          <div className={`overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5 ${loading ? "opacity-60" : ""}`}>
+          <div className={`overflow-hidden rounded-xl bg-surface shadow-sm ring-1 ring-line ${loading ? "opacity-60" : ""}`}>
             <div className={tableWrap}>
               <table className={table}>
                 <thead>
@@ -74,10 +74,10 @@ export default function SentPage() {
                         <div className="flex items-center gap-3">
                           <Avatar name={e.professor.name} size="sm" />
                           <div className="min-w-0">
-                            <Link href={`/professors/${e.professor.id}`} className="font-medium text-slate-900 hover:text-indigo-600">
+                            <Link href={`/professors/${e.professor.id}`} className="font-medium text-fg hover:text-primary-text">
                               {e.professor.name}
                             </Link>
-                            <div className="truncate text-xs text-slate-500">{e.professor.university}</div>
+                            <div className="truncate text-xs text-muted">{e.professor.university}</div>
                           </div>
                         </div>
                       </td>
@@ -86,12 +86,12 @@ export default function SentPage() {
                           <TypeChip followUpNo={e.followUpNo} />
                           {e.isHtml && <HtmlBadge />}
                         </div>
-                        <Link href={`/professors/${e.professor.id}`} className="block text-slate-800 hover:text-indigo-600">
+                        <Link href={`/professors/${e.professor.id}`} className="block text-fg hover:text-primary-text">
                           {e.subject}
                         </Link>
                           <button
                             type="button"
-                            className="mt-1 text-xs font-medium text-indigo-600 hover:text-indigo-500"
+                            className="mt-1 text-xs font-medium text-primary-text hover:underline underline-offset-2"
                             aria-expanded={open === e.id}
                             onClick={() => setOpen(open === e.id ? null : e.id)}
                           >
@@ -102,12 +102,12 @@ export default function SentPage() {
                       <td className={`${td} whitespace-nowrap`}>
                         {tab === "SENT" ? (
                           e.repliedAt ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success-fg ring-1 ring-inset ring-success-line">
                               <IconReply size={12} />
                               Replied {formatKarachi(e.repliedAt)}
                             </span>
                           ) : (
-                            <span className="text-xs text-slate-400">No reply yet</span>
+                            <span className="text-xs text-subtle">No reply yet</span>
                           )
                         ) : (
                           <EmailActions email={e} onChanged={reload} />
@@ -116,14 +116,14 @@ export default function SentPage() {
                     </tr>
                       {open === e.id && (
                         <tr>
-                          <td colSpan={4} className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
-                            <p className="mb-2 text-xs text-slate-500">
-                              <span className="font-medium text-slate-700">Subject:</span> {e.subject}
+                          <td colSpan={4} className="border-b border-line bg-surface-2/70 px-5 py-4">
+                            <p className="mb-2 text-xs text-muted">
+                              <span className="font-medium text-fg-2">Subject:</span> {e.subject}
                             </p>
                             {e.isHtml ? (
                               <EmailBody body={e.body} isHtml title={`Email: ${e.subject}`} />
                             ) : (
-                              <EmailBody body={e.body} isHtml={false} className="max-h-96 overflow-y-auto rounded-lg bg-white p-4 ring-1 ring-slate-200" textClassName="text-slate-800" />
+                              <EmailBody body={e.body} isHtml={false} className="max-h-96 overflow-y-auto rounded-lg bg-surface p-4 ring-1 ring-line" textClassName="text-fg" />
                             )}
                           </td>
                         </tr>

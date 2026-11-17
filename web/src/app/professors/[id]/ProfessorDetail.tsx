@@ -35,18 +35,18 @@ import {
 function Field({ name, children }: { name: string; children: ReactNode }) {
   return (
     <div>
-      <dt className="text-xs font-medium text-slate-500">{name}</dt>
-      <dd className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-900">{children || <span className="text-slate-400">—</span>}</dd>
+      <dt className="text-xs font-medium text-muted">{name}</dt>
+      <dd className="mt-0.5 whitespace-pre-wrap break-words text-sm text-fg">{children || <span className="text-subtle">—</span>}</dd>
     </div>
   );
 }
 
 const bubbleStyles: Record<Email["status"], string> = {
-  SENT: "bg-indigo-600 text-white ring-indigo-600",
-  SENDING: "bg-indigo-50 text-slate-900 ring-indigo-200",
-  SCHEDULED: "bg-white text-slate-900 ring-indigo-200 border border-dashed border-indigo-300",
-  FAILED: "bg-red-50 text-slate-900 ring-red-200",
-  CANCELLED: "bg-slate-100 text-slate-500 ring-slate-200",
+  SENT: "bg-primary text-primary-fg ring-primary",
+  SENDING: "bg-primary-soft text-fg ring-primary-line",
+  SCHEDULED: "bg-surface text-fg ring-primary-line border border-dashed border-primary-line",
+  FAILED: "bg-danger-soft text-fg ring-danger-line",
+  CANCELLED: "bg-surface-3 text-muted ring-line",
 };
 
 function Bubble({ e, sender, onChanged }: { e: Email; sender: string | null; onChanged: () => void }) {
@@ -55,25 +55,25 @@ function Bubble({ e, sender, onChanged }: { e: Email; sender: string | null; onC
     e.status === "SENT" ? `Sent ${formatKarachi(e.sentAt)}` : e.status === "CANCELLED" ? `Was scheduled ${formatKarachi(e.scheduledAt)}` : `Scheduled ${formatKarachi(e.scheduledAt)}`;
   return (
     <li className="flex flex-col items-end">
-      <div className="mb-1 flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500">
+      <div className="mb-1 flex flex-wrap items-center justify-end gap-2 text-xs text-muted">
         <TypeChip followUpNo={e.followUpNo} />
         {e.isHtml && <HtmlBadge />}
         <EmailStatusBadge status={e.status} />
         <span>{when}</span>
       </div>
       <div className={`w-full max-w-[42rem] rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm ring-1 ${bubbleStyles[e.status]}`}>
-        <p className={`text-sm font-semibold ${sent ? "text-white" : e.status === "CANCELLED" ? "line-through" : "text-slate-900"}`}>{e.subject}</p>
+        <p className={`text-sm font-semibold ${sent ? "text-primary-fg" : e.status === "CANCELLED" ? "line-through" : "text-fg"}`}>{e.subject}</p>
         {e.isHtml ? (
           <div className="mt-2">
             <EmailBody body={e.body} isHtml title={`Email: ${e.subject}`} />
           </div>
         ) : (
-          <EmailBody body={e.body} isHtml={false} className="mt-2" textClassName={sent ? "text-indigo-50" : ""} />
+          <EmailBody body={e.body} isHtml={false} className="mt-2" textClassName={sent ? "text-primary-fg/90" : ""} />
         )}
-        {sent && sender && <p className="mt-3 text-[11px] text-indigo-200">From {sender}</p>}
+        {sent && sender && <p className="mt-3 text-[11px] text-primary-fg/75">From {sender}</p>}
       </div>
       {e.status === "FAILED" && e.error && (
-        <div className="mt-1.5 w-full max-w-[42rem] rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">Error: {e.error}</div>
+        <div className="mt-1.5 w-full max-w-[42rem] rounded-lg bg-danger-soft px-3 py-2 text-xs text-danger-fg ring-1 ring-danger-line">Error: {e.error}</div>
       )}
       {(e.status === "SCHEDULED" || e.status === "FAILED" || e.status === "CANCELLED") && (
         <div className="mt-2">
@@ -88,12 +88,12 @@ function ReplyMarker({ name, at }: { name: string; at: string }) {
   return (
     <li className="flex items-start gap-2.5">
       <Avatar name={name} size="sm" />
-      <div className="rounded-2xl rounded-tl-sm bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm ring-1 ring-emerald-200">
+      <div className="rounded-2xl rounded-tl-sm bg-success-soft px-4 py-3 text-sm text-success-fg shadow-sm ring-1 ring-success-line">
         <p className="flex items-center gap-1.5 font-semibold">
           <IconReply size={14} />
           {name} replied
         </p>
-        <p className="mt-0.5 text-xs text-emerald-800">{formatKarachi(at)} · read the reply in your Gmail inbox</p>
+        <p className="mt-0.5 text-xs text-success-fg">{formatKarachi(at)} · read the reply in your Gmail inbox</p>
       </div>
     </li>
   );
@@ -102,14 +102,14 @@ function ReplyMarker({ name, at }: { name: string; at: string }) {
 function DetailSkeleton() {
   return (
     <div>
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-5 flex items-center gap-4">
         <Skeleton className="h-14 w-14 rounded-full" />
         <div className="space-y-2">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-3 w-64" />
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[20rem_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[20rem_1fr]">
         <Skeleton className="h-80 rounded-xl" />
         <Skeleton className="h-80 rounded-xl" />
       </div>
@@ -153,7 +153,7 @@ export function ProfessorDetail() {
 
   return (
     <div>
-      <Link href="/professors" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
+      <Link href="/professors" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg">
         <IconArrowLeft size={15} />
         Professors
       </Link>
@@ -163,17 +163,17 @@ export function ProfessorDetail() {
 
       {prof && (
         <>
-          <div className="mb-6 flex flex-wrap items-center gap-4">
+          <div className="mb-5 flex flex-wrap items-center gap-4">
             <Avatar name={prof.name} size="lg" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{prof.name}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight text-fg">{prof.name}</h1>
                 <ProfessorStatusBadge status={prof.status} />
               </div>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 text-sm text-muted">
                 {prof.university}
                 {prof.country && ` · ${prof.country}`} ·{" "}
-                <a href={`mailto:${prof.email}`} className="hover:text-slate-900 hover:underline">
+                <a href={`mailto:${prof.email}`} className="hover:text-fg hover:underline">
                   {prof.email}
                 </a>
               </p>
@@ -202,7 +202,7 @@ export function ProfessorDetail() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[20rem_1fr]">
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[20rem_1fr]">
             <Card title="Profile" className="lg:sticky lg:top-6">
               <dl className="space-y-4">
                 <Field name="Email">

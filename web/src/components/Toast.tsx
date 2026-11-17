@@ -20,9 +20,9 @@ export function useToast(): ToastFn {
 }
 
 const toneStyles: Record<ToastTone, { ring: string; icon: ReactNode }> = {
-  success: { ring: "text-emerald-600", icon: <IconCheckCircle size={18} /> },
-  error: { ring: "text-red-600", icon: <IconAlert size={18} /> },
-  info: { ring: "text-indigo-600", icon: <IconInfo size={18} /> },
+  success: { ring: "text-success-fg", icon: <IconCheckCircle size={18} /> },
+  error: { ring: "text-danger-fg", icon: <IconAlert size={18} /> },
+  info: { ring: "text-primary-text", icon: <IconInfo size={18} /> },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -62,11 +62,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             role={t.tone === "error" ? "alert" : "status"}
-            className="toast-in pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-800 shadow-lg ring-1 ring-slate-900/10"
+            className="toast-in pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl bg-surface px-4 py-3 text-sm text-fg shadow-lg ring-1 ring-line"
           >
             <span className={`mt-0.5 shrink-0 ${toneStyles[t.tone].ring}`}>{toneStyles[t.tone].icon}</span>
             <span className="min-w-0 flex-1 break-words">{t.message}</span>
-            <button type="button" aria-label="Dismiss" className="shrink-0 text-slate-400 hover:text-slate-700" onClick={() => dismiss(t.id)}>
+            <button type="button" aria-label="Dismiss" className="shrink-0 text-subtle hover:text-fg-2" onClick={() => dismiss(t.id)}>
               <IconX size={16} />
             </button>
           </div>

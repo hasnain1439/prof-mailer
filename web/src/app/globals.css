@@ -1,17 +1,161 @@
 @import "tailwindcss";
+/* prof-mailer theme: semantic tokens below drive both light and dark mode. */
+
+/* Class-based dark mode: <html class="dark"> (set before paint by the inline script in layout.tsx). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Semantic colour tokens. Components use these (bg-surface, text-muted, bg-primary, text-success-fg, …)
+ * instead of raw palette colours, so light/dark is handled here in one place.
+ * All *-fg / muted / subtle text tokens meet WCAG AA (≥4.5:1) on surface and on their *-soft backgrounds.
+ */
+:root {
+  --background: #f4f6f9;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #eef1f5;
+  --line: #e2e7ee;
+  --line-strong: #c9d1dc;
+  --fg: #0f172a;
+  --fg-2: #334155;
+  --muted: #536074;
+  --subtle: #677487;
+
+  --primary: #2f4fd6;
+  --primary-hover: #2541b8;
+  --primary-fg: #ffffff;
+  --primary-text: #2b48c6;
+  --primary-soft: #edf1ff;
+  --primary-soft-fg: #2a3fae;
+  --primary-line: #c3cffb;
+  --ring: #4f6ef7;
+
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --success-fg: #047857;
+  --success-line: #a7e9cc;
+
+  --warning: #d97706;
+  --warning-soft: #fffaeb;
+  --warning-fg: #92400e;
+  --warning-line: #f6d78b;
+
+  --danger: #e11d48;
+  --danger-soft: #fff1f3;
+  --danger-fg: #be123c;
+  --danger-line: #fecdd6;
+
+  --info: #0284c7;
+  --info-soft: #f0f8ff;
+  --info-fg: #0369a1;
+  --info-line: #bae2fb;
+
+  --accent: #7c3aed;
+  --accent-soft: #f5f3ff;
+  --accent-fg: #6d28d9;
+  --accent-line: #ddd6fe;
+
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0a101c;
+  --surface: #121a2a;
+  --surface-2: #162034;
+  --surface-3: #1e293d;
+  --line: #243149;
+  --line-strong: #34435c;
+  --fg: #e6eaf1;
+  --fg-2: #c5ccd8;
+  --muted: #9aa5b8;
+  --subtle: #8591a5;
+
+  --primary: #3b5bdb;
+  --primary-hover: #4867e6;
+  --primary-fg: #ffffff;
+  --primary-text: #9db0ff;
+  --primary-soft: #1b2850;
+  --primary-soft-fg: #bccaff;
+  --primary-line: #34478f;
+  --ring: #7088ff;
+
+  --success: #10b981;
+  --success-soft: #0d2a25;
+  --success-fg: #6ee7b7;
+  --success-line: #1c5c4a;
+
+  --warning: #f59e0b;
+  --warning-soft: #2b2213;
+  --warning-fg: #fcd34d;
+  --warning-line: #6a4d16;
+
+  --danger: #f43f5e;
+  --danger-soft: #331620;
+  --danger-fg: #fda4af;
+  --danger-line: #7a2639;
+
+  --info: #38bdf8;
+  --info-soft: #0d2536;
+  --info-fg: #7dd3fc;
+  --info-line: #1b4f6e;
+
+  --accent: #8b5cf6;
+  --accent-soft: #231b3d;
+  --accent-fg: #c4b5fd;
+  --accent-line: #4a3a85;
+
+  color-scheme: dark;
+}
 
 @theme inline {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
 
-html {
-  color-scheme: light;
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-text: var(--primary-text);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-fg: var(--primary-soft-fg);
+  --color-primary-line: var(--primary-line);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-fg: var(--success-fg);
+  --color-success-line: var(--success-line);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-fg: var(--warning-fg);
+  --color-warning-line: var(--warning-line);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-line: var(--danger-line);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-fg: var(--info-fg);
+  --color-info-line: var(--info-line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-line: var(--accent-line);
 }
 
 body {
-  background: var(--color-slate-50);
-  color: var(--color-slate-900);
+  background: var(--background);
+  color: var(--fg);
 }
 
 @keyframes toast-in {

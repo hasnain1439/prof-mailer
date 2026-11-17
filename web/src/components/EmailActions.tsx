@@ -70,7 +70,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
             onChange={(e) => setValue(e.target.value)}
             aria-label="New time (Karachi)"
           />
-          <span className="text-xs text-slate-500">PKT</span>
+          <span className="text-xs text-muted">PKT</span>
           <button type="button" className={`${btnPrimary} ${btnSmall}`} disabled={busy || !value} onClick={save}>
             Save
           </button>
@@ -93,7 +93,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
           )}
         </div>
       )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-danger-fg">{error}</p>}
     </div>
   );
 }

@@ -65,9 +65,9 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
             setForm({ ...form, [k]: e.target.value });
           }}
         />
-        <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-slate-400">{suffix}</span>
+        <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-subtle">{suffix}</span>
       </div>
-      <p className="mt-1.5 text-xs text-slate-500">{help}</p>
+      <p className="mt-1.5 text-xs text-muted">{help}</p>
     </div>
   );
 
@@ -78,15 +78,15 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
       <div className="space-y-6 p-5">
         <ErrorBox error={error} />
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">Sending</h3>
-          <p className="mb-3 text-xs text-slate-500">Caps how many emails go out per Karachi calendar day.</p>
+          <h3 className="text-sm font-semibold text-fg">Sending</h3>
+          <p className="mb-3 text-xs text-muted">Caps how many emails go out per Karachi calendar day.</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {num("dailySendLimit", "Daily send limit", 1, 500, "1–500 emails per day", "emails")}
           </div>
         </div>
-        <div className="border-t border-slate-100 pt-6">
-          <h3 className="text-sm font-semibold text-slate-900">Follow-ups</h3>
-          <p className="mb-3 text-xs text-slate-500">Automatically nudge professors who haven&apos;t replied.</p>
+        <div className="border-t border-line pt-6">
+          <h3 className="text-sm font-semibold text-fg">Follow-ups</h3>
+          <p className="mb-3 text-xs text-muted">Automatically nudge professors who haven&apos;t replied.</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {num("followUpAfterDays", "Follow up after", 1, 60, "1–60 days without a reply", "days")}
             {num("maxFollowUps", "Max follow-ups", 0, 10, "0–10 per professor (0 disables)", "max")}
@@ -114,9 +114,9 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
                 <option value={form.followUpTemplateId}>(unknown template)</option>
               )}
             </select>
-            {templates.error && <p className="mt-1.5 text-xs text-red-600">Could not load templates: {templates.error}</p>}
+            {templates.error && <p className="mt-1.5 text-xs text-danger-fg">Could not load templates: {templates.error}</p>}
             {noFollowUps ? (
-              <p className="mt-1.5 text-xs text-amber-700">
+              <p className="mt-1.5 text-xs text-warning-fg">
                 You have no follow-up templates yet.{" "}
                 <Link href="/templates" className={link}>
                   Create one
@@ -124,13 +124,13 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
                 and tick “Follow-up template”.
               </p>
             ) : (
-              <p className="mt-1.5 text-xs text-slate-500">Only templates marked as follow-up are listed.</p>
+              <p className="mt-1.5 text-xs text-muted">Only templates marked as follow-up are listed.</p>
             )}
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-3.5">
-        {saved && <span className="text-sm text-emerald-700">Saved ✓</span>}
+      <div className="flex items-center justify-end gap-3 border-t border-line bg-surface-2/60 px-5 py-3.5">
+        {saved && <span className="text-sm text-success-fg">Saved ✓</span>}
         <button type="submit" className={btnPrimary} disabled={busy}>
           {busy ? "Saving…" : "Save settings"}
         </button>
@@ -142,8 +142,8 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
 function Row({ name, children }: { name: string; children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
-      <span className="text-slate-500">{name}</span>
-      <span className="text-right font-medium text-slate-900">{children}</span>
+      <span className="text-muted">{name}</span>
+      <span className="text-right font-medium text-fg">{children}</span>
     </div>
   );
 }
@@ -159,30 +159,30 @@ export default function SettingsPage() {
       <PageHeader title="Settings" description="Send limits and follow-up behaviour. Environment flags are read-only and live in api/.env." />
       <ErrorBox error={error} onRetry={reload} />
       {loading && !data && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[2fr_1fr]">
           <Skeleton className="h-96 rounded-xl" />
           <Skeleton className="h-56 rounded-xl" />
         </div>
       )}
       {data && s && (
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[2fr_1fr]">
           <Card title="Sending & follow-ups" flush>
             <SettingsForm initial={data} onSaved={setLatest} />
           </Card>
           <div>
             <Card title="Environment" description="Read-only">
-              <div className="-my-2.5 divide-y divide-slate-100">
+              <div className="-my-2.5 divide-y divide-line">
                 <Row name="Sending from">
                   {gmail.data?.connected ? (
                     <span className="break-all">{gmail.data.email ?? "Connected"}</span>
                   ) : (
-                    <Link href="/gmail" className="text-amber-700 hover:underline">
+                    <Link href="/gmail" className="text-warning-fg hover:underline">
                       Not connected
                     </Link>
                   )}
                 </Row>
                 <Row name="DRY_RUN">
-                  {s.dryRun ? <span className="text-amber-700">ON (logged only)</span> : <span className="text-emerald-700">OFF (real sends)</span>}
+                  {s.dryRun ? <span className="text-warning-fg">ON (logged only)</span> : <span className="text-success-fg">OFF (real sends)</span>}
                 </Row>
                 <Row name="Test recipient">{s.testRecipientSet ? "Configured" : "Not set"}</Row>
                 <Row name="Timezone">{s.timezone}</Row>

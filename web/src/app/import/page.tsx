@@ -31,7 +31,7 @@ const ACCEPTED = [".csv", ".xlsx"];
 function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
   const steps = ["Upload", "Preview", "Import"];
   return (
-    <ol className="mb-6 flex items-center gap-2 sm:gap-3">
+    <ol className="mb-5 flex items-center gap-2 sm:gap-3">
       {steps.map((name, i) => {
         const n = i + 1;
         const done = step > n;
@@ -41,14 +41,14 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
             <span className="flex items-center gap-2">
               <span
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-                  done ? "bg-indigo-600 text-white" : current ? "bg-white text-indigo-700 ring-2 ring-indigo-600" : "bg-white text-slate-400 ring-1 ring-slate-300"
+                  done ? "bg-primary text-primary-fg" : current ? "bg-surface text-primary-text ring-2 ring-primary" : "bg-surface text-subtle ring-1 ring-line-strong"
                 }`}
               >
                 {done ? <IconCheck size={14} /> : n}
               </span>
-              <span className={`text-sm font-medium ${current ? "text-slate-900" : done ? "text-slate-700" : "text-slate-400"}`}>{name}</span>
+              <span className={`text-sm font-medium ${current ? "text-fg" : done ? "text-fg-2" : "text-subtle"}`}>{name}</span>
             </span>
-            {n < steps.length && <span className={`h-px w-8 sm:w-16 ${done ? "bg-indigo-600" : "bg-slate-300"}`} />}
+            {n < steps.length && <span className={`h-px w-8 sm:w-16 ${done ? "bg-primary" : "bg-line-strong"}`} />}
           </li>
         );
       })}
@@ -156,19 +156,19 @@ export default function ImportPage() {
       {result && (
         <Card>
           <div className="flex flex-col items-center py-6 text-center">
-            <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+            <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success-fg">
               <IconCheckCircle size={26} />
             </span>
-            <p className="text-lg font-semibold text-slate-900">Import complete</p>
+            <p className="text-lg font-semibold text-fg">Import complete</p>
             <div className="mt-4 grid w-full max-w-md grid-cols-3 gap-3">
               {[
                 ["Created", result.professorsCreated],
                 ["Updated", result.professorsUpdated],
                 ["Emails scheduled", result.emailsCreated],
               ].map(([k, v]) => (
-                <div key={k} className="rounded-lg bg-slate-50 px-3 py-3 ring-1 ring-slate-200">
-                  <p className="text-2xl font-semibold text-slate-900">{v}</p>
-                  <p className="text-xs text-slate-500">{k}</p>
+                <div key={k} className="rounded-lg bg-surface-2 px-3 py-3 ring-1 ring-line">
+                  <p className="text-2xl font-semibold text-fg">{v}</p>
+                  <p className="text-xs text-muted">{k}</p>
                 </div>
               ))}
             </div>
@@ -200,22 +200,22 @@ export default function ImportPage() {
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
               className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors ${
-                dragging ? "border-indigo-500 bg-indigo-50" : file ? "border-slate-300 bg-slate-50" : "border-slate-300 hover:border-indigo-400 hover:bg-slate-50"
+                dragging ? "border-primary bg-primary-soft" : file ? "border-line-strong bg-surface-2" : "border-line-strong hover:border-primary hover:bg-surface-2"
               }`}
             >
               {file ? (
-                <span className="flex items-center gap-3 rounded-lg bg-white px-4 py-3 text-left shadow-sm ring-1 ring-slate-200">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                <span className="flex items-center gap-3 rounded-lg bg-surface px-4 py-3 text-left shadow-sm ring-1 ring-line">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary-text">
                     <IconFile size={18} />
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium text-slate-900">{file.name}</span>
-                    <span className="block text-xs text-slate-500">{formatSize(file.size)} · click or drop to replace</span>
+                    <span className="block truncate text-sm font-medium text-fg">{file.name}</span>
+                    <span className="block text-xs text-muted">{formatSize(file.size)} · click or drop to replace</span>
                   </span>
                   <button
                     type="button"
                     aria-label="Remove file"
-                    className="ml-2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    className="ml-2 rounded-md p-1 text-subtle hover:bg-surface-3 hover:text-fg-2"
                     onClick={(e) => {
                       e.preventDefault();
                       chooseFile(null);
@@ -226,13 +226,13 @@ export default function ImportPage() {
                 </span>
               ) : (
                 <>
-                  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary-soft text-primary-text">
                     <IconUpload size={20} />
                   </span>
-                  <span className="text-sm font-medium text-slate-900">
-                    <span className="text-indigo-600">Click to choose a file</span> or drag and drop
+                  <span className="text-sm font-medium text-fg">
+                    <span className="text-primary-text">Click to choose a file</span> or drag and drop
                   </span>
-                  <span className="mt-1 text-xs text-slate-500">.csv or .xlsx</span>
+                  <span className="mt-1 text-xs text-muted">.csv or .xlsx</span>
                 </>
               )}
               <input
@@ -258,9 +258,9 @@ export default function ImportPage() {
                     </option>
                   ))}
                 </select>
-                {templates.error && <p className="mt-1.5 text-xs text-red-600">Could not load templates: {templates.error}</p>}
+                {templates.error && <p className="mt-1.5 text-xs text-danger-fg">Could not load templates: {templates.error}</p>}
                 {templates.data && templates.data.length === 0 && (
-                  <p className="mt-1.5 text-xs text-slate-500">
+                  <p className="mt-1.5 text-xs text-muted">
                     No initial templates yet.{" "}
                     <Link href="/templates" className={link}>
                       Create one
@@ -275,9 +275,9 @@ export default function ImportPage() {
               </button>
             </div>
 
-            <details className="rounded-lg bg-slate-50 text-sm ring-1 ring-slate-200">
-              <summary className="cursor-pointer select-none px-4 py-2.5 font-medium text-slate-700">File format</summary>
-              <div className="space-y-2 border-t border-slate-200 px-4 py-3 text-slate-600">
+            <details className="rounded-lg bg-surface-2 text-sm ring-1 ring-line">
+              <summary className="cursor-pointer select-none px-4 py-2.5 font-medium text-fg-2">File format</summary>
+              <div className="space-y-2 border-t border-line px-4 py-3 text-fg-2">
                 <p>
                   Columns:{" "}
                   <code className="font-mono text-xs">name, email, university, country, researchFocus, whyFits, profileUrl, subject, body, scheduledAt</code>
@@ -299,11 +299,11 @@ export default function ImportPage() {
           flush
           actions={
             <>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success-fg ring-1 ring-inset ring-success-line">
                 {preview.validCount} valid
               </span>
               {preview.errorCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/15">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2.5 py-1 text-xs font-medium text-danger-fg ring-1 ring-inset ring-danger-line">
                   {preview.errorCount} with errors
                 </span>
               )}
@@ -319,7 +319,7 @@ export default function ImportPage() {
             </Notice>
           )}
           {preview.errorCount > 0 && (
-            <p className="border-b border-slate-100 px-5 py-2.5 text-xs text-slate-500">Rows with errors are highlighted and will be skipped.</p>
+            <p className="border-b border-line px-5 py-2.5 text-xs text-muted">Rows with errors are highlighted and will be skipped.</p>
           )}
           <div className={tableWrap}>
             <table className={table}>
@@ -339,13 +339,13 @@ export default function ImportPage() {
                   const bad = r.errors.length > 0;
                   return (
                     <Fragment key={r.rowNumber}>
-                    <tr className={bad ? "bg-red-50/60" : tr}>
-                      <td className={`${td} tabular-nums text-slate-400`}>{r.rowNumber}</td>
+                    <tr className={bad ? "bg-danger-soft/60" : tr}>
+                      <td className={`${td} tabular-nums text-subtle`}>{r.rowNumber}</td>
                       <td className={td}>
-                        <div className="font-medium text-slate-900">{r.data.name || "—"}</div>
-                        <div className="text-xs text-slate-500">{r.data.email || "—"}</div>
+                        <div className="font-medium text-fg">{r.data.name || "—"}</div>
+                        <div className="text-xs text-muted">{r.data.email || "—"}</div>
                         {r.professorExists && (
-                          <span className="mt-1 inline-block rounded-md bg-sky-50 px-1.5 py-0.5 text-[11px] font-medium text-sky-700">Existing · will update</span>
+                          <span className="mt-1 inline-block rounded-md bg-info-soft px-1.5 py-0.5 text-[11px] font-medium text-info-fg">Existing · will update</span>
                         )}
                       </td>
                       <td className={td}>{r.data.university || "—"}</td>
@@ -357,7 +357,7 @@ export default function ImportPage() {
                           <div className="mt-1 flex items-center gap-2">
                             <button
                               type="button"
-                              className="text-xs font-medium text-indigo-600 hover:text-indigo-500"
+                              className="text-xs font-medium text-primary-text hover:underline underline-offset-2"
                               aria-expanded={openRow === r.rowNumber}
                               onClick={() => setOpenRow(openRow === r.rowNumber ? null : r.rowNumber)}
                             >
@@ -369,13 +369,13 @@ export default function ImportPage() {
                       </td>
                       <td className={td}>
                         {bad ? (
-                          <ul className="list-disc space-y-0.5 pl-4 text-xs text-red-700">
+                          <ul className="list-disc space-y-0.5 pl-4 text-xs text-danger-fg">
                             {r.errors.map((err, i) => (
                               <li key={i}>{err}</li>
                             ))}
                           </ul>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-success-fg">
                             <IconCheck size={14} />
                             OK
                           </span>
@@ -384,11 +384,11 @@ export default function ImportPage() {
                     </tr>
                     {openRow === r.rowNumber && (
                       <tr>
-                        <td colSpan={7} className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
+                        <td colSpan={7} className="border-b border-line bg-surface-2/70 px-5 py-4">
                           {r.isHtml ? (
                             <EmailBody body={r.body} isHtml title={`Row ${r.rowNumber} email`} />
                           ) : (
-                            <EmailBody body={r.body} isHtml={false} className="max-h-96 overflow-y-auto rounded-lg bg-white p-4 ring-1 ring-slate-200" textClassName="text-slate-800" />
+                            <EmailBody body={r.body} isHtml={false} className="max-h-96 overflow-y-auto rounded-lg bg-surface p-4 ring-1 ring-line" textClassName="text-fg" />
                           )}
                         </td>
                       </tr>
