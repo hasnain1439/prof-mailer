@@ -196,3 +196,38 @@ Commit re-validates the same way inside its transaction; rows with errors are sk
 - `PUT /settings`: `dailySendLimit` accepts any positive integer and is capped to 50.
 - Gmail OAuth `refreshToken` / `accessToken` are stored encrypted (AES-256-GCM, same key as the app password); legacy plaintext is read as-is and re-encrypted on the next write.
 - In-process scheduler: check-replies is polled every 10 min and runs only when ≥ 60 min have passed since `lastReplyCheckAt` (shared with `/jobs/tick`). Expired sessions are pruned hourly.
+
+---
+
+# v3: Email + password accounts, Gmail App Password only (supersedes Google sign-in and Gmail OAuth)
+
+Google sign-in and Gmail OAuth are removed. Users sign up with email + password and verify their email.
+Each user then connects the Gmail account they send from with a Gmail **App Password** (SMTP smtp.gmail.com:465 for
+sending, IMAP imap.gmail.com:993 for reply checks).
+
+System mail (verification / password reset) is sent through the app owner's SMTP account from env:
+`SMTP_HOST, SMTP_PORT (default 465), SMTP_SECURE (default true when port 465), SMTP_USER, SMTP_PASS, MAIL_FROM`
+(e.g. `prof-mailer <no-reply@programmingbridge.org>`). If SMTP is not configured and NODE_ENV !== "production",
+the API logs the link to the console instead of sending (dev only). In production a missing SMTP config fails at startup.
+
+## Auth (public, rate limited)
+| Method | Path | Body | Response |
+|---|---|---|---|
+| POST | `/auth/signup` | `{ name, email, password }` (password ≥ 8 chars) | 201 `{ ok: true }`. Sends a verification email. Duplicate email → 201 too (no account enumeration; an existing verified user gets a "someone tried to sign up" note, or nothing). |
+| POST | `/auth/verify-email` | `{ token }` | 200 `{ ok: true }`. Marks the email verified and signs the user in (sets `pm_session`). 400 if invalid or expired (24 h). |
+| POST | `/auth/resend-verification` | `{ email }` | 200 `{ ok: true }` always. |
+| POST | `/auth/login` | `{ email, password }` | 200 `{ user }` + `pm_session` cookie. 401 `{ error: "Invalid email or password" }`. 403 `{ error, code: "EMAIL_NOT_VERIFIED" }` if not verified. |
+| POST | `/auth/forgot-password` | `{ email }` | 200 `{ ok: true }` always. Sends a reset link (1 h). |
+| POST | `/auth/reset-password` | `{ token, password }` | 200 `{ ok: true }`. Revokes all sessions and signs in. 400 if invalid or expired. |
+| GET | `/auth/me` | | `{ user: { id, email, name, emailVerified } }` or 401 |
+| POST | `/auth/logout` | | 204 |
+| POST | `/auth/dev-login` | unchanged (dev only) | |
+
+Email links point to the web app: `${PUBLIC_URL}/verify-email?token=…` and `${PUBLIC_URL}/reset-password?token=…`.
+Tokens are 32 random bytes; the DB stores only their sha256. Passwords are hashed with scrypt (node:crypto) with a per-user salt.
+
+## Gmail (per user, signed in)
+- `GET /gmail/status` → `{ connected, email, authType: "APP_PASSWORD" | null, dryRun }`.
+- `POST /gmail/app-password` `{ email, appPassword }`: unchanged (verifies SMTP + IMAP, stores the password encrypted). Always enabled.
+- `POST /gmail/disconnect`, `POST /gmail/test-send` (to the user's own login email): unchanged.
+- `/gmail/connect` and `/gmail/callback` are removed.
