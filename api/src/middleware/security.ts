@@ -58,3 +58,51 @@ export function rateLimit(opts: { capacity: number; refillPerMinute: number }): 
     next();
   };
 }
+
+/**
+ * Fixed-window attempt counter keyed by an arbitrary string (e.g. a lowercased email address).
+ * In memory, single instance. Used for per-account login failures and per-address system mail.
+ */
+export class AttemptCounter {
+  private readonly map = new Map<string, { count: number; start: number }>();
+  private lastPrune = Date.now();
+
+  constructor(
+    private readonly max: number,
+    private readonly windowMs: number,
+  ) {}
+
+  private entry(key: string, now: number) {
+    if (now - this.lastPrune > this.windowMs) {
+      for (const [k, e] of this.map) if (now - e.start >= this.windowMs) this.map.delete(k);
+      this.lastPrune = now;
+    }
+    const e = this.map.get(key);
+    if (!e || now - e.start >= this.windowMs) return null;
+    return e;
+  }
+
+  /** True when the key has used up its attempts in the current window. */
+  isBlocked(key: string): boolean {
+    const e = this.entry(key, Date.now());
+    return e !== null && e.count >= this.max;
+  }
+
+  hit(key: string): void {
+    const now = Date.now();
+    const e = this.entry(key, now);
+    if (e) e.count += 1;
+    else this.map.set(key, { count: 1, start: now });
+  }
+
+  /** hit() and report whether the key was still under the limit before this hit. */
+  tryHit(key: string): boolean {
+    if (this.isBlocked(key)) return false;
+    this.hit(key);
+    return true;
+  }
+
+  reset(key: string): void {
+    this.map.delete(key);
+  }
+}

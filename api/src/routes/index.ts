@@ -10,22 +10,22 @@ import { importRouter } from "./import.js";
 import { emailsRouter } from "./emails.js";
 import { settingsRouter } from "./settings.js";
 import { dashboardRouter } from "./dashboard.js";
-import { appPasswordHandlers, gmailCallback, gmailRouter } from "./gmail.js";
+import { appPasswordHandlers, gmailRouter } from "./gmail.js";
 import { jobsRouter } from "./jobs.js";
 import { devRouter } from "./dev.js";
 
 export const apiRouter = Router();
 
-const authLimiter = rateLimit({ capacity: 20, refillPerMinute: 10 });
+// Whole /auth prefix; signup / login / forgot / resend / reset add a stricter limiter (routes/auth.ts).
+const authLimiter = rateLimit({ capacity: 30, refillPerMinute: 15 });
 const appPasswordLimiter = rateLimit({ capacity: 5, refillPerMinute: 2 });
 
 // ---- public ----
 apiRouter.use("/health", healthRouter);
 apiRouter.use("/auth", authLimiter, authRouter);
 apiRouter.use("/jobs", jobsRouter); // CRON_SECRET bearer
-apiRouter.get("/gmail/callback", authLimiter, gmailCallback); // checks the session itself (redirects)
 
-// ---- signed-in only ----
+// ---- signed-in with a verified email (401 / 403 EMAIL_NOT_VERIFIED otherwise) ----
 apiRouter.use(requireUser);
 apiRouter.use("/professors", professorsRouter);
 apiRouter.use("/templates", templatesRouter);

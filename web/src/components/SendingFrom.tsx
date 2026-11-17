@@ -45,7 +45,7 @@ export function SendingFrom({ onNavigate }: { onNavigate?: () => void }) {
           href="/gmail"
           onClick={onNavigate}
           className="block rounded-md"
-          title={`Every email is sent from this account${data.authType ? ` (${data.authType === "APP_PASSWORD" ? "App Password" : "Google OAuth"})` : ""}`}
+          title={`Every email is sent from this account${data.authType ? " (App Password)" : ""}`}
         >
           <p className="text-xs text-muted">Sending from</p>
           <p className="flex items-center gap-1.5 text-text">

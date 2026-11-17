@@ -175,9 +175,6 @@ export async function connectWithAppPassword(userId: string, rawEmail: string, p
     email,
     authType: "APP_PASSWORD" as const,
     appPasswordEnc: encryptSecret(password),
-    refreshToken: null,
-    accessToken: null,
-    expiryDate: null,
   };
   await prisma.gmailAccount.upsert({
     where: { userId },
@@ -291,7 +288,7 @@ function toThreadMessage(m: FetchMessageObject): ThreadMessageLike {
     const x = d ? new Date(d) : null;
     return x && !Number.isNaN(x.getTime()) ? x : null;
   };
-  // Prefer the receipt time (like the OAuth path's internalDate); fall back to the Date header.
+  // Prefer the receipt time (INTERNALDATE); fall back to the Date header.
   const date = valid(m.internalDate) ?? valid(m.envelope?.date) ?? new Date(0);
   const mid = m.envelope?.messageId;
   return { from: formatFrom(m), date, ...(mid ? { messageIdHeader: mid } : {}) };

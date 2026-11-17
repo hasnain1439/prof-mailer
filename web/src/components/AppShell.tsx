@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { AuthProvider, useAuth } from "./Auth";
+import { AuthProvider, isPublicPath, useAuth } from "./Auth";
 import { GmailStatusProvider, useGmailStatus } from "./GmailStatus";
 import { IconLogOut, IconLogo, IconMenu, IconRefresh, IconX } from "./icons";
 import { Nav, NavLinks } from "./Nav";
@@ -31,15 +31,9 @@ function UserBlock() {
   const display = user.name || user.email;
   return (
     <div className="flex items-center gap-2">
-      {user.picture ? (
-        // Google profile photo: plain <img> (remote host, tiny), no referrer so Google serves it.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={user.picture} alt="" referrerPolicy="no-referrer" className="h-7 w-7 shrink-0 rounded-md border border-border object-cover" />
-      ) : (
-        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-xs font-medium text-muted">
-          {initials(display)}
-        </span>
-      )}
+      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-xs font-medium text-muted">
+        {initials(display)}
+      </span>
       <div className="min-w-0 flex-1" title={user.email}>
         {user.name && <p className="truncate text-xs font-medium text-text">{user.name}</p>}
         <p className="truncate font-mono text-[11px] text-muted">{user.email}</p>
@@ -174,13 +168,13 @@ function ShellSkeleton() {
 
 const LOGIN_PATH = "/login";
 
-/** Decides between the login page (no sidebar), a redirect to it, and the signed-in app. */
+/** Decides between a public auth page (no sidebar), a redirect to it, and the signed-in app. */
 function AuthGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading, error, refresh } = useAuth();
-  const onLogin = pathname === LOGIN_PATH;
-  const mustRedirect = !onLogin && !loading && !user && !error;
+  const onPublic = isPublicPath(pathname);
+  const mustRedirect = !onPublic && !loading && !user && !error;
 
   useEffect(() => {
     if (!mustRedirect) return;
@@ -188,7 +182,8 @@ function AuthGate({ children }: { children: ReactNode }) {
     router.replace(`${LOGIN_PATH}?next=${encodeURIComponent(here)}`);
   }, [mustRedirect, router]);
 
-  if (onLogin) return <>{children}</>;
+  // Login, signup, email verification and password reset render on their own, without the shell.
+  if (onPublic) return <>{children}</>;
 
   if (error && !user) {
     return (

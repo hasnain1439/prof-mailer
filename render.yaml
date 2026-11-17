@@ -16,15 +16,19 @@ services:
         value: "true"
       - key: SCHEDULER_ENABLED
         value: "true"
-      - key: APP_PASSWORD_ENABLED
-        value: "false"
       - key: DATABASE_URL
         sync: false
       - key: DIRECT_URL
         sync: false
-      - key: GOOGLE_CLIENT_ID
+      - key: SMTP_HOST
         sync: false
-      - key: GOOGLE_CLIENT_SECRET
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
         sync: false
       - key: ENCRYPTION_KEY
         sync: false

@@ -1,5 +1,5 @@
 /**
- * AES-256-GCM encryption for small secrets stored in the database (Gmail app password, OAuth tokens).
+ * AES-256-GCM encryption for small secrets stored in the database (the Gmail App Password).
  *
  * Key: env ENCRYPTION_KEY (32 bytes as 64 hex chars or base64) when set; otherwise a random key is
  * generated once into api/.data/secret.key (gitignored). Losing that file means stored secrets can

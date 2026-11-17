@@ -1,16 +1,16 @@
 # prof-mailer
 
-An app for emailing university professors about Master's admissions. You sign in with Google, import professors from a CSV or XLSX file, schedule personalised emails, send them through your own Gmail account, detect replies, and send polite follow-ups in the same thread. Each user has their own professors, templates, queue, settings and connected Gmail.
+An app for emailing university professors about Master's admissions. You create an account with your email and a password, connect the Gmail account you send from with a Google App Password, import professors from a CSV or XLSX file, schedule personalised emails, send them through your own Gmail account, detect replies, and send polite follow-ups in the same thread. Each user has their own professors, templates, queue, settings and connected Gmail.
 
 - `api/`: Express, TypeScript, Prisma 6 and Postgres (Neon), with node-cron jobs running in the same process. Local port **4100**.
 - `web/`: Next.js (App Router) and Tailwind. Local port **3100**. The browser only talks to the web origin; Next.js rewrites `/api/*` to the API (`API_ORIGIN`), so the session cookie is first-party.
-- `docs/API_CONTRACT.md`: the REST contract (see the "Multi-user (v2)" section).
+- `docs/API_CONTRACT.md`: the REST contract (the "v3" section at the end supersedes the earlier Google sections).
 
 Production shape: **web on Vercel**, **API on Render (free)**, **database on Neon**, and **cron-job.org** pinging the API.
 
 All times are stored in UTC and shown in **Asia/Karachi** (PKT, UTC+5). The `scheduledAt` column in an import file is Karachi local time.
 
-> **Safety:** `DRY_RUN=true` is the default. In dry-run mode no email is sent. The scheduler only logs what it would send and marks the email as SENT, so you can test the whole flow. Real emails go out only after you set `DRY_RUN=false`. `DRY_RUN` is global (it applies to every user).
+> **Safety:** `DRY_RUN=true` is the default. In dry-run mode no email is sent. The scheduler only logs what it would send and marks the email as SENT, so you can test the whole flow. Real emails go out only after you set `DRY_RUN=false`. `DRY_RUN` is global (it applies to every user). Account emails (verification, password reset) are **not** affected by `DRY_RUN`.
 
 ---
 
@@ -36,13 +36,12 @@ Copy-Item .env.example .env.local   # API_ORIGIN=http://localhost:4100
 | `DATABASE_URL` | Neon **pooled** connection string (the host contains `-pooler`). Paste only the `postgresql://...` URL. |
 | `DIRECT_URL` | Neon **direct** connection string (same, without `-pooler`). Prisma migrations use it. |
 | `PORT` | `4100` |
-| `PUBLIC_URL` | The web origin: `http://localhost:3100` locally, your Vercel URL in production. OAuth redirect URIs are derived from it. |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | One Google OAuth client used for both sign-in and Gmail (see section 2). |
-| `DEV_LOGIN_ENABLED` | `true` lets you sign in locally without Google (`POST /api/auth/dev-login {"email": "..."}`). Ignored when `NODE_ENV=production`. |
+| `PUBLIC_URL` | The web origin: `http://localhost:3100` locally, your Vercel URL in production. Verification and reset links point to it. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM` | The mailbox that sends account emails (verification, password reset). See section 2. Required in production; locally you can leave `SMTP_HOST` empty and the links are printed in the API console. |
+| `DEV_LOGIN_ENABLED` | `true` lets you sign in locally without a password (`POST /api/auth/dev-login {"email": "..."}`). Ignored when `NODE_ENV=production`. |
 | `DRY_RUN` | `true` while testing. See [Switching DRY_RUN off](#6-switching-dry_run-off). |
 | `CRON_SECRET` | Long random string. Required in production. Protects `/api/jobs/*`. Leave empty locally to disable those endpoints (the in-process scheduler still runs). |
-| `ENCRYPTION_KEY` | 64 hex chars. Required in production. Encrypts stored Gmail app passwords. Locally, if empty, a key is created in `api/.data/secret.key`. |
-| `APP_PASSWORD_ENABLED` | `false` (default). The App Password (SMTP/IMAP) option only works where outbound SMTP is allowed; Render's free plan blocks it. |
+| `ENCRYPTION_KEY` | 64 hex chars. Required in production. Encrypts stored Gmail App Passwords. Locally, if empty, a key is created in `api/.data/secret.key`. |
 | `COOKIE_SECURE` | Optional. Defaults to `true` in production and `false` otherwise. |
 | `SEND_DELAY_MIN_MS` / `SEND_DELAY_MAX_MS` | Minimum random gap between two sends of the same user. Defaults 30000 and 120000. |
 
@@ -64,31 +63,36 @@ cd C:\Users\Farhan\prof-mailer\web
 npm run dev
 ```
 
-Open <http://localhost:3100> and sign in with Google, or with dev login when `DEV_LOGIN_ENABLED=true`.
+Open <http://localhost:3100>, sign up, and open the verification link (printed in the API console when SMTP is not configured). Or use dev login when `DEV_LOGIN_ENABLED=true`.
 
-## 2. Google Cloud setup (sign-in + Gmail)
+## 2. Accounts, system mail and Gmail
 
-One OAuth client serves both "Sign in with Google" and each user's Gmail connection.
+### System mail (verification and password reset)
 
-1. Open <https://console.cloud.google.com/> and create a project (for example "prof-mailer").
-2. **APIs & Services → Library**: enable the **Gmail API**.
-3. **Google Auth Platform → Branding / Audience** (the OAuth consent screen): user type **External**, app name, support email, developer contact.
-4. **Data access (scopes)**: add `openid`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`, `.../auth/gmail.send` and `.../auth/gmail.readonly`.
-5. **Clients → Create client → Web application**. Add these **Authorised redirect URIs**:
-   - `http://localhost:3100/api/auth/google/callback`
-   - `http://localhost:3100/api/gmail/callback`
-   - `https://<your-app>.vercel.app/api/auth/google/callback`
-   - `https://<your-app>.vercel.app/api/gmail/callback`
+Account emails are sent from **your own mailbox** (the app owner's), for example a `no-reply@programmingbridge.org` address at your mail provider. Put its SMTP settings in `api/.env` (and Render):
 
-   Copy the **Client ID** and **Client secret** into `api/.env` (and into Render later).
+| Variable | Example |
+|---|---|
+| `SMTP_HOST` | `mail.example.org` (your provider's SMTP server) |
+| `SMTP_PORT` | `465` (implicit TLS, the default) or `587` (STARTTLS) |
+| `SMTP_SECURE` | Optional. Defaults to `true` for port 465 and `false` otherwise (587 then upgrades with STARTTLS). |
+| `SMTP_USER` / `SMTP_PASS` | The mailbox login |
+| `MAIL_FROM` | `prof-mailer <no-reply@example.org>` (use an address the mailbox may send as) |
 
-The redirect URIs point at the **web** origin on purpose: Vercel proxies `/api/*` to Render, so cookies stay on one domain.
+- Without `SMTP_HOST` (local development only) the API prints the verification / reset link in its console instead of sending it. In production the API refuses to start without SMTP settings.
+- These emails are sent even when `DRY_RUN=true`, so people can sign up while professor emails are still dry-run.
+- **Hosting note:** Render's **free** plan blocks outbound SMTP ports 25, 465 and 587. Use a host or plan that allows SMTP (for example **Render Starter**), or, only if your mail provider supports it, `SMTP_PORT=2525`. Gmail's `smtp.gmail.com` does **not** accept port 2525, so the per-user Gmail App Password sending below also needs SMTP-allowed hosting.
 
-### Testing mode vs. open to everyone (read this)
+### User flow
 
-- While the app's publishing status is **Testing**, only Google accounts you add under **Audience → Test users** can sign in. The limit is **100 test users**, and you add each one by hand.
-- In Testing mode Google **expires refresh tokens after 7 days**. Each user then has to click **Connect Gmail** again before sending and reply checks work.
-- To let anyone sign in, the app must be **published and verified by Google**. `gmail.readonly` is a **restricted scope**. Verification for restricted scopes requires a third-party **CASA security assessment**, which takes time and usually costs money. Until that is done, keep the app in Testing and add your users as test users. (Sign-in alone with `openid email profile` needs no special review. The Gmail scopes are what require it.)
+1. **Sign up** with name, email and a password (8+ characters).
+2. **Verify** the address with the link in the email (valid 24 hours; you can request a new one). Forgot the password? The reset link is valid for 1 hour and signs out every other session.
+3. **Connect Gmail** on the Gmail page with a **Google App Password**:
+   - Turn on **2-Step Verification** for the Google account (<https://myaccount.google.com/security>).
+   - Create an App Password at <https://myaccount.google.com/apppasswords> and paste the 16 letters with your Gmail address.
+   - Make sure IMAP is enabled in Gmail (Settings → Forwarding and POP/IMAP). The API checks the SMTP and IMAP login before saving and stores the App Password encrypted.
+   - Sending uses `smtp.gmail.com:465`; reply checks read Sent / All Mail over `imap.gmail.com:993`.
+4. Use **Send test email** (it only goes to your own login address) before `DRY_RUN=false`.
 
 ## 3. Deploy the API on Render
 
@@ -97,20 +101,20 @@ The repo has a Blueprint at `render.yaml`. It runs the API from `api/` on the fr
 1. Render dashboard → **New → Blueprint** → pick this repository.
 2. Fill in the secret env vars it asks for:
    - `DATABASE_URL`, `DIRECT_URL` (Neon)
-   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (section 2)
    - `ENCRYPTION_KEY`, `CRON_SECRET` (random, see the command above)
    - `PUBLIC_URL` = your Vercel URL, for example `https://prof-mailer.vercel.app` (no trailing slash)
-3. The plain values are preset: `NODE_ENV=production`, `DRY_RUN=true`, `SCHEDULER_ENABLED=true`, `APP_PASSWORD_ENABLED=false`.
+3. The plain values are preset: `NODE_ENV=production`, `DRY_RUN=true`, `SCHEDULER_ENABLED=true`.
 
 Notes:
 - The free plan sleeps after about 15 minutes without traffic. The cron-job.org ping (section 5) keeps it awake so the in-process scheduler keeps running.
-- Render's free plan blocks outbound SMTP, so Gmail is connected with Google OAuth (Gmail API) only.
+- Render's free plan blocks outbound SMTP (25/465/587). System mail and Gmail App Password sending both need SMTP, so use a plan that allows it (for example Starter). The Blueprint says `plan: free`; change it if you deploy there.
 
 ## 4. Deploy the web app on Vercel
 
 1. Vercel → **Add New → Project** → import this repository and set **Root Directory** to `web`.
 2. Environment variable: `API_ORIGIN` = your Render URL, for example `https://prof-mailer-api.onrender.com`. It is read at build time, so redeploy after changing it.
-3. Deploy, then make sure `PUBLIC_URL` on Render is exactly this Vercel URL, and that the two Vercel redirect URIs are in the Google client.
+3. Deploy, then make sure `PUBLIC_URL` on Render is exactly this Vercel URL. Verification and reset links use it.
 
 Mutating requests must come from `PUBLIC_URL` (the API checks the `Origin` header), so use the production Vercel URL, not a preview URL.
 
@@ -123,7 +127,7 @@ Create two jobs at <https://cron-job.org>:
 
 ## 6. Switching DRY_RUN off
 
-1. Each user connects Gmail on the **Gmail** page and uses **Send test email**. It only ever goes to that user's own Google address.
+1. Each user connects Gmail on the **Gmail** page (App Password) and uses **Send test email**. It only ever goes to that user's own login address.
 2. Review the **Queue** carefully. Anything scheduled in the past is sent on the next tick.
 3. Set `DRY_RUN=false` (in Render: Environment, then save, which redeploys; locally: `api/.env`, then restart the API). The header's "DRY RUN" badge disappears.
 

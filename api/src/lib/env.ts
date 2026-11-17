@@ -35,7 +35,19 @@ const PUBLIC_URL = (() => {
 const CRON_SECRET = (process.env.CRON_SECRET ?? "").trim();
 const ENCRYPTION_KEY = (process.env.ENCRYPTION_KEY ?? "").trim();
 
+/** Owner's SMTP mailbox for system mail (verification / password reset). Not gated by DRY_RUN. */
+const SMTP_HOST = (process.env.SMTP_HOST ?? "").trim();
+const SMTP_PORT = int("SMTP_PORT", 465);
+const SMTP_SECURE = bool("SMTP_SECURE", SMTP_PORT === 465);
+const SMTP_USER = (process.env.SMTP_USER ?? "").trim();
+const SMTP_PASS = process.env.SMTP_PASS ?? "";
+const MAIL_FROM = (process.env.MAIL_FROM ?? "").trim() || SMTP_USER;
+const SMTP_CONFIGURED = Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS && MAIL_FROM);
+
 if (IS_PROD) {
+  if (!SMTP_CONFIGURED) {
+    throw new Error("System mail is not configured: set SMTP_HOST, SMTP_USER, SMTP_PASS and MAIL_FROM in production");
+  }
   // Render's filesystem is ephemeral, so the dev key-file fallback would lose every stored secret.
   if (!ENCRYPTION_KEY) throw new Error("Missing required environment variable in production: ENCRYPTION_KEY");
   if (CRON_SECRET.length < 16) throw new Error("CRON_SECRET must be set (16+ chars) in production");
@@ -52,18 +64,19 @@ export const env = {
   /** Safety switch: true unless explicitly set to "false". When true, emails are logged, never sent. */
   DRY_RUN: bool("DRY_RUN", true),
 
-  /** Shared by Google sign-in and per-user Gmail OAuth. */
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? "",
-  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? "",
-  LOGIN_REDIRECT_URI: `${PUBLIC_URL}/api/auth/google/callback`,
-  GMAIL_REDIRECT_URI: `${PUBLIC_URL}/api/gmail/callback`,
+  /** System mail (verification / reset links). When not configured (dev only), links are logged instead. */
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_SECURE,
+  SMTP_USER,
+  SMTP_PASS,
+  MAIL_FROM,
+  SMTP_CONFIGURED,
 
   /** Bearer secret for /jobs/*. Empty (dev only) disables the HTTP job endpoints. */
   CRON_SECRET,
-  /** Local QA sign-in without Google. Never active in production. */
+  /** Local QA sign-in without a password. Never active in production. */
   DEV_LOGIN_ENABLED: bool("DEV_LOGIN_ENABLED", false) && !IS_PROD,
-  /** Gmail App Password (SMTP/IMAP). Off by default: Render free blocks outbound SMTP. */
-  APP_PASSWORD_ENABLED: bool("APP_PASSWORD_ENABLED", false),
   /** Secure flag on cookies. */
   COOKIE_SECURE: bool("COOKIE_SECURE", IS_PROD),
 

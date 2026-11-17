@@ -1,15 +1,14 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { api, errorMessage } from "@/lib/api";
 import type { GmailStatus } from "@/lib/types";
 import { useAuth } from "@/components/Auth";
 import { useGmailStatus } from "@/components/GmailStatus";
-import { IconExternal, IconMail, IconRefresh, IconSend } from "@/components/icons";
+import { IconExternal, IconRefresh, IconSend } from "@/components/icons";
 import { DryRunPill } from "@/components/SendingFrom";
 import { useToast } from "@/components/Toast";
-import { Badge, Button, Card, ErrorBox, Field, Input, Loading, Mono, Notice, PageHeader, btnPrimary, link } from "@/components/ui";
+import { Badge, Button, Card, ErrorBox, Field, Input, Loading, Mono, Notice, PageHeader, link } from "@/components/ui";
 
 function Code({ children }: { children: ReactNode }) {
   return <code className="rounded-sm border border-border bg-bg px-1 py-px font-mono text-[0.85em] text-text">{children}</code>;
@@ -44,7 +43,7 @@ function Spinner() {
 
 function AuthTypeBadge({ authType }: { authType: GmailStatus["authType"] }) {
   if (!authType) return null;
-  return <Badge className="border border-border bg-surface text-muted">{authType === "APP_PASSWORD" ? "App password" : "Google OAuth"}</Badge>;
+  return <Badge className="border border-border bg-surface text-muted">App Password</Badge>;
 }
 
 function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
@@ -72,8 +71,8 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
 
   return (
     <Card
-      title="Alternative: Gmail with an app password"
-      description="Sends over SMTP and checks replies over IMAP. Use this only if connecting with Google doesn't work for your account."
+      title="Connect your Gmail"
+      description="prof-mailer sends from your Gmail with a Google App Password, and checks the same inbox for replies. It takes about two minutes."
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <form onSubmit={submit} className="space-y-3" autoComplete="off">
@@ -90,7 +89,7 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
               onChange={(e) => setEmail(e.target.value)}
             />
           </Field>
-          <Field label="App password" htmlFor="ap-password">
+          <Field label="App Password" htmlFor="ap-password" hint="16 letters. Spaces are fine.">
             <Input
               id="ap-password"
               type="password"
@@ -112,13 +111,13 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" variant="primary" disabled={busy || !email.trim() || !password.trim()}>
               {busy && <Spinner />}
-              {busy ? "Verifying with Gmail…" : "Connect"}
+              {busy ? "Verifying with Gmail…" : "Connect Gmail"}
             </Button>
             {busy && <span className="text-xs text-muted">This can take up to 30 seconds. No email is sent.</span>}
           </div>
         </form>
 
-        <div className="space-y-3 text-[13px] text-muted lg:border-l lg:border-border lg:pl-6">
+        <div className="order-first space-y-3 text-[13px] text-muted lg:order-last lg:border-l lg:border-border lg:pl-6">
           <ol className="list-decimal space-y-1.5 pl-5 marker:font-mono marker:text-muted">
             <li>
               Turn on <strong className="font-medium text-text">2-Step Verification</strong> at{" "}
@@ -134,57 +133,14 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
               </a>{" "}
               and create one named <Code>prof-mailer</Code>.
             </li>
-            <li>Paste the 16-letter password here and click Connect.</li>
+            <li>Paste the 16-letter password here and click Connect Gmail.</li>
           </ol>
           <ul className="list-disc space-y-1 border-t border-border pt-3 pl-5 text-xs">
-            <li>Your normal Gmail password won&apos;t work; it must be an app password.</li>
-            <li>Google Workspace (university/company) accounts may have app passwords disabled by the admin.</li>
-            <li>The password is stored encrypted.</li>
+            <li>Your normal Gmail password won&apos;t work; it must be an App Password.</li>
+            <li>Google Workspace (university or company) admins may disable App Passwords for their accounts.</li>
+            <li>The App Password is stored encrypted, and you can disconnect at any time.</li>
           </ul>
         </div>
-      </div>
-    </Card>
-  );
-}
-
-function GoogleConnectCard({ data }: { data: GmailStatus }) {
-  const { user } = useAuth();
-  return (
-    <Card title="Connect Gmail" description="Mail is sent from your own Gmail account, through Google.">
-      <div className="space-y-3 text-[13px] text-muted">
-        <p>Google will ask you to allow prof-mailer to:</p>
-        <ul className="list-disc space-y-1 pl-5 marker:text-border">
-          <li>
-            <strong className="font-medium text-text">Send email on your behalf</strong>: only the emails and follow-ups you schedule here.
-          </li>
-          <li>
-            <strong className="font-medium text-text">Read your email</strong>: used only to spot replies in the threads prof-mailer started, so
-            follow-ups stop when a professor answers.
-          </li>
-        </ul>
-        <div className="flex flex-wrap items-center gap-3 pt-1">
-          {data.oauthConfigured ? (
-            <a href={api.gmailConnectUrl} className={btnPrimary}>
-              <IconMail />
-              Connect Gmail
-            </a>
-          ) : (
-            <Button variant="primary" disabled>
-              <IconMail />
-              Connect Gmail
-            </Button>
-          )}
-          <span className="text-xs">
-            {user ? (
-              <>
-                Choose <Mono className="!text-xs text-text">{user.email}</Mono> or another Gmail address. You&apos;ll come back here afterwards.
-              </>
-            ) : (
-              "You'll come back here afterwards."
-            )}
-          </span>
-        </div>
-        {!data.oauthConfigured && <p className="text-xs">Google sign-in isn&apos;t configured on the server.</p>}
       </div>
     </Card>
   );
@@ -265,9 +221,6 @@ function HowItWorks({ data }: { data: GmailStatus }) {
 }
 
 export function GmailPanel() {
-  const params = useSearchParams();
-  const connectedParam = params.get("connected") === "1";
-  const errorParam = params.get("error");
   const toast = useToast();
 
   const { data, error, loading, reload } = useGmailStatus();
@@ -327,8 +280,6 @@ export function GmailPanel() {
         </Button>
       </PageHeader>
 
-      {connectedParam && <Notice tone="success">Gmail connected successfully.</Notice>}
-      {errorParam && <ErrorBox error={`Gmail connection failed: ${errorParam}`} />}
       {error && !data && (
         <Notice
           tone="error"
@@ -367,7 +318,7 @@ export function GmailPanel() {
               />
             ) : (
               <Notice tone="warning" title="No Gmail account connected">
-                Connect the Gmail account you&apos;ll send from. Scheduled emails can&apos;t go out until you do.
+                Connect the Gmail account you&apos;ll send from with an App Password. Scheduled emails can&apos;t go out until you do.
               </Notice>
             )}
 
@@ -376,8 +327,7 @@ export function GmailPanel() {
                 {data.connected && (
                   <Notice tone="info">Connecting another account replaces the current connection ({data.email ?? "current account"}).</Notice>
                 )}
-                <GoogleConnectCard data={data} />
-                {data.appPasswordEnabled && <AppPasswordCard onConnected={onConnected} />}
+                <AppPasswordCard onConnected={onConnected} />
               </>
             )}
 

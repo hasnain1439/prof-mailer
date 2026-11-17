@@ -11,6 +11,7 @@ import {
   Download,
   ExternalLink,
   Eye,
+  EyeOff,
   FileText,
   Inbox,
   Info,
@@ -66,6 +67,7 @@ export const IconExternal = wrap(ExternalLink);
 export const IconTrash = wrap(Trash2);
 export const IconPencil = wrap(Pencil);
 export const IconEye = wrap(Eye);
+export const IconEyeOff = wrap(EyeOff);
 export const IconDownload = wrap(Download);
 export const IconInbox = wrap(Inbox);
 export const IconFile = wrap(FileText);

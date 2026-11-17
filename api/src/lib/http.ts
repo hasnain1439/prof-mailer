@@ -6,6 +6,8 @@ export class HttpError extends Error {
     public status: number,
     message: string,
     public details?: unknown,
+    /** Machine-readable error code returned as `code` (e.g. "EMAIL_NOT_VERIFIED"). */
+    public code?: string,
   ) {
     super(message);
   }

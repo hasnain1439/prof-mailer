@@ -32,6 +32,8 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public details?: unknown,
+    /** Machine-readable error code from the API body (e.g. "EMAIL_NOT_VERIFIED"). */
+    public code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -118,10 +120,10 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     }
   }
   if (!res.ok) {
-    const body = (data && typeof data === "object" ? data : {}) as { error?: unknown; details?: unknown };
+    const body = (data && typeof data === "object" ? data : {}) as { error?: unknown; details?: unknown; code?: unknown };
     const base = typeof body.error === "string" ? body.error : `Request failed (${res.status} ${res.statusText})`;
     const extra = describeDetails(body.details);
-    throw new ApiError(extra ? `${base}: ${extra}` : base, res.status, body.details);
+    throw new ApiError(extra ? `${base}: ${extra}` : base, res.status, body.details, typeof body.code === "string" ? body.code : undefined);
   }
   return data as T;
 }
@@ -137,7 +139,18 @@ export const api = {
   logout: () => request<void>("/auth/logout", { method: "POST", allowUnauthorized: true }),
   devLogin: (body: { email: string; name?: string }) =>
     request<{ user: AuthUser }>("/auth/dev-login", { method: "POST", json: body, allowUnauthorized: true }),
-  googleSignInUrl: (next?: string) => `${API_URL}/auth/google${next ? `?next=${encodeURIComponent(next)}` : ""}`,
+  signup: (body: { name: string; email: string; password: string }) =>
+    request<{ ok: true }>("/auth/signup", { method: "POST", json: body, allowUnauthorized: true }),
+  login: (body: { email: string; password: string }) =>
+    request<{ user: AuthUser }>("/auth/login", { method: "POST", json: body, allowUnauthorized: true }),
+  verifyEmail: (token: string) =>
+    request<{ ok: true }>("/auth/verify-email", { method: "POST", json: { token }, allowUnauthorized: true }),
+  resendVerification: (email: string) =>
+    request<{ ok: true }>("/auth/resend-verification", { method: "POST", json: { email }, allowUnauthorized: true }),
+  forgotPassword: (email: string) =>
+    request<{ ok: true }>("/auth/forgot-password", { method: "POST", json: { email }, allowUnauthorized: true }),
+  resetPassword: (body: { token: string; password: string }) =>
+    request<{ ok: true }>("/auth/reset-password", { method: "POST", json: body, allowUnauthorized: true }),
 
   // Dashboard
   dashboard: () => request<Dashboard>("/dashboard"),
@@ -195,7 +208,6 @@ export const api = {
 
   // Gmail
   gmailStatus: () => request<GmailStatus>("/gmail/status"),
-  gmailConnectUrl: `${API_URL}/gmail/connect`,
   connectAppPassword: (body: { email: string; appPassword: string }) =>
     request<GmailAppPasswordResult>("/gmail/app-password", { method: "POST", json: body }),
   gmailDisconnect: () => request<void>("/gmail/disconnect", { method: "POST" }),

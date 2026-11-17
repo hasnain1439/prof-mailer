@@ -8,7 +8,12 @@ export const notFound: RequestHandler = (req, res) => {
 
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message, ...(err.details ? { details: err.details } : {}) });
+    if (err.status === 429) res.setHeader("Retry-After", "60");
+    res.status(err.status).json({
+      error: err.message,
+      ...(err.code ? { code: err.code } : {}),
+      ...(err.details ? { details: err.details } : {}),
+    });
     return;
   }
   if (err instanceof Prisma.PrismaClientKnownRequestError) {

@@ -17,8 +17,15 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string | null;
-  picture: string | null;
+  emailVerifiedAt: Date | null;
 }
+
+/** Public JSON shape of the signed-in user (GET /auth/me, POST /auth/login). */
+export function publicUser(u: AuthUser) {
+  return { id: u.id, email: u.email, name: u.name, emailVerified: u.emailVerifiedAt !== null };
+}
+
+export const AUTH_USER_SELECT = { id: true, email: true, name: true, emailVerifiedAt: true } as const;
 
 declare global {
   namespace Express {
@@ -29,7 +36,7 @@ declare global {
   }
 }
 
-function hashToken(token: string): string {
+export function hashToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
@@ -61,7 +68,7 @@ export const attachUser: RequestHandler = async (req, res, next) => {
     const id = hashToken(token);
     const session = await prisma.session.findUnique({
       where: { id },
-      include: { user: { select: { id: true, email: true, name: true, picture: true } } },
+      include: { user: { select: AUTH_USER_SELECT } },
     });
     if (!session) return next();
     const now = Date.now();
@@ -82,8 +89,17 @@ export const attachUser: RequestHandler = async (req, res, next) => {
   }
 };
 
+/** Revoke every session of a user (password reset). */
+export async function revokeAllSessions(userId: string): Promise<void> {
+  await prisma.session.deleteMany({ where: { userId } });
+}
+
+/** Signed in AND email verified. Mounted after the public /auth routes. */
 export const requireUser: RequestHandler = (req, _res, next) => {
   if (!req.user) return next(new HttpError(401, "Not signed in"));
+  if (!req.user.emailVerifiedAt) {
+    return next(new HttpError(403, "Please verify your email address first", undefined, "EMAIL_NOT_VERIFIED"));
+  }
   next();
 };
 
@@ -93,9 +109,11 @@ export function uid(req: Request): string {
   return req.user.id;
 }
 
-/** Remove expired sessions (called from the scheduler / tick). */
+/** Remove expired sessions and email-link tokens (called from the scheduler). */
 export async function pruneExpiredSessions(): Promise<number> {
-  const r = await prisma.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+  const now = new Date();
+  const r = await prisma.session.deleteMany({ where: { expiresAt: { lt: now } } });
+  await prisma.authToken.deleteMany({ where: { expiresAt: { lt: now } } });
   return r.count;
 }
 
@@ -104,16 +122,4 @@ export function safeEqual(a: string, b: string): boolean {
   const ha = createHash("sha256").update(a, "utf8").digest();
   const hb = createHash("sha256").update(b, "utf8").digest();
   return timingSafeEqual(ha, hb);
-}
-
-/** Only same-site relative paths ("/x", not "//host" or "/\host"); anything else becomes "/". */
-export function safeNextPath(raw: unknown): string {
-  if (typeof raw !== "string" || raw.length > 500) return "/";
-  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
-  if (/[\u0000-\u001f\\]/.test(raw)) return "/";
-  return raw;
-}
-
-export function randomState(): string {
-  return randomBytes(24).toString("base64url");
 }

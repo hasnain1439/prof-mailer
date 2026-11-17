@@ -108,7 +108,7 @@ function GettingStarted() {
   const items = [
     {
       done: gmail.data.connected,
-      title: "Connect your Gmail account",
+      title: "Connect your Gmail (App Password)",
       help: gmail.data.connected ? `Sending from ${gmail.data.email ?? "your account"}` : "Every email is sent from the account you connect.",
       href: "/gmail",
       cta: "Connect",

@@ -36,24 +36,3 @@ export function setCookie(res: Response, name: string, value: string, maxAgeMs: 
 export function clearCookie(res: Response, name: string, path = "/"): void {
   res.clearCookie(name, { ...baseCookieOptions(), path });
 }
-
-const STATE_TTL_MS = 10 * 60 * 1000;
-
-/** Short-lived httpOnly cookie carrying OAuth state as base64url JSON (compared with the query state). */
-export function setStateCookie(res: Response, name: string, data: Record<string, string>, path: string): void {
-  setCookie(res, name, Buffer.from(JSON.stringify(data), "utf8").toString("base64url"), STATE_TTL_MS, path);
-}
-
-export function readStateCookie(req: Request, name: string): Record<string, string> | null {
-  const raw = getCookie(req, name);
-  if (!raw || raw.length > 2000) return null;
-  try {
-    const v = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as unknown;
-    if (!v || typeof v !== "object") return null;
-    const out: Record<string, string> = {};
-    for (const [k, x] of Object.entries(v)) if (typeof x === "string") out[k] = x;
-    return out;
-  } catch {
-    return null;
-  }
-}

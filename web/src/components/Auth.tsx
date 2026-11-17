@@ -15,10 +15,18 @@ export interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
-/** Only same-app relative paths are allowed as a post-login destination. */
+/** Pages reachable without a session; they render without the app shell. */
+export const PUBLIC_PATHS = ["/login", "/signup", "/verify-email", "/forgot-password", "/reset-password"] as const;
+
+export function isPublicPath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
+/** Only same-app relative paths are allowed as a post-login destination (never another auth page). */
 export function safeNext(next: string | null | undefined): string {
   if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/";
-  if (next === "/login" || next.startsWith("/login?")) return "/";
+  if (isPublicPath(next.split(/[?#]/)[0])) return "/";
   return next;
 }
 

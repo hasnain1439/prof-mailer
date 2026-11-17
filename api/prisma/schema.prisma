@@ -27,20 +27,42 @@ enum EmailStatus {
   CANCELLED
 }
 
+// Email + password accounts. email is stored trimmed + lowercased.
 model User {
-  id           String        @id @default(cuid())
-  googleSub    String        @unique
-  email        String
-  name         String?
-  picture      String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  sessions     Session[]
-  professors   Professor[]
-  templates    Template[]
-  emails       Email[]
-  settings     Settings?
-  gmailAccount GmailAccount?
+  id              String        @id @default(cuid())
+  email           String        @unique
+  name            String?
+  // "scrypt$N$r$p$<salt b64>$<hash b64>" (src/lib/password.ts)
+  passwordHash    String
+  emailVerifiedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  sessions        Session[]
+  authTokens      AuthToken[]
+  professors      Professor[]
+  templates       Template[]
+  emails          Email[]
+  settings        Settings?
+  gmailAccount    GmailAccount?
+}
+
+enum AuthTokenType {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
+// One-time email links. id = sha256(hex) of the 32-byte random token sent by email.
+model AuthToken {
+  id        String        @id
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      AuthTokenType
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
 }
 
 // id = sha256(hex) of the random session token held in the pm_session cookie.
@@ -150,21 +172,17 @@ model AppState {
 }
 
 enum GmailAuthType {
-  OAUTH
   APP_PASSWORD
 }
 
-// One connected Gmail account per user.
-// OAUTH: refreshToken (+ accessToken) set. APP_PASSWORD: appPasswordEnc set (AES-256-GCM, see src/lib/crypto.ts).
+// One connected Gmail account per user: address + Google App Password (SMTP send, IMAP reply checks).
+// appPasswordEnc is AES-256-GCM encrypted (see src/lib/crypto.ts).
 model GmailAccount {
   id             String        @id @default(cuid())
   userId         String        @unique
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   email          String
-  authType       GmailAuthType @default(OAUTH)
-  refreshToken   String?
-  accessToken    String?
-  expiryDate     DateTime?
+  authType       GmailAuthType @default(APP_PASSWORD)
   appPasswordEnc String?
   connectedAt    DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

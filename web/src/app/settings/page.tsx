@@ -205,6 +205,11 @@ export default function SettingsPage() {
                 <Row name="Signed in as">
                   <Mono className="break-all">{user?.email ?? "—"}</Mono>
                 </Row>
+                <Row name="Password">
+                  <Link href="/forgot-password" className={link}>
+                    Change password
+                  </Link>
+                </Row>
                 <Row name="Sending from">
                   {gmail.data?.connected ? (
                     <Mono className="break-all">{gmail.data.email ?? "Connected"}</Mono>

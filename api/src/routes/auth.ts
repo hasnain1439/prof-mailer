@@ -1,66 +1,200 @@
-import { createHash } from "node:crypto";
-import { Router } from "express";
+/**
+ * Email + password accounts (contract v3). All routes are public and rate limited.
+ * No account enumeration: signup / resend / forgot answer the same way whether or not the address
+ * exists, emails are sent in the background (so timing does not depend on it), and login runs a
+ * dummy scrypt for unknown addresses. Never log passwords, tokens or request bodies.
+ */
+import { randomBytes } from "node:crypto";
+import { Router, type RequestHandler } from "express";
 import { z } from "zod";
-import { createSession, destroySession, randomState, safeEqual, safeNextPath } from "../lib/auth.js";
-import { clearCookie, readStateCookie, setStateCookie } from "../lib/cookies.js";
+import { AUTH_USER_SELECT, createSession, destroySession, publicUser, revokeAllSessions } from "../lib/auth.js";
+import { consumeAuthToken, issueAuthToken, RESET_TTL_MS, VERIFY_TTL_MS, webLink } from "../lib/authTokens.js";
 import { env } from "../lib/env.js";
 import { HttpError, validateBody } from "../lib/http.js";
+import { dummyVerify, hashPassword, PASSWORD_MAX, PASSWORD_MIN, verifyPassword } from "../lib/password.js";
 import { prisma } from "../lib/prisma.js";
-import { createLoginAuthUrl, exchangeLoginCode, isGoogleConfigured } from "../services/gmail/oauth.js";
-import { safeErrorMessage } from "../jobs/util.js";
+import { AttemptCounter, rateLimit } from "../middleware/security.js";
+import {
+  sendAlreadyRegisteredEmail,
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} from "../services/mail/system.js";
 
 export const authRouter = Router();
 
-const LOGIN_STATE_COOKIE = "pm_login_state";
-const LOGIN_STATE_PATH = "/api/auth";
+/** Stricter per-IP limit for signup / login / forgot / resend (burst 10, then 5 per minute). */
+const strictLimiter = rateLimit({ capacity: 10, refillPerMinute: 5 });
+/** Per-account login failures: 10 per 15 minutes, then 429 until the window ends. */
+const loginFailures = new AttemptCounter(10, 15 * 60 * 1000);
+/** System mail per recipient address: at most 5 per hour (stops mail-bombing through resend/forgot). */
+const mailPerAddress = new AttemptCounter(5, 60 * 60 * 1000);
 
-function loginErrorRedirect(code: string): string {
-  const url = new URL("/login", env.PUBLIC_URL);
-  url.searchParams.set("error", code);
-  return url.toString();
+const emailField = z.string().trim().toLowerCase().max(320).pipe(z.email("Invalid email"));
+const passwordField = z
+  .string()
+  .min(PASSWORD_MIN, `Password must be at least ${PASSWORD_MIN} characters`)
+  .max(PASSWORD_MAX, `Password must be at most ${PASSWORD_MAX} characters`);
+const tokenField = z.string().min(1).max(200);
+
+/** Fire-and-forget system mail, throttled per address. Failures are logged by the mailer. */
+function sendInBackground(to: string, send: () => Promise<boolean>): void {
+  if (!mailPerAddress.tryHit(to)) {
+    console.warn("[auth] system mail throttled for one address");
+    return;
+  }
+  void send().catch(() => console.error("[auth] system mail failed"));
 }
 
-async function upsertUser(identity: { sub: string; email: string; name: string | null; picture: string | null }) {
-  return prisma.user.upsert({
-    where: { googleSub: identity.sub },
-    update: { email: identity.email, name: identity.name, picture: identity.picture },
-    create: { googleSub: identity.sub, email: identity.email, name: identity.name, picture: identity.picture },
-    select: { id: true },
+async function startVerification(user: { id: string; email: string; name: string | null }): Promise<void> {
+  if (!mailPerAddress.tryHit(user.email)) {
+    console.warn("[auth] verification mail throttled for one address");
+    return;
+  }
+  const token = await issueAuthToken(user.id, "VERIFY_EMAIL", VERIFY_TTL_MS);
+  const url = webLink(env.PUBLIC_URL, "/verify-email", token);
+  void sendVerificationEmail(user.email, user.name, url).catch(() => console.error("[auth] system mail failed"));
+}
+
+// ---------------------------------------------------------------------------------------------
+// signup
+
+const signupSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100),
+  email: emailField,
+  password: passwordField,
+});
+
+authRouter.post("/signup", strictLimiter, validateBody(signupSchema), async (req, res) => {
+  const body = req.body as z.infer<typeof signupSchema>;
+  // Hash first on every path so the response time does not reveal whether the address exists.
+  const passwordHash = await hashPassword(body.password);
+  const existing = await prisma.user.findUnique({ where: { email: body.email } });
+
+  if (!existing) {
+    try {
+      const user = await prisma.user.create({
+        data: { email: body.email, name: body.name, passwordHash },
+        select: { id: true, email: true, name: true },
+      });
+      await startVerification(user);
+    } catch (err) {
+      // Concurrent signup with the same address: answer the same way.
+      if ((err as { code?: string }).code !== "P2002") throw err;
+    }
+  } else if (existing.emailVerifiedAt) {
+    const login = new URL("/login", env.PUBLIC_URL).toString();
+    const forgot = new URL("/forgot-password", env.PUBLIC_URL).toString();
+    sendInBackground(existing.email, () => sendAlreadyRegisteredEmail(existing.email, existing.name, login, forgot));
+  } else {
+    // Unverified account: the newest signup wins (only the mailbox owner can verify it).
+    await prisma.user.update({ where: { id: existing.id }, data: { name: body.name, passwordHash } });
+    await revokeAllSessions(existing.id);
+    await startVerification({ id: existing.id, email: existing.email, name: body.name });
+  }
+  res.status(201).json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------------------------
+// verify email (signs in)
+
+const verifySchema = z.object({ token: tokenField });
+
+authRouter.post("/verify-email", validateBody(verifySchema), async (req, res) => {
+  const { token } = req.body as z.infer<typeof verifySchema>;
+  const userId = await consumeAuthToken(token, "VERIFY_EMAIL");
+  if (!userId) throw new HttpError(400, "This link is invalid or has expired. Request a new one.");
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: AUTH_USER_SELECT });
+  if (!user) throw new HttpError(400, "This link is invalid or has expired. Request a new one.");
+  const verified = user.emailVerifiedAt
+    ? user
+    : await prisma.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date() }, select: AUTH_USER_SELECT });
+  await prisma.authToken.deleteMany({ where: { userId, type: "VERIFY_EMAIL" } });
+  await destroySession(req, res);
+  await createSession(req, res, userId);
+  res.json({ ok: true, user: publicUser(verified) });
+});
+
+const emailOnlySchema = z.object({ email: emailField });
+
+authRouter.post("/resend-verification", strictLimiter, validateBody(emailOnlySchema), async (req, res) => {
+  const { email } = req.body as z.infer<typeof emailOnlySchema>;
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true, name: true, emailVerifiedAt: true } });
+  if (user && !user.emailVerifiedAt) await startVerification(user);
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------------------------
+// login
+
+const loginSchema = z.object({
+  email: emailField,
+  password: z.string().min(1, "Password is required").max(PASSWORD_MAX),
+});
+
+const INVALID_LOGIN = "Invalid email or password";
+
+authRouter.post("/login", strictLimiter, validateBody(loginSchema), async (req, res) => {
+  const { email, password } = req.body as z.infer<typeof loginSchema>;
+  if (loginFailures.isBlocked(email)) {
+    throw new HttpError(429, "Too many failed sign-in attempts. Try again in 15 minutes or reset your password.");
+  }
+  const user = await prisma.user.findUnique({ where: { email }, select: { ...AUTH_USER_SELECT, passwordHash: true } });
+  const ok = user ? await verifyPassword(password, user.passwordHash) : await dummyVerify(password);
+  if (!user || !ok) {
+    loginFailures.hit(email);
+    throw new HttpError(401, INVALID_LOGIN);
+  }
+  if (!user.emailVerifiedAt) {
+    throw new HttpError(403, "Please verify your email address first. Check your inbox for the link.", undefined, "EMAIL_NOT_VERIFIED");
+  }
+  loginFailures.reset(email);
+  await destroySession(req, res);
+  await createSession(req, res, user.id);
+  res.json({ user: publicUser(user) });
+});
+
+// ---------------------------------------------------------------------------------------------
+// password reset
+
+authRouter.post("/forgot-password", strictLimiter, validateBody(emailOnlySchema), async (req, res) => {
+  const { email } = req.body as z.infer<typeof emailOnlySchema>;
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true, name: true } });
+  if (user && mailPerAddress.tryHit(user.email)) {
+    const token = await issueAuthToken(user.id, "RESET_PASSWORD", RESET_TTL_MS);
+    const url = webLink(env.PUBLIC_URL, "/reset-password", token);
+    void sendPasswordResetEmail(user.email, user.name, url).catch(() => console.error("[auth] system mail failed"));
+  }
+  res.json({ ok: true });
+});
+
+const resetSchema = z.object({ token: tokenField, password: passwordField });
+
+authRouter.post("/reset-password", strictLimiter, validateBody(resetSchema), async (req, res) => {
+  const { token, password } = req.body as z.infer<typeof resetSchema>;
+  const userId = await consumeAuthToken(token, "RESET_PASSWORD");
+  if (!userId) throw new HttpError(400, "This link is invalid or has expired. Request a new one.");
+  const passwordHash = await hashPassword(password);
+  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { emailVerifiedAt: true } });
+  if (!existing) throw new HttpError(400, "This link is invalid or has expired. Request a new one.");
+  // The link proves control of the mailbox, so it also verifies the address.
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash, ...(existing.emailVerifiedAt ? {} : { emailVerifiedAt: new Date() }) },
+    select: AUTH_USER_SELECT,
   });
-}
-
-authRouter.get("/google", (req, res) => {
-  if (!isGoogleConfigured()) return res.redirect(302, loginErrorRedirect("not_configured"));
-  const state = randomState();
-  setStateCookie(res, LOGIN_STATE_COOKIE, { s: state, n: safeNextPath(req.query.next) }, LOGIN_STATE_PATH);
-  res.redirect(302, createLoginAuthUrl(state));
+  await prisma.authToken.deleteMany({ where: { userId } });
+  await revokeAllSessions(userId);
+  loginFailures.reset(user.email);
+  await createSession(req, res, userId);
+  res.json({ ok: true, user: publicUser(user) });
 });
 
-authRouter.get("/google/callback", async (req, res) => {
-  const q = req.query as Record<string, unknown>;
-  const saved = readStateCookie(req, LOGIN_STATE_COOKIE);
-  clearCookie(res, LOGIN_STATE_COOKIE, LOGIN_STATE_PATH);
-  if (!isGoogleConfigured()) return res.redirect(302, loginErrorRedirect("not_configured"));
-  if (typeof q.error === "string") return res.redirect(302, loginErrorRedirect("access_denied"));
-  if (!saved?.s || typeof q.state !== "string" || !safeEqual(saved.s, q.state)) {
-    return res.redirect(302, loginErrorRedirect("invalid_state"));
-  }
-  if (typeof q.code !== "string" || !q.code) return res.redirect(302, loginErrorRedirect("missing_code"));
-  try {
-    const identity = await exchangeLoginCode(q.code);
-    const user = await upsertUser(identity);
-    await createSession(req, res, user.id);
-    return res.redirect(302, `${env.PUBLIC_URL}${safeNextPath(saved.n)}`);
-  } catch (err) {
-    console.error(`[auth] Google sign-in failed: ${safeErrorMessage(err, 200)}`);
-    return res.redirect(302, loginErrorRedirect("signin_failed"));
-  }
-});
+// ---------------------------------------------------------------------------------------------
+// session
 
 authRouter.get("/me", (req, res) => {
   if (!req.user) throw new HttpError(401, "Not signed in");
-  const { id, email, name, picture } = req.user;
-  res.json({ user: { id, email, name, picture } });
+  res.json({ user: publicUser(req.user) });
 });
 
 authRouter.post("/logout", async (req, res) => {
@@ -68,24 +202,35 @@ authRouter.post("/logout", async (req, res) => {
   res.status(204).end();
 });
 
-// Local QA sign-in without Google. Only when DEV_LOGIN_ENABLED=true AND NODE_ENV !== "production".
+// Local QA sign-in without a password. Only when DEV_LOGIN_ENABLED=true AND NODE_ENV !== "production".
 const devLoginSchema = z.object({
-  email: z.string().trim().toLowerCase().pipe(z.email("Invalid email")),
+  email: emailField,
   name: z.string().trim().max(200).optional(),
 });
 
-authRouter.post("/dev-login", (req, _res, next) => {
+const devLoginGuard: RequestHandler = (_req, _res, next) => {
   if (!env.DEV_LOGIN_ENABLED || env.IS_PROD) return next(new HttpError(404, "Not found"));
   next();
-}, validateBody(devLoginSchema), async (req, res) => {
+};
+
+authRouter.post("/dev-login", devLoginGuard, validateBody(devLoginSchema), async (req, res) => {
   const body = req.body as z.infer<typeof devLoginSchema>;
-  // Synthetic, stable "sub" that can never collide with a real Google sub (those are numeric).
-  const sub = `dev:${createHash("sha256").update(body.email).digest("hex").slice(0, 32)}`;
-  const user = await upsertUser({ sub, email: body.email, name: body.name || null, picture: null });
+  const existing = await prisma.user.findUnique({ where: { email: body.email }, select: AUTH_USER_SELECT });
+  const user = existing
+    ? existing.emailVerifiedAt
+      ? existing
+      : await prisma.user.update({ where: { id: existing.id }, data: { emailVerifiedAt: new Date() }, select: AUTH_USER_SELECT })
+    : await prisma.user.create({
+        data: {
+          email: body.email,
+          name: body.name || null,
+          // Random, never revealed: dev users sign in via dev-login (or set a password with forgot-password).
+          passwordHash: await hashPassword(randomBytes(24).toString("base64url")),
+          emailVerifiedAt: new Date(),
+        },
+        select: AUTH_USER_SELECT,
+      });
+  await destroySession(req, res);
   await createSession(req, res, user.id);
-  const full = await prisma.user.findUniqueOrThrow({
-    where: { id: user.id },
-    select: { id: true, email: true, name: true, picture: true },
-  });
-  res.json({ user: full });
+  res.json({ user: publicUser(user) });
 });

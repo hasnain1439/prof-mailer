@@ -154,24 +154,16 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string | null;
-  picture: string | null;
+  emailVerified: boolean;
 }
 
-export type GmailAuthType = "OAUTH" | "APP_PASSWORD";
+export type GmailAuthType = "APP_PASSWORD";
 
 export interface GmailStatus {
-  /** Google OAuth client configured on the server. */
-  oauthConfigured: boolean;
-  /** @deprecated alias of oauthConfigured */
-  configured: boolean;
   connected: boolean;
   email: string | null;
   authType: GmailAuthType | null;
   dryRun: boolean;
-  /** Legacy single-user flag; unused in the multi-user UI. */
-  testRecipientSet: boolean;
-  /** App Password (SMTP/IMAP) connect is offered only when the server enables it. */
-  appPasswordEnabled: boolean;
 }
 
 export interface GmailAppPasswordResult {
