@@ -2,33 +2,117 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { PROFESSOR_STATUSES, type ProfessorStatus } from "@/lib/types";
+import { PROFESSOR_STATUSES, type Email, type ProfessorStatus } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { EmailActions } from "@/components/EmailActions";
+import { EmailBody, HtmlBadge } from "@/components/EmailBody";
+import { useGmailStatus } from "@/components/GmailStatus";
+import { IconArrowLeft, IconExternal, IconInbox, IconPencil, IconReply, IconTrash, IconUpload } from "@/components/icons";
 import { ProfessorForm } from "@/components/ProfessorForm";
+import { useToast } from "@/components/Toast";
 import {
+  Avatar,
   Card,
-  Empty,
-  ErrorBox,
-  Loading,
-  Modal,
-  PageHeader,
-  ProfessorStatusBadge,
   EmailStatusBadge,
+  EmptyState,
+  ErrorBox,
+  Modal,
+  ProfessorStatusBadge,
+  Skeleton,
+  TypeChip,
   btnDanger,
+  btnPrimary,
   btnSecondary,
-  followUpLabel,
+  btnSmall,
   input,
+  link,
+  professorStatusLabel,
 } from "@/components/ui";
 
-function Field({ name, children }: { name: string; children: React.ReactNode }) {
+function Field({ name, children }: { name: string; children: ReactNode }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-neutral-500">{name}</dt>
-      <dd className="mt-0.5 whitespace-pre-wrap break-words text-sm text-neutral-900">{children || "—"}</dd>
+      <dt className="text-xs font-medium text-slate-500">{name}</dt>
+      <dd className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-900">{children || <span className="text-slate-400">—</span>}</dd>
+    </div>
+  );
+}
+
+const bubbleStyles: Record<Email["status"], string> = {
+  SENT: "bg-indigo-600 text-white ring-indigo-600",
+  SENDING: "bg-indigo-50 text-slate-900 ring-indigo-200",
+  SCHEDULED: "bg-white text-slate-900 ring-indigo-200 border border-dashed border-indigo-300",
+  FAILED: "bg-red-50 text-slate-900 ring-red-200",
+  CANCELLED: "bg-slate-100 text-slate-500 ring-slate-200",
+};
+
+function Bubble({ e, sender, onChanged }: { e: Email; sender: string | null; onChanged: () => void }) {
+  const sent = e.status === "SENT";
+  const when =
+    e.status === "SENT" ? `Sent ${formatKarachi(e.sentAt)}` : e.status === "CANCELLED" ? `Was scheduled ${formatKarachi(e.scheduledAt)}` : `Scheduled ${formatKarachi(e.scheduledAt)}`;
+  return (
+    <li className="flex flex-col items-end">
+      <div className="mb-1 flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500">
+        <TypeChip followUpNo={e.followUpNo} />
+        {e.isHtml && <HtmlBadge />}
+        <EmailStatusBadge status={e.status} />
+        <span>{when}</span>
+      </div>
+      <div className={`w-full max-w-[42rem] rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm ring-1 ${bubbleStyles[e.status]}`}>
+        <p className={`text-sm font-semibold ${sent ? "text-white" : e.status === "CANCELLED" ? "line-through" : "text-slate-900"}`}>{e.subject}</p>
+        {e.isHtml ? (
+          <div className="mt-2">
+            <EmailBody body={e.body} isHtml title={`Email: ${e.subject}`} />
+          </div>
+        ) : (
+          <EmailBody body={e.body} isHtml={false} className="mt-2" textClassName={sent ? "text-indigo-50" : ""} />
+        )}
+        {sent && sender && <p className="mt-3 text-[11px] text-indigo-200">From {sender}</p>}
+      </div>
+      {e.status === "FAILED" && e.error && (
+        <div className="mt-1.5 w-full max-w-[42rem] rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 ring-1 ring-red-200">Error: {e.error}</div>
+      )}
+      {(e.status === "SCHEDULED" || e.status === "FAILED" || e.status === "CANCELLED") && (
+        <div className="mt-2">
+          <EmailActions email={e} onChanged={onChanged} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+function ReplyMarker({ name, at }: { name: string; at: string }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <Avatar name={name} size="sm" />
+      <div className="rounded-2xl rounded-tl-sm bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm ring-1 ring-emerald-200">
+        <p className="flex items-center gap-1.5 font-semibold">
+          <IconReply size={14} />
+          {name} replied
+        </p>
+        <p className="mt-0.5 text-xs text-emerald-800">{formatKarachi(at)} · read the reply in your Gmail inbox</p>
+      </div>
+    </li>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div>
+      <div className="mb-6 flex items-center gap-4">
+        <Skeleton className="h-14 w-14 rounded-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-3 w-64" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[20rem_1fr]">
+        <Skeleton className="h-80 rounded-xl" />
+        <Skeleton className="h-80 rounded-xl" />
+      </div>
     </div>
   );
 }
@@ -37,6 +121,8 @@ export function ProfessorDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
+  const toast = useToast();
+  const gmail = useGmailStatus();
   const { data: prof, error, loading, reload } = useApi(() => api.getProfessor(id), [id]);
   const [editing, setEditing] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -45,6 +131,7 @@ export function ProfessorDetail() {
     setActionError(null);
     try {
       await api.updateProfessor(id, { status: s });
+      toast(`Status set to ${professorStatusLabel(s)}.`);
       reload();
     } catch (e) {
       setActionError(errorMessage(e));
@@ -55,107 +142,118 @@ export function ProfessorDetail() {
     if (!prof || !window.confirm(`Delete ${prof.name} and all their emails?`)) return;
     try {
       await api.deleteProfessor(id);
+      toast(`${prof.name} deleted.`);
       router.push("/professors");
     } catch (e) {
       setActionError(errorMessage(e));
     }
   }
 
+  const sender = gmail.data?.connected ? gmail.data.email : null;
+
   return (
     <div>
-      <div className="mb-2 text-sm">
-        <Link href="/professors" className="text-neutral-600 hover:underline">
-          ← Professors
-        </Link>
-      </div>
+      <Link href="/professors" className="mb-4 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900">
+        <IconArrowLeft size={15} />
+        Professors
+      </Link>
       <ErrorBox error={error} onRetry={reload} />
       <ErrorBox error={actionError} />
-      {loading && !prof && <Loading />}
+      {loading && !prof && <DetailSkeleton />}
 
       {prof && (
         <>
-          <PageHeader title={prof.name}>
-            <ProfessorStatusBadge status={prof.status} />
-            <select
-              aria-label="Status"
-              className={`${input} !w-auto !py-1 text-sm`}
-              value={prof.status}
-              onChange={(e) => changeStatus(e.target.value as ProfessorStatus)}
-            >
-              {PROFESSOR_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <button type="button" className={btnSecondary} onClick={() => setEditing(true)}>
-              Edit
-            </button>
-            <button type="button" className={btnDanger} onClick={remove}>
-              Delete
-            </button>
-          </PageHeader>
-
-          <Card title="Profile">
-            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Field name="Email">
-                <a href={`mailto:${prof.email}`} className="hover:underline">
+          <div className="mb-6 flex flex-wrap items-center gap-4">
+            <Avatar name={prof.name} size="lg" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{prof.name}</h1>
+                <ProfessorStatusBadge status={prof.status} />
+              </div>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {prof.university}
+                {prof.country && ` · ${prof.country}`} ·{" "}
+                <a href={`mailto:${prof.email}`} className="hover:text-slate-900 hover:underline">
                   {prof.email}
                 </a>
-              </Field>
-              <Field name="University">{prof.university}</Field>
-              <Field name="Country">{prof.country}</Field>
-              <Field name="Profile">
-                {prof.profileUrl && (
-                  <a href={prof.profileUrl} target="_blank" rel="noreferrer" className="text-blue-700 hover:underline">
-                    {prof.profileUrl}
-                  </a>
-                )}
-              </Field>
-              <Field name="Research focus">{prof.researchFocus}</Field>
-              <Field name="Added">{formatKarachi(prof.createdAt)}</Field>
-              <div className="sm:col-span-2 lg:col-span-3">
-                <Field name="Why I fit">{prof.whyFits}</Field>
-              </div>
-              <div className="sm:col-span-2 lg:col-span-3">
-                <Field name="Notes">{prof.notes}</Field>
-              </div>
-            </dl>
-          </Card>
-
-          <Card title={`Thread (${prof.emails.length})`}>
-            {prof.emails.length === 0 ? (
-              <Empty>No emails for this professor yet. Use Import to schedule one.</Empty>
-            ) : (
-              <ol className="space-y-4">
-                {prof.emails.map((e) => (
-                  <li key={e.id} className="rounded-md border border-neutral-200">
-                    <div className="flex flex-wrap items-center gap-2 border-b border-neutral-100 bg-neutral-50 px-3 py-2">
-                      <span className="text-xs font-semibold text-neutral-600">{followUpLabel(e.followUpNo)}</span>
-                      <EmailStatusBadge status={e.status} />
-                      <span className="font-medium text-neutral-900">{e.subject}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-x-6 gap-y-1 px-3 py-2 text-xs text-neutral-600">
-                      <span>Scheduled: {formatKarachi(e.scheduledAt)}</span>
-                      <span>Sent: {formatKarachi(e.sentAt)}</span>
-                      <span className={e.repliedAt ? "font-medium text-green-700" : undefined}>Replied: {formatKarachi(e.repliedAt)}</span>
-                    </div>
-                    {e.status === "FAILED" && e.error && (
-                      <div className="mx-3 mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-800">Error: {e.error}</div>
-                    )}
-                    <pre className="mx-3 mb-3 whitespace-pre-wrap break-words rounded bg-neutral-50 p-3 font-sans text-sm text-neutral-800">
-                      {e.body}
-                    </pre>
-                    {(e.status === "SCHEDULED" || e.status === "FAILED" || e.status === "CANCELLED") && (
-                      <div className="px-3 pb-3">
-                        <EmailActions email={e} onChanged={reload} />
-                      </div>
-                    )}
-                  </li>
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                aria-label="Status"
+                className={`${input} !w-auto`}
+                value={prof.status}
+                onChange={(e) => changeStatus(e.target.value as ProfessorStatus)}
+              >
+                {PROFESSOR_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {professorStatusLabel(s)}
+                  </option>
                 ))}
-              </ol>
-            )}
-          </Card>
+              </select>
+              <button type="button" className={btnSecondary} onClick={() => setEditing(true)}>
+                <IconPencil size={15} />
+                Edit
+              </button>
+              <button type="button" className={btnDanger} onClick={remove}>
+                <IconTrash size={15} />
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[20rem_1fr]">
+            <Card title="Profile" className="lg:sticky lg:top-6">
+              <dl className="space-y-4">
+                <Field name="Email">
+                  <a href={`mailto:${prof.email}`} className={link}>
+                    {prof.email}
+                  </a>
+                </Field>
+                <Field name="University">{prof.university}</Field>
+                <Field name="Country">{prof.country}</Field>
+                <Field name="Profile">
+                  {prof.profileUrl && (
+                    <a href={prof.profileUrl} target="_blank" rel="noreferrer" className={`${link} inline-flex items-center gap-1 break-all`}>
+                      {prof.profileUrl.replace(/^https?:\/\//, "")}
+                      <IconExternal size={12} />
+                    </a>
+                  )}
+                </Field>
+                <Field name="Research focus">{prof.researchFocus}</Field>
+                <Field name="Why I fit">{prof.whyFits}</Field>
+                <Field name="Notes">{prof.notes}</Field>
+                <Field name="Added">{formatKarachi(prof.createdAt)}</Field>
+              </dl>
+            </Card>
+
+            <Card
+              title="Conversation"
+              description={`${prof.emails.length} email${prof.emails.length === 1 ? "" : "s"}${sender ? ` · from ${sender}` : ""}`}
+            >
+              {prof.emails.length === 0 ? (
+                <EmptyState
+                  compact
+                  icon={<IconInbox size={20} />}
+                  title="No emails yet"
+                  action={
+                    <Link href="/import" className={`${btnPrimary} ${btnSmall}`}>
+                      <IconUpload size={14} />
+                      Schedule via Import
+                    </Link>
+                  }
+                >
+                  Emails to {prof.name} will show up here as a conversation.
+                </EmptyState>
+              ) : (
+                <ol className="space-y-6">
+                  {prof.emails.map((e) => (
+                    <FragmentWithReply key={e.id} e={e} name={prof.name} sender={sender} onChanged={reload} />
+                  ))}
+                </ol>
+              )}
+            </Card>
+          </div>
 
           <Modal open={editing} title="Edit professor" onClose={() => setEditing(false)} wide>
             {editing && (
@@ -164,6 +262,7 @@ export function ProfessorDetail() {
                 onCancel={() => setEditing(false)}
                 onSaved={() => {
                   setEditing(false);
+                  toast("Professor saved.");
                   reload();
                 }}
               />
@@ -172,5 +271,14 @@ export function ProfessorDetail() {
         </>
       )}
     </div>
+  );
+}
+
+function FragmentWithReply({ e, name, sender, onChanged }: { e: Email; name: string; sender: string | null; onChanged: () => void }) {
+  return (
+    <>
+      <Bubble e={e} sender={sender} onChanged={onChanged} />
+      {e.repliedAt && <ReplyMarker name={name} at={e.repliedAt} />}
+    </>
   );
 }

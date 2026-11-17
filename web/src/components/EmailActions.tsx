@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import type { Email } from "@/lib/types";
-import { karachiInputFromNow, karachiInputToUtcIso, utcIsoToKarachiInput } from "@/lib/time";
+import { formatKarachi, karachiInputFromNow, karachiInputToUtcIso, utcIsoToKarachiInput } from "@/lib/time";
+import { IconCalendar, IconX } from "./icons";
+import { useToast } from "./Toast";
 import { btnDanger, btnPrimary, btnSecondary, btnSmall, input } from "./ui";
 
 /** Cancel + Reschedule controls for a queued (SCHEDULED/FAILED) email. */
 export function EmailActions({ email, onChanged }: { email: Email; onChanged: () => void }) {
+  const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -22,6 +25,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
     setError(null);
     try {
       await api.cancelEmail(email.id);
+      toast("Email cancelled.");
       onChanged();
     } catch (e) {
       setError(errorMessage(e));
@@ -46,6 +50,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
       const scheduledAt = karachiInputToUtcIso(value);
       await api.updateEmail(email.id, { scheduledAt });
       setEditing(false);
+      toast(`Rescheduled for ${formatKarachi(scheduledAt)}.`);
       onChanged();
     } catch (e) {
       setError(errorMessage(e));
@@ -57,7 +62,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
   return (
     <div className="flex flex-col gap-1">
       {editing ? (
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           <input
             type="datetime-local"
             className={`${input} !w-auto !py-1 text-xs`}
@@ -65,18 +70,19 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
             onChange={(e) => setValue(e.target.value)}
             aria-label="New time (Karachi)"
           />
-          <span className="text-xs text-neutral-500">PKT</span>
+          <span className="text-xs text-slate-500">PKT</span>
           <button type="button" className={`${btnPrimary} ${btnSmall}`} disabled={busy || !value} onClick={save}>
             Save
           </button>
-          <button type="button" className={`${btnSecondary} ${btnSmall}`} disabled={busy} onClick={() => setEditing(false)}>
-            Close
+          <button type="button" aria-label="Close" className={`${btnSecondary} ${btnSmall}`} disabled={busy} onClick={() => setEditing(false)}>
+            <IconX size={14} />
           </button>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {canReschedule && (
             <button type="button" className={`${btnSecondary} ${btnSmall}`} disabled={busy} onClick={startEdit}>
+              <IconCalendar size={14} />
               {email.status === "FAILED" ? "Retry / reschedule" : "Reschedule"}
             </button>
           )}
@@ -87,7 +93,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
           )}
         </div>
       )}
-      {error && <p className="text-xs text-red-700">{error}</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }

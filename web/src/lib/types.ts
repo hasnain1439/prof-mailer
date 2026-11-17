@@ -33,6 +33,7 @@ export interface Template {
   subject: string;
   body: string;
   isFollowUp: boolean;
+  isHtml: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +49,7 @@ export interface Email {
   sentAt: string | null;
   repliedAt: string | null;
   error: string | null;
+  isHtml: boolean;
   gmailThreadId: string | null;
   gmailMessageId: string | null;
   messageIdHeader: string | null;
@@ -98,6 +100,7 @@ export interface TemplateInput {
   subject: string;
   body: string;
   isFollowUp?: boolean;
+  isHtml?: boolean;
 }
 
 export interface ImportRowData {
@@ -121,6 +124,7 @@ export interface ImportPreviewRow {
   body: string;
   errors: string[];
   professorExists: boolean;
+  isHtml: boolean;
 }
 
 export interface ImportPreview {

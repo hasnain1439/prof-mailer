@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { PROFESSOR_STATUSES, type Professor, type ProfessorInput, type ProfessorStatus } from "@/lib/types";
-import { ErrorBox, btnPrimary, btnSecondary, input, label } from "./ui";
+import { ErrorBox, btnPrimary, btnSecondary, input, label, professorStatusLabel } from "./ui";
 
 type FormState = Required<{ [K in keyof ProfessorInput]: K extends "status" ? ProfessorStatus : string }>;
 
@@ -69,9 +69,9 @@ export function ProfessorForm({
   );
 
   return (
-    <form onSubmit={submit} className="space-y-3">
+    <form onSubmit={submit} className="space-y-4">
       <ErrorBox error={error} />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {text("name", "Name", { required: true })}
         {text("email", "Email", { required: true, type: "email" })}
         {text("university", "University", { required: true })}
@@ -84,7 +84,7 @@ export function ProfessorForm({
           <select id="pf-status" className={input} value={form.status} onChange={(e) => set("status", e.target.value as ProfessorStatus)}>
             {PROFESSOR_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {professorStatusLabel(s)}
               </option>
             ))}
           </select>
@@ -103,7 +103,7 @@ export function ProfessorForm({
         </label>
         <textarea id="pf-notes" rows={2} className={input} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
       </div>
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="-mx-6 -mb-6 mt-2 flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
         <button type="button" className={btnSecondary} onClick={onCancel} disabled={busy}>
           Cancel
         </button>

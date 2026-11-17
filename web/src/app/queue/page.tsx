@@ -1,66 +1,174 @@
 "use client";
 
 import Link from "next/link";
+import { Fragment, useState } from "react";
 import { api } from "@/lib/api";
+import type { EmailStatus } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { EmailActions } from "@/components/EmailActions";
-import { Empty, ErrorBox, EmailStatusBadge, Loading, PageHeader, btnSecondary, followUpLabel, table, td, th } from "@/components/ui";
+import { EmailBody, HtmlBadge } from "@/components/EmailBody";
+import { IconClock, IconRefresh, IconUpload } from "@/components/icons";
+import {
+  Avatar,
+  EmailStatusBadge,
+  EmptyCard,
+  ErrorBox,
+  PageHeader,
+  TableSkeleton,
+  TypeChip,
+  btnPrimary,
+  btnSecondary,
+  table,
+  tableWrap,
+  td,
+  th,
+  tr,
+} from "@/components/ui";
+
+type Filter = "ALL" | "SCHEDULED" | "FAILED";
 
 export default function QueuePage() {
   const { data, error, loading, reload } = useApi(() => api.listEmails({ status: ["SCHEDULED", "SENDING", "FAILED"] }));
+  const [filter, setFilter] = useState<Filter>("ALL");
+  const [open, setOpen] = useState<string | null>(null);
+
+  const count = (s: EmailStatus[]) => data?.filter((e) => s.includes(e.status)).length ?? 0;
+  const rows = data?.filter((e) => filter === "ALL" || (filter === "SCHEDULED" ? e.status !== "FAILED" : e.status === "FAILED"));
+  const tabs: { key: Filter; label: string; n: number }[] = [
+    { key: "ALL", label: "All", n: data?.length ?? 0 },
+    { key: "SCHEDULED", label: "Scheduled", n: count(["SCHEDULED", "SENDING"]) },
+    { key: "FAILED", label: "Failed", n: count(["FAILED"]) },
+  ];
 
   return (
     <div>
-      <PageHeader title="Queue">
+      <PageHeader
+        title="Queue"
+        description="Scheduled, sending and failed emails. Reschedule times are entered in Karachi time (PKT); failed emails can be retried by rescheduling."
+      >
         <button type="button" className={btnSecondary} onClick={reload} disabled={loading}>
+          <IconRefresh size={16} className={loading ? "animate-spin" : undefined} />
           Refresh
         </button>
       </PageHeader>
-      <p className="mb-4 text-sm text-neutral-600">Scheduled, sending and failed emails. Reschedule times are entered in Karachi time (PKT). Failed emails can be retried by rescheduling.</p>
 
       <ErrorBox error={error} onRetry={reload} />
-      {loading && !data && <Loading />}
+      {loading && !data && <TableSkeleton cols={6} />}
       {data &&
         (data.length === 0 ? (
-          <Empty>The queue is empty.</Empty>
+          <EmptyCard
+            icon={<IconClock size={20} />}
+            title="The queue is empty"
+            action={
+              <Link href="/import" className={btnPrimary}>
+                <IconUpload size={16} />
+                Import &amp; schedule emails
+              </Link>
+            }
+          >
+            Nothing is waiting to be sent. Import professors with a scheduled time to fill the queue.
+          </EmptyCard>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-            <table className={table}>
-              <thead>
-                <tr>
-                  <th className={th}>Professor</th>
-                  <th className={th}>Subject</th>
-                  <th className={th}>Type</th>
-                  <th className={th}>Scheduled</th>
-                  <th className={th}>Status</th>
-                  <th className={th}>Error</th>
-                  <th className={th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((e) => (
-                  <tr key={e.id} className={e.status === "FAILED" ? "bg-red-50/50" : undefined}>
-                    <td className={td}>
-                      <Link href={`/professors/${e.professor.id}`} className="font-medium hover:underline">
-                        {e.professor.name}
-                      </Link>
-                      <div className="text-xs text-neutral-500">{e.professor.email}</div>
-                    </td>
-                    <td className={td}>{e.subject}</td>
-                    <td className={`${td} whitespace-nowrap`}>{followUpLabel(e.followUpNo)}</td>
-                    <td className={`${td} whitespace-nowrap`}>{formatKarachi(e.scheduledAt)}</td>
-                    <td className={td}>
-                      <EmailStatusBadge status={e.status} />
-                    </td>
-                    <td className={`${td} max-w-xs break-words text-xs text-red-700`}>{e.error ?? ""}</td>
-                    <td className={td}>
-                      {e.status === "SENDING" ? <span className="text-xs text-neutral-500">Sending…</span> : <EmailActions email={e} onChanged={reload} />}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/5">
+            <div className="flex gap-1 border-b border-slate-100 px-3 py-2">
+              {tabs.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setFilter(t.key)}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    filter === t.key ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {t.label}
+                  <span
+                    className={`rounded-full px-1.5 text-[11px] tabular-nums ${
+                      t.key === "FAILED" && t.n > 0 ? "bg-red-100 text-red-700" : "bg-slate-200/70 text-slate-600"
+                    }`}
+                  >
+                    {t.n}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {rows && rows.length === 0 ? (
+              <p className="px-5 py-10 text-center text-sm text-slate-500">No {filter === "FAILED" ? "failed" : "scheduled"} emails.</p>
+            ) : (
+              <div className={tableWrap}>
+                <table className={table}>
+                  <thead>
+                    <tr>
+                      <th className={th}>Professor</th>
+                      <th className={th}>Subject</th>
+                      <th className={th}>Scheduled</th>
+                      <th className={th}>Status</th>
+                      <th className={th}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows?.map((e) => (
+                      <Fragment key={e.id}>
+                      <tr className={`${tr} ${e.status === "FAILED" ? "bg-red-50/40" : ""}`}>
+                        <td className={td}>
+                          <div className="flex items-center gap-3">
+                            <Avatar name={e.professor.name} size="sm" />
+                            <div className="min-w-0">
+                              <Link href={`/professors/${e.professor.id}`} className="font-medium text-slate-900 hover:text-indigo-600">
+                                {e.professor.name}
+                              </Link>
+                              <div className="truncate text-xs text-slate-500">{e.professor.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className={`${td} max-w-sm`}>
+                          <div className="mb-1 flex flex-wrap gap-1.5">
+                            <TypeChip followUpNo={e.followUpNo} />
+                            {e.isHtml && <HtmlBadge />}
+                          </div>
+                          <div className="text-slate-800">{e.subject}</div>
+                          {e.error && <div className="mt-1 break-words text-xs text-red-600">{e.error}</div>}
+                          <button
+                            type="button"
+                            className="mt-1 text-xs font-medium text-indigo-600 hover:text-indigo-500"
+                            aria-expanded={open === e.id}
+                            onClick={() => setOpen(open === e.id ? null : e.id)}
+                          >
+                            {open === e.id ? "Hide email" : "View email"}
+                          </button>
+                        </td>
+                        <td className={`${td} whitespace-nowrap text-xs`}>{formatKarachi(e.scheduledAt)}</td>
+                        <td className={td}>
+                          <EmailStatusBadge status={e.status} />
+                        </td>
+                        <td className={td}>
+                          {e.status === "SENDING" ? (
+                            <span className="text-xs text-slate-500">Sending…</span>
+                          ) : (
+                            <EmailActions email={e} onChanged={reload} />
+                          )}
+                        </td>
+                      </tr>
+                      {open === e.id && (
+                        <tr>
+                          <td colSpan={5} className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
+                            <p className="mb-2 text-xs text-slate-500">
+                              <span className="font-medium text-slate-700">Subject:</span> {e.subject}
+                            </p>
+                            {e.isHtml ? (
+                              <EmailBody body={e.body} isHtml title={`Email: ${e.subject}`} />
+                            ) : (
+                              <EmailBody body={e.body} isHtml={false} className="max-h-96 overflow-y-auto rounded-lg bg-white p-4 ring-1 ring-slate-200" textClassName="text-slate-800" />
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         ))}
     </div>

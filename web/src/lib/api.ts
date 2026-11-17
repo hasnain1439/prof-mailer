@@ -136,7 +136,7 @@ export const api = {
     request<Template>(`/templates/${encodeURIComponent(id)}`, { method: "PATCH", json: body }),
   deleteTemplate: (id: string) => request<void>(`/templates/${encodeURIComponent(id)}`, { method: "DELETE" }),
   previewTemplate: (id: string, professorId: string) =>
-    request<{ subject: string; body: string }>(`/templates/${encodeURIComponent(id)}/preview`, {
+    request<{ subject: string; body: string; isHtml: boolean }>(`/templates/${encodeURIComponent(id)}/preview`, {
       method: "POST",
       json: { professorId },
     }),
