@@ -147,12 +147,23 @@ export interface Dashboard {
   dailySendLimit: number;
 }
 
+export type GmailAuthType = "OAUTH" | "APP_PASSWORD";
+
 export interface GmailStatus {
+  /** Google OAuth client id/secret present in api/.env. */
+  oauthConfigured: boolean;
+  /** @deprecated alias of oauthConfigured */
   configured: boolean;
   connected: boolean;
   email: string | null;
+  authType: GmailAuthType | null;
   dryRun: boolean;
   testRecipientSet: boolean;
+}
+
+export interface GmailAppPasswordResult {
+  ok: true;
+  email: string;
 }
 
 export interface GmailTestSendResult {

@@ -3,6 +3,7 @@ import type {
   Email,
   EmailStatus,
   EmailWithProfessor,
+  GmailAppPasswordResult,
   GmailStatus,
   GmailTestSendResult,
   ImportCommitResult,
@@ -171,6 +172,8 @@ export const api = {
   // Gmail
   gmailStatus: () => request<GmailStatus>("/gmail/status"),
   gmailConnectUrl: `${API_URL}/gmail/connect`,
+  connectAppPassword: (body: { email: string; appPassword: string }) =>
+    request<GmailAppPasswordResult>("/gmail/app-password", { method: "POST", json: body }),
   gmailDisconnect: () => request<void>("/gmail/disconnect", { method: "POST" }),
   gmailTestSend: (body: { subject?: string; body?: string } = {}) =>
     request<GmailTestSendResult>("/gmail/test-send", { method: "POST", json: body }),
