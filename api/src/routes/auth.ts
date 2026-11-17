@@ -69,7 +69,7 @@ const nameField = z.string().trim().min(1, "Name is required").max(100);
 
 // Name and password are both chosen on the verification page (by the mailbox owner).
 const signupSchema = z.object({
-  name: nameField.optional(),
+  name: z.unknown().optional(), // accepted and ignored (older clients)
   email: emailField,
 });
 

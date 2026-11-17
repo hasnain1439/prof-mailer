@@ -39,7 +39,7 @@ export function SignupPanel() {
     return (
       <AuthCard title="Check your inbox">
         <Notice tone="success" className="">
-          We sent a link to {sentTo}. Open it to confirm your email and choose your password.
+          We sent a link to {sentTo}. Open it to confirm your email and choose your name and password.
         </Notice>
         <p className="mt-3 text-xs text-muted">The link expires in 24 hours. Didn&apos;t get it? Check your spam folder, or send it again.</p>
         <div className="mt-4">
