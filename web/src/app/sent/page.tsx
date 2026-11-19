@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useState } from "react";
+import { contactHref } from "@/lib/types";
 import { api } from "@/lib/api";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
@@ -74,7 +75,7 @@ export default function SentPage() {
                       <div className="flex items-center gap-2.5">
                         <Avatar name={e.professor.name} size="sm" />
                         <div className="min-w-0">
-                          <Link href={`/professors/${e.professor.id}`} className="font-medium text-text hover:text-accent">
+                          <Link href={contactHref(e.professor)} className="font-medium text-text hover:text-accent">
                             {e.professor.name}
                           </Link>
                           <div className="truncate text-xs text-muted" title={contactOrg(e.professor)}>
@@ -88,7 +89,7 @@ export default function SentPage() {
                         <TypeChip followUpNo={e.followUpNo} />
                         {e.isHtml && <HtmlBadge />}
                         {e.attachCv && <CvClip />}
-                        <Link href={`/professors/${e.professor.id}`} className="truncate text-text hover:text-accent" title={e.subject}>
+                        <Link href={contactHref(e.professor)} className="truncate text-text hover:text-accent" title={e.subject}>
                           {e.subject}
                         </Link>
                       </div>

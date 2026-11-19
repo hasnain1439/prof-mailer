@@ -163,8 +163,8 @@ Sending rules for each user: at most one email per scheduler tick, at least a ra
 
 ## 8. Companies (job applications) and CV
 
-- **Contacts** holds both professors and companies. Use the Professor / Company switch in the form, or the `type` column (`professor` / `company`) in an import file.
-- For a company, fill in **Company**, **Role**, **Contact person** (HR or recruiter name, or "Hiring Team"), the email, an optional **Job link**, and **Why you fit**. Import columns: `type`, `company`, `role`, `jobUrl` (the sample CSV has a company row).
+- The sidebar has separate **Professors** and **Companies** pages. Each has its own **New** button and an **Import** button that opens the import page for that type.
+- **Import** has a Professors / Companies switch, and each one downloads its own sample (`prof-mailer-professors-sample.csv` or `prof-mailer-companies-sample.csv`). Company columns: `company, role, name, email, jobUrl, country, skills, whyFits, subject, body, scheduledAt` (`name` = recruiter / HR person or "Hiring Team"). A file of the wrong type shows "company is required" / "university is required" on every row.
 - Template placeholders for jobs: `{{company}}`, `{{role}}`, `{{jobUrl}}` (plus `{{name}}` and `{{whyFits}}`). Example subject: `Application: {{role}} at {{company}}`.
 - **CV**: upload it once in **Settings** (PDF, DOC or DOCX, up to 5 MB). Tick **Attach my CV** on a template (or in Import) and every email made from it carries the CV. If the CV is missing at send time the email is marked FAILED with a clear message.
 - **Settings → Company follow-up template**: follow-ups to companies use it (otherwise the normal follow-up template).

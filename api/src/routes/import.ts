@@ -109,7 +109,18 @@ async function existingProfessors(
 }
 
 // ---- GET /import/sample.csv ----
-importRouter.get("/sample.csv", (_req, res) => {
+/** `type` query / form field / body value → kind (undefined = mixed import). */
+function expectedKindOf(v: unknown): "PROFESSOR" | "COMPANY" | undefined {
+  const t = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return t === "company" ? "COMPANY" : t === "professor" ? "PROFESSOR" : undefined;
+}
+
+// Columns of the per-kind samples (`skills` is read as researchFocus).
+const PROFESSOR_SAMPLE_COLUMNS = ["name", "email", "university", "country", "researchFocus", "whyFits", "profileUrl", "subject", "body", "scheduledAt"] as const;
+const COMPANY_SAMPLE_COLUMNS = ["company", "role", "name", "email", "jobUrl", "country", "skills", "whyFits", "subject", "body", "scheduledAt"] as const;
+
+importRouter.get("/sample.csv", (req, res) => {
+  const only = expectedKindOf(req.query.type);
   const rows: ImportRowData[] = [
     {
       type: "professor",
@@ -178,9 +189,43 @@ importRouter.get("/sample.csv", (_req, res) => {
       scheduledAt: "2026-11-22 11:00",
     },
   ];
-  const csv = Papa.unparse({ fields: [...IMPORT_COLUMNS], data: rows.map((r) => IMPORT_COLUMNS.map((c) => r[c])) });
+  let csv: string;
+  let filename = "prof-mailer-sample.csv";
+  if (only === "COMPANY") {
+    const companies: ImportRowData[] = [
+      ...rows.filter((r) => r.type === "company"),
+      {
+        ...rows.find((r) => r.type === "company")!,
+        name: "Sara Recruiter",
+        email: "sara.recruiter@cloudsoft.example.com",
+        company: "CloudSoft Example Ltd",
+        role: "Backend Developer (Node.js)",
+        jobUrl: "https://cloudsoft.example.com/careers/backend",
+        country: "Netherlands",
+        researchFocus: "Node.js, TypeScript, PostgreSQL",
+        whyFits: "I built and deployed a multi-user email scheduling app with Express and Postgres",
+        subject: "Application for {{role}}",
+        body:
+          "Dear {{name}},\n\nI would like to apply for the {{role}} role at {{company}}. {{whyFits}}.\n\nI have attached my CV and would be glad to talk.\n\nKind regards,\nYour Name",
+        scheduledAt: "2026-11-22 11:30",
+      },
+    ];
+    csv = Papa.unparse({
+      fields: [...COMPANY_SAMPLE_COLUMNS],
+      data: companies.map((r) => COMPANY_SAMPLE_COLUMNS.map((c) => (c === "skills" ? r.researchFocus : r[c]))),
+    });
+    filename = "prof-mailer-companies-sample.csv";
+  } else if (only === "PROFESSOR") {
+    csv = Papa.unparse({
+      fields: [...PROFESSOR_SAMPLE_COLUMNS],
+      data: rows.filter((r) => r.type !== "company").map((r) => PROFESSOR_SAMPLE_COLUMNS.map((c) => r[c])),
+    });
+    filename = "prof-mailer-professors-sample.csv";
+  } else {
+    csv = Papa.unparse({ fields: [...IMPORT_COLUMNS], data: rows.map((r) => IMPORT_COLUMNS.map((c) => r[c])) });
+  }
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", 'attachment; filename="prof-mailer-sample.csv"');
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.send(csv);
 });
 
@@ -200,7 +245,7 @@ importRouter.post("/preview", uploadFile, async (req, res) => {
     if (e instanceof ImportParseError) throw new HttpError(400, e.message);
     throw e;
   }
-  const rows = validateImportRows(parsed, template, await existingProfessors(prisma, userId, parsed));
+  const rows = validateImportRows(parsed, template, await existingProfessors(prisma, userId, parsed), expectedKindOf(req.body?.type));
   const errorCount = rows.filter((r) => r.errors.length > 0).length;
   res.json({ rows, validCount: rows.length - errorCount, errorCount });
 });
@@ -223,6 +268,8 @@ const commitSchema = z.object({
   templateId: z.string().trim().nullish(),
   /** Overrides the template's attachCv for every row. */
   attachCv: z.boolean().optional(),
+  /** "professor" | "company": the page the import was started from (see validateImportRows). */
+  type: z.enum(["professor", "company"]).optional(),
 });
 
 importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
@@ -238,7 +285,7 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
     async (tx) => {
       // Re-validate against the DB inside the transaction (same rules as the preview, incl. re-import errors).
       const existing = await existingProfessors(tx, userId, parsed);
-      const valid = validateImportRows(parsed, template, existing).filter((r) => r.errors.length === 0);
+      const valid = validateImportRows(parsed, template, existing, expectedKindOf(body.type)).filter((r) => r.errors.length === 0);
       let professorsCreated = 0;
       let professorsUpdated = 0;
       let emailsCreated = 0;

@@ -26,6 +26,9 @@ import type {
 } from "./types";
 
 /** Same-origin by default: Next.js rewrites /api/* to the Express API (see next.config.ts). */
+/** Import started from the Professors or Companies page. */
+export type ImportType = "professor" | "company";
+
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/+$/, "");
 
 /** Error code the API returns (403) for a blocked account. */
@@ -194,17 +197,18 @@ export const api = {
     }),
 
   // Import
-  sampleCsvUrl: `${API_URL}/import/sample.csv`,
-  importPreview: (file: File, templateId?: string) => {
+  sampleCsvUrl: (type?: ImportType) => `${API_URL}/import/sample.csv${type ? `?type=${type}` : ""}`,
+  importPreview: (file: File, templateId?: string, type?: ImportType) => {
     const form = new FormData();
     form.append("file", file);
     if (templateId) form.append("templateId", templateId);
+    if (type) form.append("type", type);
     return request<ImportPreview>("/import/preview", { method: "POST", form });
   },
-  importCommit: (rows: ImportRowData[], templateId?: string, attachCv?: boolean) =>
+  importCommit: (rows: ImportRowData[], templateId?: string, attachCv?: boolean, type?: ImportType) =>
     request<ImportCommitResult>("/import/commit", {
       method: "POST",
-      json: { rows, ...(templateId ? { templateId } : {}), ...(attachCv !== undefined ? { attachCv } : {}) },
+      json: { rows, ...(templateId ? { templateId } : {}), ...(attachCv !== undefined ? { attachCv } : {}), ...(type ? { type } : {}) },
     }),
 
   // Emails

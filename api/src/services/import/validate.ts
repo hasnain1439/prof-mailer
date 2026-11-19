@@ -82,11 +82,14 @@ export function normalizeEmail(email: string): string {
  * Validate rows and render final subject/body.
  * @param template the selected template (null when none was given)
  * @param existing professors already in the DB, keyed by lowercase email
+ * @param expectedKind set when importing from the Professors or Companies page: rows with an empty
+ *   `type` get this kind, and rows of the other kind are errors.
  */
 export function validateImportRows(
   rows: ParsedRow[],
   template: ImportTemplate | null,
   existing: ReadonlyMap<string, ExistingProfessorInfo>,
+  expectedKind?: ContactKind,
 ): ImportPreviewRow[] {
   const seen = new Map<string, number>(); // email → first rowNumber
 
@@ -95,9 +98,16 @@ export function validateImportRows(
     const warnings: string[] = [];
     if (!data.name) errors.push("name is required");
     const university = rowUniversity(data);
-    if (!university) errors.push("university or company is required");
-    const kind = parseKind(data.type);
+    const kind = parseKind(data.type || (expectedKind ? expectedKind.toLowerCase() : ""));
+    // From the Professors / Companies page the matching column is required, so a file of the
+    // other kind (university vs company column) is caught instead of imported as the wrong type.
+    if (expectedKind === "COMPANY" && !data.company) errors.push("company is required");
+    else if (expectedKind === "PROFESSOR" && !data.university) errors.push("university is required");
+    else if (!university) errors.push(kind === "COMPANY" ? "company is required" : "university or company is required");
     if (!kind) errors.push(`type "${data.type}" must be "professor" or "company"`);
+    else if (expectedKind && kind !== expectedKind) {
+      errors.push(kind === "COMPANY" ? "This row is a company; import it from the Companies page" : "This row is a professor; import it from the Professors page");
+    }
     if (data.jobUrl && !/^https?:\/\/\S+$/i.test(data.jobUrl)) errors.push(`jobUrl "${data.jobUrl}" must be an http(s) URL`);
 
     const email = normalizeEmail(data.email);

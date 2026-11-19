@@ -40,6 +40,9 @@ export class ImportParseError extends Error {}
 const HEADER_MAP: Record<string, ImportColumn> = {
   ...(Object.fromEntries(IMPORT_COLUMNS.map((c) => [c.toLowerCase(), c])) as Record<string, ImportColumn>),
   kind: "type",
+  skills: "researchFocus",
+  contactperson: "name",
+  joblink: "jobUrl",
 };
 
 /** Map a raw header cell to a canonical column (case-insensitive; ignores spaces, `_`, `-`). */

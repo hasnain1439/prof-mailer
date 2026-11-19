@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { contactHref } from "@/lib/types";
 import { api } from "@/lib/api";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
@@ -254,7 +255,7 @@ export default function DashboardPage() {
             <Mono>{data.contacts.professors}</Mono>
             {data.contacts.professors === 1 ? "professor" : "professors"}
           </Link>
-          <Link href="/professors" className="inline-flex items-center gap-1.5 text-text hover:text-accent">
+          <Link href="/companies" className="inline-flex items-center gap-1.5 text-text hover:text-accent">
             <IconBuilding size={14} className="text-muted" />
             <Mono>{data.contacts.companies}</Mono>
             {data.contacts.companies === 1 ? "company" : "companies"}
@@ -293,7 +294,7 @@ export default function DashboardPage() {
                   <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 hover:bg-bg">
                     <div className="min-w-0 flex-1 basis-56">
                       <div className="flex min-w-0 items-center gap-2">
-                        <Link href={`/professors/${e.professor.id}`} className="truncate text-[13px] font-medium text-text hover:text-accent">
+                        <Link href={contactHref(e.professor)} className="truncate text-[13px] font-medium text-text hover:text-accent">
                           {e.professor.name}
                         </Link>
                         <TypeChip followUpNo={e.followUpNo} />
@@ -323,7 +324,7 @@ export default function DashboardPage() {
                   <li key={e.id} className="flex items-center gap-3 px-4 py-2 hover:bg-bg">
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        <Link href={`/professors/${e.professor.id}`} className="truncate text-[13px] font-medium text-text hover:text-accent">
+                        <Link href={contactHref(e.professor)} className="truncate text-[13px] font-medium text-text hover:text-accent">
                           {e.professor.name}
                         </Link>
                         <TypeChip followUpNo={e.followUpNo} />

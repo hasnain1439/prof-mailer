@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useAuth } from "./Auth";
-import { IconClock, IconDashboard, IconMail, IconSend, IconSettings, IconShield, IconTemplate, IconUpload, IconUsers } from "./icons";
+import { IconBuilding, IconClock, IconGraduation, IconDashboard, IconMail, IconSend, IconSettings, IconShield, IconTemplate, IconUpload } from "./icons";
 
 type NavItem = { href: string; label: string; icon: ReactNode; adminOnly?: boolean };
 
@@ -12,7 +12,8 @@ const groups: { heading?: string; links: NavItem[] }[] = [
   {
     links: [
       { href: "/", label: "Dashboard", icon: <IconDashboard /> },
-      { href: "/professors", label: "Contacts", icon: <IconUsers /> },
+      { href: "/professors", label: "Professors", icon: <IconGraduation /> },
+      { href: "/companies", label: "Companies", icon: <IconBuilding /> },
       { href: "/templates", label: "Templates", icon: <IconTemplate /> },
       { href: "/import", label: "Import", icon: <IconUpload /> },
     ],

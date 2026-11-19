@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useRef, useState, type DragEvent, type FormEvent } from "react";
-import { api, errorMessage } from "@/lib/api";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Fragment, Suspense, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { api, errorMessage, type ImportType } from "@/lib/api";
 import type { ContactKind, ImportCommitResult, ImportPreview, ImportPreviewRow } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
-import { IconAlert, IconArrowRight, IconCheck, IconDownload, IconFile, IconPaperclip, IconX } from "@/components/icons";
+import { IconBuilding, IconGraduation, IconAlert, IconArrowRight, IconCheck, IconDownload, IconFile, IconPaperclip, IconX } from "@/components/icons";
 import { EmailBody, HtmlBadge } from "@/components/EmailBody";
 import { useToast } from "@/components/Toast";
 import {
@@ -16,6 +17,7 @@ import {
   ErrorBox,
   Field,
   KindIcon,
+  Loading,
   Mono,
   Notice,
   PageHeader,
@@ -76,7 +78,36 @@ function formatSize(bytes: number): string {
 }
 
 export default function ImportPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <ImportInner />
+    </Suspense>
+  );
+}
+
+const TYPE_COPY: Record<ImportType, { label: string; many: string; href: string; columns: string; required: string }> = {
+  professor: {
+    label: "Professors",
+    many: "professors",
+    href: "/professors",
+    columns: "name, email, university, country, researchFocus, whyFits, profileUrl, subject, body, scheduledAt",
+    required: "name, email, university, scheduledAt",
+  },
+  company: {
+    label: "Companies",
+    many: "companies",
+    href: "/companies",
+    columns: "company, role, name, email, jobUrl, country, skills, whyFits, subject, body, scheduledAt",
+    required: "company, name, email, scheduledAt",
+  },
+};
+
+function ImportInner() {
   const toast = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const type: ImportType = useSearchParams().get("type") === "company" ? "company" : "professor";
+  const tc = TYPE_COPY[type];
   const templates = useApi(() => api.listTemplates(false));
   const cv = useApi(() => api.getCv());
   const hasCv = cv.data ? cv.data.cv !== null : null;
@@ -126,7 +157,7 @@ export default function ImportPage() {
     setError(null);
     setResult(null);
     try {
-      setPreview(await api.importPreview(file, templateId || undefined));
+      setPreview(await api.importPreview(file, templateId || undefined, type));
       setPreviewTemplateId(templateId);
     } catch (err) {
       setPreview(null);
@@ -145,10 +176,11 @@ export default function ImportPage() {
         validRows.map((r) => r.data),
         previewTemplateId || undefined,
         attachCv,
+        type,
       );
       setResult(res);
       setPreview(null);
-      toast(`Imported ${res.professorsCreated + res.professorsUpdated} contact(s), ${res.emailsCreated} email(s) scheduled.`);
+      toast(`Imported ${res.professorsCreated + res.professorsUpdated} ${tc.many}, ${res.emailsCreated} email(s) scheduled.`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -163,12 +195,37 @@ export default function ImportPage() {
 
   return (
     <div>
-      <PageHeader title="Import" description="Upload a spreadsheet of professors or companies and schedule an email to each one.">
-        <a href={api.sampleCsvUrl} className={btnSecondary} download>
+      <PageHeader title={`Import ${tc.many}`} description={`Upload a spreadsheet of ${tc.many} and schedule an email to each one.`}>
+        <a href={api.sampleCsvUrl(type)} className={btnSecondary} download>
           <IconDownload />
-          Download sample CSV
+          Download {tc.many} sample
         </a>
       </PageHeader>
+
+      <div role="tablist" aria-label="What to import" className="mb-4 flex gap-1 border-b border-border">
+        {(["professor", "company"] as const).map((t) => {
+          const active = type === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                if (active) return;
+                chooseFile(null);
+                router.replace(`${pathname}?type=${t}`);
+              }}
+              className={`-mb-px inline-flex h-8 items-center gap-1.5 border-b-2 px-2.5 text-[13px] font-medium transition-colors ${
+                active ? "border-accent text-text" : "border-transparent text-muted hover:text-text"
+              }`}
+            >
+              {t === "company" ? <IconBuilding size={14} /> : <IconGraduation size={14} />}
+              {TYPE_COPY[t].label}
+            </button>
+          );
+        })}
+      </div>
 
       <StepIndicator step={step} />
 
@@ -195,8 +252,8 @@ export default function ImportPage() {
               View queue
               <IconArrowRight />
             </Link>
-            <Link href="/professors" className={btnSecondary}>
-              Contacts
+            <Link href={tc.href} className={btnSecondary}>
+              {tc.label}
             </Link>
             <Button onClick={reset}>Import another file</Button>
           </div>
@@ -204,7 +261,7 @@ export default function ImportPage() {
       )}
 
       {!result && (
-        <Card title="Upload file" description="CSV or Excel (.xlsx), one contact (professor or company) per row">
+        <Card title="Upload file" description={`CSV or Excel (.xlsx), one ${type} per row`}>
           <form onSubmit={runPreview} className="space-y-4">
             <label
               htmlFor="imp-file"
@@ -317,21 +374,37 @@ export default function ImportPage() {
               <summary className="cursor-pointer px-3 py-2 font-medium text-text select-none">File format</summary>
               <div className="space-y-1.5 border-t border-border px-3 py-2.5 text-muted">
                 <p>
-                  Columns:{" "}
-                  <code className={code}>
-                    type, name, email, university, company, role, jobUrl, country, researchFocus, whyFits, profileUrl, subject, body, scheduledAt
-                  </code>
+                  Columns: <code className={code}>{tc.columns}</code>
                 </p>
                 <p>
-                  <code className={code}>type</code> is <code className={code}>professor</code> or <code className={code}>company</code> (empty means
-                  professor). For companies, put the company in <code className={code}>company</code>, the job title in{" "}
-                  <code className={code}>role</code>, the posting link in <code className={code}>jobUrl</code>, and the recruiter (or “Hiring Team”) in{" "}
-                  <code className={code}>name</code>. <code className={code}>researchFocus</code> can hold your skills / stack.
+                  Required: <code className={code}>{tc.required}</code>. Download the {tc.many} sample above to start from a filled-in example.
                 </p>
+                {type === "company" ? (
+                  <p>
+                    <code className={code}>company</code> is the company name, <code className={code}>role</code> the job title,{" "}
+                    <code className={code}>name</code> the recruiter or HR person (or “Hiring Team”), <code className={code}>jobUrl</code> the posting
+                    link and <code className={code}>skills</code> your skills / stack.
+                  </p>
+                ) : (
+                  <p>
+                    <code className={code}>researchFocus</code> is the professor&apos;s research area and <code className={code}>whyFits</code> why
+                    you fit their group.
+                  </p>
+                )}
                 <p>
                   <code className={code}>scheduledAt</code> is Karachi time, <code className={code}>YYYY-MM-DD HH:mm</code>. Leave subject/body empty to
-                  use the selected template, which can use <code className={code}>{"{{company}}"}</code>, <code className={code}>{"{{role}}"}</code> and{" "}
-                  <code className={code}>{"{{jobUrl}}"}</code>.
+                  use the selected template
+                  {type === "company" ? (
+                    <>
+                      , which can use <code className={code}>{"{{company}}"}</code>, <code className={code}>{"{{role}}"}</code> and{" "}
+                      <code className={code}>{"{{jobUrl}}"}</code>
+                    </>
+                  ) : (
+                    <>
+                      , which can use <code className={code}>{"{{university}}"}</code> and <code className={code}>{"{{researchFocus}}"}</code>
+                    </>
+                  )}
+                  .
                 </p>
               </div>
             </details>

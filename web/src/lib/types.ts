@@ -238,3 +238,8 @@ export interface CvInfo {
   size: number;
   updatedAt: string;
 }
+
+/** Detail page of a contact: /companies/:id for companies, /professors/:id otherwise. */
+export function contactHref(p: { id: string; kind?: ContactKind }): string {
+  return `${p.kind === "COMPANY" ? "/companies" : "/professors"}/${encodeURIComponent(p.id)}`;
+}

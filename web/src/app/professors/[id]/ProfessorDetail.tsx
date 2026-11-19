@@ -157,7 +157,7 @@ export function ProfessorDetail() {
     try {
       await api.deleteProfessor(id);
       toast(`${prof.name} deleted.`);
-      router.push("/professors");
+      router.push(prof.kind === "COMPANY" ? "/companies" : "/professors");
     } catch (e) {
       setActionError(errorMessage(e));
     }
@@ -167,9 +167,9 @@ export function ProfessorDetail() {
 
   return (
     <div>
-      <Link href="/professors" className="mb-3 inline-flex items-center gap-1 text-[13px] text-muted hover:text-text">
+      <Link href={prof?.kind === "COMPANY" ? "/companies" : "/professors"} className="mb-3 inline-flex items-center gap-1 text-[13px] text-muted hover:text-text">
         <IconArrowLeft size={14} />
-        Contacts
+        {prof?.kind === "COMPANY" ? "Companies" : "Professors"}
       </Link>
       <ErrorBox error={error} onRetry={reload} />
       <ErrorBox error={actionError} />

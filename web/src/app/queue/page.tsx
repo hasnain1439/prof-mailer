@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Fragment, useState } from "react";
 import { api } from "@/lib/api";
-import type { EmailStatus } from "@/lib/types";
+import { contactHref, type EmailStatus } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { EmailActions } from "@/components/EmailActions";
@@ -111,7 +111,7 @@ export default function QueuePage() {
                         <div className="flex items-center gap-2.5">
                           <Avatar name={e.professor.name} size="sm" />
                           <div className="min-w-0">
-                            <Link href={`/professors/${e.professor.id}`} className="font-medium text-text hover:text-accent">
+                            <Link href={contactHref(e.professor)} className="font-medium text-text hover:text-accent">
                               {e.professor.name}
                             </Link>
                             <Mono className="block truncate !text-xs text-muted">{e.professor.email}</Mono>

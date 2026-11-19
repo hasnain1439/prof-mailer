@@ -8,9 +8,9 @@ import { Button, ErrorBox, Field, Input, Select, Textarea, professorStatusLabel 
 
 type FormState = Required<{ [K in keyof ProfessorInput]: K extends "status" ? ProfessorStatus : K extends "kind" ? ContactKind : string }>;
 
-function initial(p?: Professor): FormState {
+function initial(p?: Professor, kind?: ContactKind): FormState {
   return {
-    kind: p?.kind ?? "PROFESSOR",
+    kind: p?.kind ?? kind ?? "PROFESSOR",
     name: p?.name ?? "",
     email: p?.email ?? "",
     university: p?.university ?? "",
@@ -28,14 +28,17 @@ function initial(p?: Professor): FormState {
 /** Create (no `professor`) or edit form for a contact (professor or company). Empty optional fields are sent as "" which the API stores as null. */
 export function ProfessorForm({
   professor,
+  kind,
   onSaved,
   onCancel,
 }: {
   professor?: Professor;
+  /** Fixes the contact type (hides the Professor / Company switch). */
+  kind?: ContactKind;
   onSaved: (p: Professor) => void;
   onCancel: () => void;
 }) {
-  const [form, setForm] = useState<FormState>(() => initial(professor));
+  const [form, setForm] = useState<FormState>(() => initial(professor, kind));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,10 +123,12 @@ export function ProfessorForm({
   return (
     <form onSubmit={submit} className="space-y-3">
       <ErrorBox error={error} />
-      <div role="radiogroup" aria-label="Contact type" className="inline-flex gap-0.5 rounded-md border border-border bg-bg p-0.5">
-        {kindOption("PROFESSOR", "Professor", <IconGraduation size={14} />)}
-        {kindOption("COMPANY", "Company", <IconBuilding size={14} />)}
-      </div>
+      {!kind && (
+        <div role="radiogroup" aria-label="Contact type" className="inline-flex gap-0.5 rounded-md border border-border bg-bg p-0.5">
+          {kindOption("PROFESSOR", "Professor", <IconGraduation size={14} />)}
+          {kindOption("COMPANY", "Company", <IconBuilding size={14} />)}
+        </div>
+      )}
       {company ? (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

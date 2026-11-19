@@ -299,3 +299,9 @@ Filename is sanitised (basename, no control chars, max 120 chars).
 **Import**: new optional columns `type` (alias `kind`; values `professor`/`company`, case-insensitive, empty = professor, anything else = row error), `company` (used as `university` when `university` is empty; the required check is "university or company"), `role`, `jobUrl`. Sample CSV includes a company row. Preview rows include `kind`, `role`, `jobUrl`. Upsert by (user, email) also updates kind/role/jobUrl.
 
 **Dashboard**: `GET /dashboard` gains `contacts: { professors: number, companies: number }`.
+
+### v4.1: separate Professors / Companies pages
+- `GET /import/sample.csv?type=professor|company` returns a sample with only that kind's columns (company sample uses `skills` for researchFocus). Without `type` the mixed sample is returned.
+- Import preview (form field) and commit (body) accept `type: "professor" | "company"`. Rows with an empty `type` get that kind; rows of the other kind are errors, and the matching column is required (`company` for companies, `university` for professors).
+- Header aliases: `skills` → researchFocus, `contact person` → name, `job link` → jobUrl.
+- Web: `/professors` and `/companies` (+ `/companies/:id`), import at `/import?type=company`.
