@@ -247,3 +247,23 @@ Tokens are 32 random bytes; the DB stores only their sha256. Passwords are hashe
 - `GET /auth/verify-email/check?token=…` → `{ valid: boolean }` (does not consume). The verify page calls it on load.
 - System emails never include user-supplied names ("Hi,").
 - Client IP for rate limits: the web proxy (`web/src/proxy.ts`, runs before the `/api` rewrite) strips any client `x-pm-*` headers and, on Vercel, sends `x-pm-client-ip` + `x-pm-proxy-secret`. The API trusts `x-pm-client-ip` only when `x-pm-proxy-secret` equals `API_PROXY_SECRET` (same value on Vercel and Render). Otherwise it uses `req.ip` with `TRUST_PROXY_HOPS=1`, i.e. the address that reached Render, so a spoofed `X-Forwarded-For` can't choose a rate-limit bucket.
+
+## v3.3: admin
+Admins are normal accounts whose email is listed in the API env `ADMIN_EMAILS` (comma-separated, case-insensitive). There is no admin password and no DB role: `isAdmin` is derived from the env on every request (change it and restart the API).
+
+- `GET /auth/me`, `POST /auth/login`, `/auth/dev-login`, `/auth/verify-email`, `/auth/reset-password` → `user` gains `isAdmin: boolean`.
+- **Blocking**: `User.blockedAt` (nullable). A blocked user:
+  - `POST /auth/login` (correct password) and `/auth/dev-login` → 403 `{ error: "This account has been blocked.", code: "ACCOUNT_BLOCKED" }`. `/auth/verify-email` and `/auth/reset-password` still consume the link (and set the password) but answer the same 403 without signing in.
+  - All sessions are revoked when blocked (so existing cookies get 401). Should a session still exist, `/auth/me` and every signed-in route answer 403 `ACCOUNT_BLOCKED`.
+  - SCHEDULED / SENDING emails are left as they are, but the scheduler (send-due, reply checks, stale-SENDING reset) skips blocked users, so nothing is sent until they are unblocked.
+
+All admin routes require a verified, non-blocked session whose email is in `ADMIN_EMAILS`; anyone else (signed in or not) gets 404 `{ error: "Not found" }`.
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| GET | `/admin/users?q=` | | `AdminUser[]` ordered by `createdAt` desc, at most 500. `q` matches email or name (case-insensitive substring). |
+| POST | `/admin/users/:id/block` | | `AdminUser` (updated). 400 `CANNOT_BLOCK_SELF` / `CANNOT_BLOCK_ADMIN`; 404 if no such user. Idempotent. |
+| POST | `/admin/users/:id/unblock` | | `AdminUser` (updated). 404 if no such user. Idempotent. |
+| GET | `/admin/stats` | | `{ users, verifiedUsers, blockedUsers, gmailConnected, emailsSentToday, emailsSentTotal, emailsScheduled }` |
+
+`AdminUser = { id, email, name, createdAt, emailVerified, blocked, blockedAt, isAdmin, gmailConnected, gmailEmail, professorCount, emailsSent, emailsScheduled, lastSentAt }`. `emailsScheduled` counts SCHEDULED + SENDING; `emailsSentToday` uses the Asia/Karachi calendar day. Password hashes, tokens and app passwords are never returned. Admin actions are logged as `[admin] <adminId> blocked|unblocked <userId>` (ids only).

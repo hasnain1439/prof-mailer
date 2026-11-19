@@ -155,6 +155,34 @@ export interface AuthUser {
   email: string;
   name: string | null;
   emailVerified: boolean;
+  isAdmin: boolean;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: string;
+  emailVerified: boolean;
+  blocked: boolean;
+  blockedAt: string | null;
+  isAdmin: boolean;
+  gmailConnected: boolean;
+  gmailEmail: string | null;
+  professorCount: number;
+  emailsSent: number;
+  emailsScheduled: number;
+  lastSentAt: string | null;
+}
+
+export interface AdminStats {
+  users: number;
+  verifiedUsers: number;
+  blockedUsers: number;
+  gmailConnected: number;
+  emailsSentToday: number;
+  emailsSentTotal: number;
+  emailsScheduled: number;
 }
 
 export type GmailAuthType = "APP_PASSWORD";

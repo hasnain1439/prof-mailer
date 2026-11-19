@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { ApiError, UNAUTHORIZED_EVENT, api, errorMessage } from "@/lib/api";
+import { ACCOUNT_BLOCKED, ApiError, UNAUTHORIZED_EVENT, api, errorMessage } from "@/lib/api";
 import type { AuthUser } from "@/lib/types";
 
 export interface AuthState {
@@ -47,7 +47,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       (e: unknown) => {
         if (cancelled) return;
-        if (e instanceof ApiError && e.status === 401) setState({ user: null, loading: false, error: null });
+        // A blocked account is treated as signed out (the login page explains it).
+        if (e instanceof ApiError && (e.status === 401 || e.code === ACCOUNT_BLOCKED)) setState({ user: null, loading: false, error: null });
         else setState({ user: null, loading: false, error: errorMessage(e) });
       },
     );

@@ -40,3 +40,5 @@ services:
         sync: false
       - key: PUBLIC_URL
         sync: false
+      - key: ADMIN_EMAILS # comma-separated login emails of admins (optional)
+        sync: false

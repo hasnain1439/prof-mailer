@@ -7,7 +7,7 @@
 import { randomBytes } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
-import { AUTH_USER_SELECT, hashToken, createSession, destroySession, publicUser, revokeAllSessions } from "../lib/auth.js";
+import { AUTH_USER_SELECT, blockedError, hashToken, createSession, destroySession, publicUser, revokeAllSessions } from "../lib/auth.js";
 import { consumeAuthToken, issueAuthToken, RESET_TTL_MS, VERIFY_TTL_MS, webLink } from "../lib/authTokens.js";
 import { env } from "../lib/env.js";
 import { HttpError, validateBody } from "../lib/http.js";
@@ -121,6 +121,7 @@ authRouter.post("/verify-email", validateBody(verifySchema), async (req, res) =>
   await prisma.authToken.deleteMany({ where: { userId, type: "VERIFY_EMAIL" } });
   await revokeAllSessions(userId);
   await destroySession(req, res);
+  if (verified.blockedAt) throw blockedError();
   await createSession(req, res, userId);
   res.json({ ok: true, user: publicUser(verified) });
 });
@@ -167,6 +168,8 @@ authRouter.post("/login", strictLimiter, validateBody(loginSchema), async (req, 
   if (!user.emailVerifiedAt) {
     throw new HttpError(403, "Please verify your email address first. Check your inbox for the link.", undefined, "EMAIL_NOT_VERIFIED");
   }
+  // Only revealed after a correct password, so it doesn't leak which addresses are blocked.
+  if (user.blockedAt) throw blockedError();
   loginFailures.reset(failureKey(email, clientIp(req)));
   loginFailuresPerAccount.reset(email);
   await destroySession(req, res);
@@ -206,6 +209,7 @@ authRouter.post("/reset-password", strictLimiter, validateBody(resetSchema), asy
   await prisma.authToken.deleteMany({ where: { userId } });
   await revokeAllSessions(userId);
   loginFailuresPerAccount.reset(user.email);
+  if (user.blockedAt) throw blockedError();
   await createSession(req, res, userId);
   res.json({ ok: true, user: publicUser(user) });
 });
@@ -215,6 +219,7 @@ authRouter.post("/reset-password", strictLimiter, validateBody(resetSchema), asy
 
 authRouter.get("/me", (req, res) => {
   if (!req.user) throw new HttpError(401, "Not signed in");
+  if (req.user.blockedAt) throw blockedError();
   res.json({ user: publicUser(req.user) });
 });
 
@@ -251,6 +256,7 @@ authRouter.post("/dev-login", devLoginGuard, validateBody(devLoginSchema), async
         },
         select: AUTH_USER_SELECT,
       });
+  if (user.blockedAt) throw blockedError();
   await destroySession(req, res);
   await createSession(req, res, user.id);
   res.json({ user: publicUser(user) });

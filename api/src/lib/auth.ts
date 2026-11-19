@@ -5,6 +5,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { Request, RequestHandler, Response } from "express";
 import { clearCookie, getCookie, setCookie } from "./cookies.js";
+import { env } from "./env.js";
 import { HttpError } from "./http.js";
 import { prisma } from "./prisma.js";
 
@@ -18,14 +19,25 @@ export interface AuthUser {
   email: string;
   name: string | null;
   emailVerifiedAt: Date | null;
+  blockedAt: Date | null;
+}
+
+/** Admins are listed in env ADMIN_EMAILS (no DB role): derived on every request. */
+export function isAdminEmail(email: string): boolean {
+  return env.ADMIN_EMAILS.has(email.trim().toLowerCase());
 }
 
 /** Public JSON shape of the signed-in user (GET /auth/me, POST /auth/login). */
 export function publicUser(u: AuthUser) {
-  return { id: u.id, email: u.email, name: u.name, emailVerified: u.emailVerifiedAt !== null };
+  return { id: u.id, email: u.email, name: u.name, emailVerified: u.emailVerifiedAt !== null, isAdmin: isAdminEmail(u.email) };
 }
 
-export const AUTH_USER_SELECT = { id: true, email: true, name: true, emailVerifiedAt: true } as const;
+export const AUTH_USER_SELECT = { id: true, email: true, name: true, emailVerifiedAt: true, blockedAt: true } as const;
+
+export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
+export function blockedError(): HttpError {
+  return new HttpError(403, "This account has been blocked.", undefined, ACCOUNT_BLOCKED);
+}
 
 declare global {
   namespace Express {
@@ -89,14 +101,15 @@ export const attachUser: RequestHandler = async (req, res, next) => {
   }
 };
 
-/** Revoke every session of a user (password reset). */
+/** Revoke every session of a user (password reset, admin block). */
 export async function revokeAllSessions(userId: string): Promise<void> {
   await prisma.session.deleteMany({ where: { userId } });
 }
 
-/** Signed in AND email verified. Mounted after the public /auth routes. */
+/** Signed in AND email verified AND not blocked. Mounted after the public /auth routes. */
 export const requireUser: RequestHandler = (req, _res, next) => {
   if (!req.user) return next(new HttpError(401, "Not signed in"));
+  if (req.user.blockedAt) return next(blockedError());
   if (!req.user.emailVerifiedAt) {
     return next(new HttpError(403, "Please verify your email address first", undefined, "EMAIL_NOT_VERIFIED"));
   }

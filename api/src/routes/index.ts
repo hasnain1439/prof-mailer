@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireUser } from "../lib/auth.js";
 import { env } from "../lib/env.js";
 import { rateLimit } from "../middleware/security.js";
+import { adminRouter } from "./admin.js";
 import { authRouter } from "./auth.js";
 import { healthRouter } from "./health.js";
 import { professorsRouter } from "./professors.js";
@@ -29,6 +30,8 @@ apiRouter.use(
   authRouter,
 );
 apiRouter.use("/jobs", jobsRouter); // CRON_SECRET bearer
+// Admins only (ADMIN_EMAILS); answers 404 to everyone else, signed in or not, so the routes stay hidden.
+apiRouter.use("/admin", adminRouter);
 
 // ---- signed-in with a verified email (401 / 403 EMAIL_NOT_VERIFIED otherwise) ----
 apiRouter.use(requireUser);

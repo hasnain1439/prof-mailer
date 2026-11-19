@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { ApiError, api, errorMessage } from "@/lib/api";
+import { ACCOUNT_BLOCKED, ApiError, api, errorMessage } from "@/lib/api";
 import { safeNext, useAuth } from "@/components/Auth";
 import { AuthCard, AuthLink, AuthLinks, PasswordInput, ResendVerification } from "@/components/AuthCard";
 import { Badge, Button, Field, Input, Notice } from "@/components/ui";
@@ -86,6 +86,7 @@ export function LoginCard({ next = "/", interactive = true }: { next?: string; i
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -93,12 +94,15 @@ export function LoginCard({ next = "/", interactive = true }: { next?: string; i
     setBusy(true);
     setError(null);
     setUnverifiedEmail(null);
+    setBlocked(false);
     try {
       await api.login({ email: email.trim(), password });
       window.location.assign(next); // full reload so the app starts clean for this user
     } catch (err) {
       if (err instanceof ApiError && err.status === 403 && err.code === "EMAIL_NOT_VERIFIED") {
         setUnverifiedEmail(email.trim());
+      } else if (err instanceof ApiError && err.code === ACCOUNT_BLOCKED) {
+        setBlocked(true);
       } else {
         setError(errorMessage(err));
       }
@@ -136,6 +140,11 @@ export function LoginCard({ next = "/", interactive = true }: { next?: string; i
         {error && (
           <Notice tone="error" className="">
             {error}
+          </Notice>
+        )}
+        {blocked && (
+          <Notice tone="error" title="This account has been blocked" className="">
+            You can&apos;t sign in with it. If you think this is a mistake, contact the person who runs this app.
           </Notice>
         )}
 

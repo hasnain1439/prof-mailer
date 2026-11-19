@@ -1,4 +1,6 @@
 import type {
+  AdminStats,
+  AdminUser,
   AuthUser,
   Dashboard,
   Email,
@@ -24,7 +26,10 @@ import type {
 /** Same-origin by default: Next.js rewrites /api/* to the Express API (see next.config.ts). */
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/+$/, "");
 
-/** Fired on window whenever an API call answers 401; AuthProvider listens and sends the user to /login. */
+/** Error code the API returns (403) for a blocked account. */
+export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
+
+/** Fired on window whenever an API call answers 401 (or 403 ACCOUNT_BLOCKED); AuthProvider listens and sends the user to /login. */
 export const UNAUTHORIZED_EVENT = "pm:unauthorized";
 
 export class ApiError extends Error {
@@ -123,7 +128,12 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
     const body = (data && typeof data === "object" ? data : {}) as { error?: unknown; details?: unknown; code?: unknown };
     const base = typeof body.error === "string" ? body.error : `Request failed (${res.status} ${res.statusText})`;
     const extra = describeDetails(body.details);
-    throw new ApiError(extra ? `${base}: ${extra}` : base, res.status, body.details, typeof body.code === "string" ? body.code : undefined);
+    const code = typeof body.code === "string" ? body.code : undefined;
+    // A blocked account is signed out like an expired session.
+    if (code === ACCOUNT_BLOCKED && !opts.allowUnauthorized && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
+    throw new ApiError(extra ? `${base}: ${extra}` : base, res.status, body.details, code);
   }
   return data as T;
 }
@@ -215,4 +225,10 @@ export const api = {
   gmailDisconnect: () => request<void>("/gmail/disconnect", { method: "POST" }),
   gmailTestSend: (body: { subject?: string; body?: string } = {}) =>
     request<GmailTestSendResult>("/gmail/test-send", { method: "POST", json: body }),
+
+  // Admin (404 unless the signed-in user is an admin)
+  adminStats: () => request<AdminStats>("/admin/stats"),
+  adminUsers: (q?: string) => request<AdminUser[]>("/admin/users", { query: { q } }),
+  adminBlock: (id: string) => request<AdminUser>(`/admin/users/${encodeURIComponent(id)}/block`, { method: "POST" }),
+  adminUnblock: (id: string) => request<AdminUser>(`/admin/users/${encodeURIComponent(id)}/unblock`, { method: "POST" }),
 };

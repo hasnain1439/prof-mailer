@@ -39,6 +39,7 @@ Copy-Item .env.example .env.local   # API_ORIGIN=http://localhost:4100
 | `PUBLIC_URL` | The web origin: `http://localhost:3100` locally, your Vercel URL in production. Verification and reset links point to it. |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM` | The mailbox that sends account emails (verification, password reset). See section 2. Required in production; locally you can leave `SMTP_HOST` empty and the links are printed in the API console. |
 | `DEV_LOGIN_ENABLED` | `true` lets you sign in locally without a password (`POST /api/auth/dev-login {"email": "..."}`). Ignored when `NODE_ENV=production`. |
+| `ADMIN_EMAILS` | Optional. Comma-separated login emails of admins (case-insensitive). Admins get an **Admin** page (`/admin`) to see all users and block or unblock them. See [Admins](#admins). |
 | `DRY_RUN` | `true` while testing. See [Switching DRY_RUN off](#6-switching-dry_run-off). |
 | `CRON_SECRET` | Long random string. Required in production. Protects `/api/jobs/*`. Leave empty locally to disable those endpoints (the in-process scheduler still runs). |
 | `ENCRYPTION_KEY` | 64 hex chars. Required in production. Encrypts stored Gmail App Passwords. Locally, if empty, a key is created in `api/.data/secret.key`. |
@@ -94,6 +95,16 @@ Account emails are sent from **your own mailbox** (the app owner's), for example
    - Sending uses `smtp.gmail.com:465`; reply checks read Sent / All Mail over `imap.gmail.com:993`.
 4. Use **Send test email** (it only goes to your own login address) before `DRY_RUN=false`.
 
+### Admins
+
+There is no separate admin password. To become an admin:
+
+1. Sign up and verify your account normally.
+2. Put your login email in the API env var `ADMIN_EMAILS` (comma-separated for several admins, e.g. `you@example.org,other@example.org`). Locally in `api/.env`, on Render in the service's environment.
+3. Restart the API (Render restarts on env changes). Reload the web app: an **Admin** item appears under Setup.
+
+The Admin page shows totals (users, verified, blocked, Gmail connected, emails sent today / in total, scheduled) and every account with its counts. **Block** signs the user out everywhere and stops them from signing in; their scheduled emails stay in the queue but the scheduler skips them until you **Unblock**. Admins can't block themselves or other admins. Removing an email from `ADMIN_EMAILS` (and restarting) removes admin rights.
+
 ## 3. Deploy the API on Render
 
 The repo has a Blueprint at `render.yaml`. It runs the API from `api/` on the free plan, runs `prisma migrate deploy` on every build, and uses `/api/health` as the health check.
@@ -105,6 +116,7 @@ The repo has a Blueprint at `render.yaml`. It runs the API from `api/` on the fr
    - `ENCRYPTION_KEY`, `CRON_SECRET` (random, see the command above)
    - `API_PROXY_SECRET`: another long random string. Put the **same value** on Vercel. It lets the API trust the browser IP that Vercel forwards (used for rate limits); without it, everyone behind Vercel shares one rate-limit bucket.
    - `PUBLIC_URL` = your Vercel URL, for example `https://prof-mailer.vercel.app` (no trailing slash)
+   - `ADMIN_EMAILS` (optional): your login email, to get the Admin page (see [Admins](#admins))
 3. The plain values are preset: `NODE_ENV=production`, `DRY_RUN=true`, `SCHEDULER_ENABLED=true`.
 
 Notes:

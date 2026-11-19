@@ -78,6 +78,13 @@ export const env = {
 
   /** Bearer secret for /jobs/*. Empty (dev only) disables the HTTP job endpoints. */
   CRON_SECRET,
+  /** Lowercased emails of admin accounts (ADMIN_EMAILS, comma-separated). Admin rights are derived per request. */
+  ADMIN_EMAILS: new Set(
+    (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  ) as ReadonlySet<string>,
   /** Local QA sign-in without a password. Never active in production. */
   DEV_LOGIN_ENABLED: bool("DEV_LOGIN_ENABLED", false) && !IS_PROD,
   /** Secure flag on cookies. */

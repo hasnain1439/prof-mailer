@@ -33,7 +33,8 @@ const loggedNotConnected = new Set<string>();
  */
 export async function resetStaleSending(now: Date = new Date()): Promise<number> {
   const r = await prisma.email.updateMany({
-    where: { status: "SENDING", updatedAt: { lt: new Date(now.getTime() - STALE_SENDING_MS) } },
+    // Blocked users' rows are left as they are (reviewed after an unblock).
+    where: { status: "SENDING", updatedAt: { lt: new Date(now.getTime() - STALE_SENDING_MS) }, user: { blockedAt: null } },
     data: {
       status: "FAILED",
       error: "Interrupted while sending - it may already have been delivered. Check Gmail Sent before rescheduling.",
@@ -108,8 +109,9 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
   });
 
   for (const email of candidates) {
+    // Re-checks the block at claim time, so a user blocked mid-run is never sent for.
     const claim = await prisma.email.updateMany({
-      where: { id: email.id, userId, status: "SCHEDULED" },
+      where: { id: email.id, userId, status: "SCHEDULED", user: { blockedAt: null } },
       data: { status: "SENDING" },
     });
     if (claim.count === 0) continue;
@@ -189,8 +191,9 @@ export async function runSendDue(now: Date = new Date()): Promise<SendDueResult>
   const clock = () => new Date(now.getTime() + (Date.now() - realStart));
   try {
     await resetStaleSending(new Date());
+    // Blocked users are skipped: their emails stay SCHEDULED (untouched) and are never sent.
     const users = await prisma.email.findMany({
-      where: { status: "SCHEDULED", scheduledAt: { lte: now } },
+      where: { status: "SCHEDULED", scheduledAt: { lte: now }, user: { blockedAt: null } },
       distinct: ["userId"],
       select: { userId: true },
     });

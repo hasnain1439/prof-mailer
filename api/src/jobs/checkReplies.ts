@@ -168,7 +168,8 @@ export async function runCheckReplies(now: Date = new Date()): Promise<CheckRepl
     await setAppState(LAST_CHECK_KEY, new Date().toISOString());
     result.followUpsCancelled += await cancelFollowUpsForStoppedProfessors();
     const users = await prisma.email.findMany({
-      where: { status: "SENT", gmailThreadId: { not: null }, repliedAt: null },
+      // Blocked users are skipped (no IMAP logins, no new follow-ups for them).
+      where: { status: "SENT", gmailThreadId: { not: null }, repliedAt: null, user: { blockedAt: null } },
       distinct: ["userId"],
       select: { userId: true },
     });

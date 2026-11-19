@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { IconClock, IconDashboard, IconMail, IconSend, IconSettings, IconTemplate, IconUpload, IconUsers } from "./icons";
+import { useAuth } from "./Auth";
+import { IconClock, IconDashboard, IconMail, IconSend, IconSettings, IconShield, IconTemplate, IconUpload, IconUsers } from "./icons";
 
-const groups: { heading?: string; links: { href: string; label: string; icon: ReactNode }[] }[] = [
+type NavItem = { href: string; label: string; icon: ReactNode; adminOnly?: boolean };
+
+const groups: { heading?: string; links: NavItem[] }[] = [
   {
     links: [
       { href: "/", label: "Dashboard", icon: <IconDashboard /> },
@@ -26,18 +29,19 @@ const groups: { heading?: string; links: { href: string; label: string; icon: Re
     links: [
       { href: "/settings", label: "Settings", icon: <IconSettings /> },
       { href: "/gmail", label: "Gmail account", icon: <IconMail /> },
+      { href: "/admin", label: "Admin", icon: <IconShield />, adminOnly: true },
     ],
   },
 ];
 
-export function NavLinks({ active, onNavigate }: { active: string | null; onNavigate?: () => void }) {
+export function NavLinks({ active, onNavigate, isAdmin = false }: { active: string | null; onNavigate?: () => void; isAdmin?: boolean }) {
   return (
     <nav className="space-y-4">
       {groups.map((g, gi) => (
         <div key={gi}>
           {g.heading && <p className="mb-1 px-2 text-xs text-muted">{g.heading}</p>}
           <ul className="space-y-px">
-            {g.links.map((l) => {
+            {g.links.filter((l) => !l.adminOnly || isAdmin).map((l) => {
               const isActive = active !== null && (l.href === "/" ? active === "/" : active === l.href || active.startsWith(l.href + "/"));
               return (
                 <li key={l.href}>
@@ -64,5 +68,6 @@ export function NavLinks({ active, onNavigate }: { active: string | null; onNavi
 
 export function Nav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  return <NavLinks active={pathname} onNavigate={onNavigate} />;
+  const { user } = useAuth();
+  return <NavLinks active={pathname} onNavigate={onNavigate} isAdmin={!!user?.isAdmin} />;
 }

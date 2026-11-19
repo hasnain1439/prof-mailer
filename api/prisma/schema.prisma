@@ -35,6 +35,8 @@ model User {
   // "scrypt$N$r$p$<salt b64>$<hash b64>" (src/lib/password.ts)
   passwordHash    String? // null until the user sets it on the verification page
   emailVerifiedAt DateTime?
+  // Set by an admin: no sign-in, no API access, the scheduler skips the user's emails.
+  blockedAt       DateTime?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   sessions        Session[]

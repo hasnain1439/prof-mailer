@@ -26,6 +26,7 @@ import {
   Search,
   Send,
   Settings,
+  ShieldCheck,
   Trash2,
   Upload,
   Users,
@@ -75,3 +76,4 @@ export const IconCopy = wrap(Copy);
 export const IconCalendar = wrap(Calendar);
 export const IconLogo = wrap(Mail);
 export const IconLogOut = wrap(LogOut);
+export const IconShield = wrap(ShieldCheck);
