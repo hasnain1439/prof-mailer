@@ -6,13 +6,14 @@ import { api, errorMessage } from "@/lib/api";
 import type { Template } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { EmailBody } from "@/components/EmailBody";
-import { IconEye, IconFile, IconPencil, IconPlus, IconTemplate, IconTrash, IconUpload, IconX } from "@/components/icons";
+import { IconEye, IconFile, IconPaperclip, IconPencil, IconPlus, IconTemplate, IconTrash, IconUpload, IconX } from "@/components/icons";
 import { MAX_HTML_UPLOAD_BYTES, PROFESSIONAL_LAYOUT, extractHtmlTitle } from "@/lib/emailLayout";
 import { useToast } from "@/components/Toast";
 import {
   Badge,
   Button,
   Card,
+  CvClip,
   EmptyCard,
   ErrorBox,
   Field,
@@ -35,10 +36,13 @@ import {
 } from "@/components/ui";
 
 const PLACEHOLDERS = [
-  { key: "{{name}}", help: "Professor's name" },
-  { key: "{{university}}", help: "University" },
-  { key: "{{researchFocus}}", help: "Research focus" },
-  { key: "{{whyFits}}", help: "Why you fit their group" },
+  { key: "{{name}}", help: "Contact's name (professor, recruiter or hiring team)" },
+  { key: "{{university}}", help: "University (for companies: the company name)" },
+  { key: "{{company}}", help: "Company name (same value as {{university}})" },
+  { key: "{{role}}", help: "Job title (companies)" },
+  { key: "{{jobUrl}}", help: "Job posting link (companies)" },
+  { key: "{{researchFocus}}", help: "Research focus (companies: skills / stack)" },
+  { key: "{{whyFits}}", help: "Why you fit their group or role" },
 ];
 
 interface Draft {
@@ -48,11 +52,23 @@ interface Draft {
   body: string;
   isFollowUp: boolean;
   isHtml: boolean;
+  attachCv: boolean;
 }
 
-const emptyDraft: Draft = { id: null, name: "", subject: "", body: "", isFollowUp: false, isHtml: false };
+const emptyDraft: Draft = { id: null, name: "", subject: "", body: "", isFollowUp: false, isHtml: false, attachCv: false };
 
-function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (t: Template) => void; onCancel: () => void }) {
+function TemplateEditor({
+  draft,
+  hasCv,
+  onSaved,
+  onCancel,
+}: {
+  draft: Draft;
+  /** null while unknown (loading or the CV endpoint failed) */
+  hasCv: boolean | null;
+  onSaved: (t: Template) => void;
+  onCancel: () => void;
+}) {
   const [form, setForm] = useState<Draft>(draft);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +131,14 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
     setBusy(true);
     setError(null);
     try {
-      const body = { name: form.name, subject: form.subject, body: form.body, isFollowUp: form.isFollowUp, isHtml: form.isHtml };
+      const body = {
+        name: form.name,
+        subject: form.subject,
+        body: form.body,
+        isFollowUp: form.isFollowUp,
+        isHtml: form.isHtml,
+        attachCv: form.attachCv,
+      };
       const saved = form.id ? await api.updateTemplate(form.id, body) : await api.createTemplate(body);
       onSaved(saved);
     } catch (err) {
@@ -141,6 +164,28 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
           />
           Follow-up template
         </label>
+      </div>
+      <div>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-text">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-accent"
+            checked={form.attachCv}
+            onChange={(e) => setForm({ ...form, attachCv: e.target.checked })}
+          />
+          <IconPaperclip size={14} className="text-muted" />
+          Attach my CV
+        </label>
+        {form.attachCv && hasCv === false && (
+          <p className="mt-1 text-xs text-replied-fg">
+            You haven&apos;t uploaded a CV yet. Emails that need it will fail until you{" "}
+            <Link href="/settings" className={link}>
+              upload one in Settings
+            </Link>
+            .
+          </p>
+        )}
+        {!form.attachCv && <p className="mt-1 text-xs text-muted">Useful for job applications: the CV from Settings is attached to every email from this template.</p>}
       </div>
       <Field label="Subject *" htmlFor="t-subject">
         <input
@@ -194,7 +239,7 @@ function TemplateEditor({ draft, onSaved, onCancel }: { draft: Draft; onSaved: (
           />
         </div>
         <p className="w-full text-xs text-muted">
-          A simple, personal-looking email usually gets more replies from professors than a heavily designed one. Keep the HTML light.
+          A simple, personal-looking email usually gets more replies than a heavily designed one. Keep the HTML light.
         </p>
         {fileNote && <p className="w-full text-xs text-sent-fg">{fileNote}</p>}
       </div>
@@ -278,17 +323,17 @@ function TemplatePreview({ template }: { template: Template }) {
           <Link href="/import" className={link}>
             import
           </Link>{" "}
-          a professor to preview this template with real data.
+          a contact to preview this template with real data.
         </p>
       )}
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-64 flex-1">
-          <Field label="Preview for professor" htmlFor="pv-prof">
+          <Field label="Preview for contact" htmlFor="pv-prof">
             <Select id="pv-prof" value={professorId} onChange={(e) => setProfessorId(e.target.value)}>
-              <option value="">Choose a professor…</option>
+              <option value="">Choose a contact…</option>
               {(professors.data ?? []).map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.university})
+                  {p.name} ({p.kind === "COMPANY" && p.role ? `${p.university} · ${p.role}` : p.university})
                 </option>
               ))}
             </Select>
@@ -321,6 +366,8 @@ export default function TemplatesPage() {
   const toast = useToast();
   const { data, error, loading, reload } = useApi(() => api.listTemplates());
   const settings = useApi(() => api.getSettings());
+  const cv = useApi(() => api.getCv());
+  const hasCv = cv.data ? cv.data.cv !== null : null;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [previewing, setPreviewing] = useState<Template | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -345,6 +392,8 @@ export default function TemplatesPage() {
   }
 
   const followUpId = settings.data?.followUpTemplateId ?? null;
+  const companyFollowUpId = settings.data?.companyFollowUpTemplateId ?? null;
+  const missingCv = hasCv === false && (data ?? []).some((t) => t.attachCv);
   const initial = data?.filter((t) => !t.isFollowUp) ?? [];
   const followUps = data?.filter((t) => t.isFollowUp) ?? [];
 
@@ -354,8 +403,11 @@ export default function TemplatesPage() {
   const renderRow = (t: Template) => (
     <tr key={t.id} className={tr}>
       <Td className="max-w-64">
-        <span className="block truncate font-medium" title={t.name}>
-          {t.name}
+        <span className="flex items-center gap-1.5">
+          <span className="truncate font-medium" title={t.name}>
+            {t.name}
+          </span>
+          {t.attachCv && <CvClip />}
         </span>
       </Td>
       <Td className="max-w-md">
@@ -368,6 +420,7 @@ export default function TemplatesPage() {
           {t.isFollowUp ? <Badge tone="scheduled">Follow-up</Badge> : <Badge className={outlineBadge}>Initial</Badge>}
           {t.isHtml && <Badge className={`${outlineBadge} font-mono`}>HTML</Badge>}
           {t.isFollowUp && t.id === followUpId && <Badge tone="sent">Used for follow-ups</Badge>}
+          {t.isFollowUp && t.id === companyFollowUpId && <Badge tone="sent">Company follow-ups</Badge>}
         </div>
       </Td>
       <Td className="text-right whitespace-nowrap">
@@ -388,7 +441,15 @@ export default function TemplatesPage() {
             variant="ghost"
             onClick={() => {
               setPreviewing(null);
-              setDraft({ id: t.id, name: t.name, subject: t.subject, body: t.body, isFollowUp: t.isFollowUp, isHtml: !!t.isHtml });
+              setDraft({
+                id: t.id,
+                name: t.name,
+                subject: t.subject,
+                body: t.body,
+                isFollowUp: t.isFollowUp,
+                isHtml: !!t.isHtml,
+                attachCv: !!t.attachCv,
+              });
             }}
           >
             <IconPencil size={14} />
@@ -405,7 +466,7 @@ export default function TemplatesPage() {
 
   return (
     <div>
-      <PageHeader title="Templates" description="Reusable emails with placeholders like {{name}} that are filled in for each professor.">
+      <PageHeader title="Templates" description="Reusable emails with placeholders like {{name}} that are filled in for each contact.">
         <Button variant="primary" onClick={() => startNew()}>
           <IconPlus />
           New template
@@ -427,6 +488,7 @@ export default function TemplatesPage() {
           <TemplateEditor
             key={draft.id ?? `new-${draft.isFollowUp}`}
             draft={draft}
+            hasCv={hasCv}
             onCancel={() => setDraft(null)}
             onSaved={(t) => {
               toast(draft.id ? `Template "${t.name}" saved.` : `Template "${t.name}" created.`);
@@ -466,11 +528,23 @@ export default function TemplatesPage() {
                 </>
               }
             >
-              Start with an initial email template, then add a follow-up template for professors who don&apos;t reply.
+              Start with an initial email template, then add a follow-up template for contacts who don&apos;t reply.
             </EmptyCard>
           )
         ) : (
           <>
+            {missingCv && (
+              <Notice
+                tone="warning"
+                action={
+                  <Link href="/settings" className={`${btnSecondary} ${btnSmall}`}>
+                    Upload CV
+                  </Link>
+                }
+              >
+                Some templates attach your CV, but you haven&apos;t uploaded one yet. Those emails will fail until you do.
+              </Notice>
+            )}
             {noFollowUpSelected && (
               <Notice
                 tone="warning"

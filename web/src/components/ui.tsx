@@ -7,8 +7,8 @@
  */
 
 import { useEffect, type ButtonHTMLAttributes, type ComponentProps, type ReactNode } from "react";
-import type { EmailStatus, ProfessorStatus } from "@/lib/types";
-import { IconAlert, IconCheckCircle, IconInfo, IconX } from "./icons";
+import type { ContactKind, EmailStatus, ProfessorStatus } from "@/lib/types";
+import { IconAlert, IconBuilding, IconCheckCircle, IconGraduation, IconInfo, IconPaperclip, IconX } from "./icons";
 
 /* ---------- class strings (for <Link>/<a> styled as buttons, or legacy callers) ---------- */
 
@@ -328,6 +328,7 @@ export const profStatusStyles: Record<ProfessorStatus, { tone: StatusTone; cls: 
   SENT: { tone: "sent", cls: toneCls.sent, label: "Sent" },
   REPLIED: { tone: "replied", cls: toneCls.replied, label: "Replied" },
   INTERESTED: { tone: "sent", cls: toneCls.sent, label: "Interested" },
+  INTERVIEW: { tone: "scheduled", cls: toneCls.scheduled, label: "Interview" },
   DECLINED: { tone: "failed", cls: toneCls.failed, label: "Declined" },
 };
 
@@ -345,13 +346,41 @@ export function EmailStatusBadge({ status }: { status: EmailStatus }) {
   return <Badge tone={s.tone}>{s.label}</Badge>;
 }
 
-export function ProfessorStatusBadge({ status }: { status: ProfessorStatus }) {
+export function ProfessorStatusBadge({ status, kind }: { status: ProfessorStatus; kind?: ContactKind }) {
   const s = profStatusStyles[status];
-  return <Badge tone={s.tone}>{s.label}</Badge>;
+  return <Badge tone={s.tone}>{professorStatusLabel(status, kind)}</Badge>;
 }
 
-export function professorStatusLabel(s: ProfessorStatus): string {
+/** Status label; DECLINED reads "Rejected" for companies (the value stays DECLINED). */
+export function professorStatusLabel(s: ProfessorStatus, kind?: ContactKind): string {
+  if (s === "DECLINED" && kind === "COMPANY") return "Rejected";
   return profStatusStyles[s].label;
+}
+
+/** Small icon marking a contact as professor or company. */
+export function KindIcon({ kind, size = 14, className = "" }: { kind: ContactKind | undefined; size?: number; className?: string }) {
+  const company = kind === "COMPANY";
+  return (
+    <span className={`inline-flex shrink-0 text-muted ${className}`} title={company ? "Company" : "Professor"}>
+      {company ? <IconBuilding size={size} /> : <IconGraduation size={size} />}
+      <span className="sr-only">{company ? "Company" : "Professor"}</span>
+    </span>
+  );
+}
+
+/** Paperclip marker for emails/templates that attach the CV. */
+export function CvClip({ className = "" }: { className?: string }) {
+  return (
+    <span className={`inline-flex shrink-0 text-muted ${className}`} title="Attaches your CV">
+      <IconPaperclip size={14} />
+      <span className="sr-only">Attaches your CV</span>
+    </span>
+  );
+}
+
+/** "Company · Role" for company contacts, the university otherwise. */
+export function contactOrg(p: { kind?: ContactKind; university: string; role?: string | null }): string {
+  return p.kind === "COMPANY" && p.role ? `${p.university} · ${p.role}` : p.university;
 }
 
 export function TypeChip({ followUpNo }: { followUpNo: number }) {

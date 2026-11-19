@@ -12,7 +12,7 @@ const groups: { heading?: string; links: NavItem[] }[] = [
   {
     links: [
       { href: "/", label: "Dashboard", icon: <IconDashboard /> },
-      { href: "/professors", label: "Professors", icon: <IconUsers /> },
+      { href: "/professors", label: "Contacts", icon: <IconUsers /> },
       { href: "/templates", label: "Templates", icon: <IconTemplate /> },
       { href: "/import", label: "Import", icon: <IconUpload /> },
     ],

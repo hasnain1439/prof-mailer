@@ -16,6 +16,7 @@ export async function buildSettingsResponse(userId: string) {
     maxFollowUps: s.maxFollowUps,
     dailySendLimit: Math.min(s.dailySendLimit, MAX_DAILY_SEND_LIMIT),
     followUpTemplateId: s.followUpTemplateId,
+    companyFollowUpTemplateId: s.companyFollowUpTemplateId,
     dryRun: env.DRY_RUN,
     // Test sends always go to the signed-in user's own address.
     testRecipientSet: true,

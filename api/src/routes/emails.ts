@@ -63,27 +63,35 @@ emailsRouter.post("/:id/cancel", async (req, res) => {
   res.json(await getEmailOr404(userId, id));
 });
 
-const patchSchema = z.object({
-  scheduledAt: z.iso.datetime({ offset: true }).transform((s) => new Date(s)),
-  subject: z.string().trim().min(1).optional(),
-  body: z.string().refine((s) => s.trim() !== "", "Required").optional(),
-});
+const patchSchema = z
+  .object({
+    scheduledAt: z.iso
+      .datetime({ offset: true })
+      .transform((s) => new Date(s))
+      .optional(),
+    subject: z.string().trim().min(1).optional(),
+    body: z.string().refine((s) => s.trim() !== "", "Required").optional(),
+    attachCv: z.boolean().optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), "Nothing to update");
 
 emailsRouter.patch("/:id", validateBody(patchSchema), async (req, res) => {
   const id = req.params.id as string;
-  const { scheduledAt, subject, body } = req.body as z.infer<typeof patchSchema>;
+  const { scheduledAt, subject, body, attachCv } = req.body as z.infer<typeof patchSchema>;
   const userId = uid(req);
   const e = await getEmailOr404(userId, id);
-  const allowed: EmailStatus[] = ["SCHEDULED", "FAILED", "CANCELLED"];
-  if (!allowed.includes(e.status)) throw new HttpError(409, `Cannot reschedule an email with status ${e.status}`);
+  // Rescheduling revives FAILED/CANCELLED; edits without scheduledAt only apply to SCHEDULED emails.
+  const allowed: EmailStatus[] = scheduledAt ? ["SCHEDULED", "FAILED", "CANCELLED"] : ["SCHEDULED"];
+  if (!allowed.includes(e.status)) {
+    throw new HttpError(409, `Cannot ${scheduledAt ? "reschedule" : "edit"} an email with status ${e.status}`);
+  }
   const r = await prisma.email.updateMany({
     where: { id, userId, status: { in: allowed } },
     data: {
-      scheduledAt,
-      status: "SCHEDULED",
-      error: null,
+      ...(scheduledAt ? { scheduledAt, status: "SCHEDULED", error: null } : {}),
       ...(subject !== undefined ? { subject } : {}),
       ...(body !== undefined ? { body } : {}),
+      ...(attachCv !== undefined ? { attachCv } : {}),
     },
   });
   if (r.count === 0) throw new HttpError(409, "Email status changed; please refresh");

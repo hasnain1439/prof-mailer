@@ -18,6 +18,25 @@ export interface ImportPreviewRow {
   /** non-blocking: the row is imported, but the user should know */
   warnings: string[];
   professorExists: boolean;
+  /** Resolved from the `type` column (empty = PROFESSOR). */
+  kind: ContactKind;
+  role: string | null;
+  jobUrl: string | null;
+}
+
+export type ContactKind = "PROFESSOR" | "COMPANY";
+
+/** `type` cell → kind; null when the value is not recognised. */
+export function parseKind(raw: string): ContactKind | null {
+  const v = raw.trim().toLowerCase();
+  if (v === "" || v === "professor") return "PROFESSOR";
+  if (v === "company") return "COMPANY";
+  return null;
+}
+
+/** `university` column, falling back to `company`. */
+export function rowUniversity(data: ImportRowData): string {
+  return data.university || data.company;
 }
 
 /** What the DB already knows about a professor in the file (keyed by lowercase email). */
@@ -29,14 +48,14 @@ export interface ExistingProfessorInfo {
   firstSentAt: Date | null;
 }
 
-const STOP_STATUSES = new Set(["REPLIED", "INTERESTED", "DECLINED"]);
+const STOP_STATUSES = new Set(["REPLIED", "INTERESTED", "INTERVIEW", "DECLINED"]);
 
-/** Re-import rules for an existing professor: errors block the row, warnings don't. */
+/** Re-import rules for an existing contact: errors block the row, warnings don't. */
 function existingProfessorChecks(info: ExistingProfessorInfo | undefined, errors: string[], warnings: string[]): void {
   if (!info) return;
   if (STOP_STATUSES.has(info.status)) {
     const what = info.status === "REPLIED" ? "already replied" : `already marked ${info.status}`;
-    errors.push(`Professor ${what}; not scheduling another first email`);
+    errors.push(`Contact ${what}; not scheduling another first email`);
   }
   if (info.hasPendingEmail) errors.push("Already has a scheduled email");
   if (info.firstSentAt && errors.length === 0) {
@@ -50,6 +69,7 @@ export interface ImportTemplate {
   subject: string;
   body: string;
   isHtml: boolean;
+  attachCv: boolean;
 }
 
 const emailSchema = z.email();
@@ -74,7 +94,11 @@ export function validateImportRows(
     const errors: string[] = [];
     const warnings: string[] = [];
     if (!data.name) errors.push("name is required");
-    if (!data.university) errors.push("university is required");
+    const university = rowUniversity(data);
+    if (!university) errors.push("university or company is required");
+    const kind = parseKind(data.type);
+    if (!kind) errors.push(`type "${data.type}" must be "professor" or "company"`);
+    if (data.jobUrl && !/^https?:\/\/\S+$/i.test(data.jobUrl)) errors.push(`jobUrl "${data.jobUrl}" must be an http(s) URL`);
 
     const email = normalizeEmail(data.email);
     if (!email) errors.push("email is required");
@@ -106,7 +130,9 @@ export function validateImportRows(
 
     const vars: TemplateVars = {
       name: data.name,
-      university: data.university,
+      university,
+      role: data.role,
+      jobUrl: data.jobUrl,
       researchFocus: data.researchFocus,
       whyFits: data.whyFits,
     };
@@ -121,6 +147,9 @@ export function validateImportRows(
       errors,
       warnings,
       professorExists: email !== "" && existing.has(email),
+      kind: kind ?? "PROFESSOR",
+      role: data.role || null,
+      jobUrl: data.jobUrl || null,
     };
   });
 }

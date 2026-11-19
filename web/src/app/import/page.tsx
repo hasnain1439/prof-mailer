@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { Fragment, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
-import type { ImportCommitResult, ImportPreview } from "@/lib/types";
+import type { ContactKind, ImportCommitResult, ImportPreview, ImportPreviewRow } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
-import { IconAlert, IconArrowRight, IconCheck, IconDownload, IconFile, IconX } from "@/components/icons";
+import { IconAlert, IconArrowRight, IconCheck, IconDownload, IconFile, IconPaperclip, IconX } from "@/components/icons";
 import { EmailBody, HtmlBadge } from "@/components/EmailBody";
 import { useToast } from "@/components/Toast";
 import {
@@ -15,6 +15,7 @@ import {
   Card,
   ErrorBox,
   Field,
+  KindIcon,
   Mono,
   Notice,
   PageHeader,
@@ -57,6 +58,17 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 | 4 }) {
   );
 }
 
+/** Contact type of a preview row: the server's `kind`, else derived from the raw type column. */
+function rowKind(r: ImportPreviewRow): ContactKind | null {
+  if (r.kind) return r.kind;
+  const t = (r.data.type ?? "").trim().toLowerCase();
+  if (t === "" || t === "professor") return "PROFESSOR";
+  if (t === "company") return "COMPANY";
+  return null;
+}
+
+const code = "font-mono text-xs text-text";
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -66,6 +78,10 @@ function formatSize(bytes: number): string {
 export default function ImportPage() {
   const toast = useToast();
   const templates = useApi(() => api.listTemplates(false));
+  const cv = useApi(() => api.getCv());
+  const hasCv = cv.data ? cv.data.cv !== null : null;
+  // null = follow the chosen template's attachCv
+  const [attachCvOverride, setAttachCvOverride] = useState<boolean | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [templateId, setTemplateId] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -80,6 +96,8 @@ export default function ImportPage() {
 
   const validRows = preview?.rows.filter((r) => r.errors.length === 0) ?? [];
   const warningCount = validRows.filter((r) => (r.warnings?.length ?? 0) > 0).length;
+  const chosenTemplate = (templates.data ?? []).find((t) => t.id === templateId);
+  const attachCv = attachCvOverride ?? chosenTemplate?.attachCv ?? false;
   const step: 1 | 2 | 3 | 4 = result ? 4 : preview ? (busy === "commit" ? 3 : 2) : 1;
 
   function chooseFile(f: File | null) {
@@ -126,10 +144,11 @@ export default function ImportPage() {
       const res = await api.importCommit(
         validRows.map((r) => r.data),
         previewTemplateId || undefined,
+        attachCv,
       );
       setResult(res);
       setPreview(null);
-      toast(`Imported ${res.professorsCreated + res.professorsUpdated} professor(s), ${res.emailsCreated} email(s) scheduled.`);
+      toast(`Imported ${res.professorsCreated + res.professorsUpdated} contact(s), ${res.emailsCreated} email(s) scheduled.`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -144,7 +163,7 @@ export default function ImportPage() {
 
   return (
     <div>
-      <PageHeader title="Import" description="Upload a spreadsheet of professors and schedule an email to each one.">
+      <PageHeader title="Import" description="Upload a spreadsheet of professors or companies and schedule an email to each one.">
         <a href={api.sampleCsvUrl} className={btnSecondary} download>
           <IconDownload />
           Download sample CSV
@@ -177,7 +196,7 @@ export default function ImportPage() {
               <IconArrowRight />
             </Link>
             <Link href="/professors" className={btnSecondary}>
-              Professors
+              Contacts
             </Link>
             <Button onClick={reset}>Import another file</Button>
           </div>
@@ -185,7 +204,7 @@ export default function ImportPage() {
       )}
 
       {!result && (
-        <Card title="Upload file" description="CSV or Excel (.xlsx), one professor per row">
+        <Card title="Upload file" description="CSV or Excel (.xlsx), one contact (professor or company) per row">
           <form onSubmit={runPreview} className="space-y-4">
             <label
               htmlFor="imp-file"
@@ -241,21 +260,48 @@ export default function ImportPage() {
             <div className="flex flex-wrap items-end gap-3">
               <div className="w-full sm:w-80">
                 <Field label="Template (optional)" htmlFor="imp-template">
-                  <Select id="imp-template" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+                  <Select
+                    id="imp-template"
+                    value={templateId}
+                    onChange={(e) => {
+                      setTemplateId(e.target.value);
+                      setAttachCvOverride(null);
+                    }}
+                  >
                     <option value="">None (use subject/body columns)</option>
                     {(templates.data ?? []).map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name}
+                        {t.attachCv ? " (attaches CV)" : ""}
                       </option>
                     ))}
                   </Select>
                 </Field>
               </div>
+              <label className="flex h-8 cursor-pointer items-center gap-2 text-[13px] text-text">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-accent"
+                  checked={attachCv}
+                  onChange={(e) => setAttachCvOverride(e.target.checked)}
+                />
+                <IconPaperclip size={14} className="text-muted" />
+                Attach my CV
+              </label>
               <Button type="submit" variant="primary" disabled={!file || busy !== null}>
                 {busy === "preview" ? "Reading file…" : "Preview"}
                 <IconArrowRight />
               </Button>
             </div>
+            {attachCv && hasCv === false && (
+              <p className="-mt-2 text-xs text-replied-fg">
+                You haven&apos;t uploaded a CV yet. These emails will fail to send until you{" "}
+                <Link href="/settings" className={link}>
+                  upload one in Settings
+                </Link>
+                .
+              </p>
+            )}
             {templates.error && <p className="-mt-2 text-xs text-failed-fg">Could not load templates: {templates.error}</p>}
             {templates.data && templates.data.length === 0 && (
               <p className="-mt-2 text-xs text-muted">
@@ -272,11 +318,20 @@ export default function ImportPage() {
               <div className="space-y-1.5 border-t border-border px-3 py-2.5 text-muted">
                 <p>
                   Columns:{" "}
-                  <code className="font-mono text-xs text-text">name, email, university, country, researchFocus, whyFits, profileUrl, subject, body, scheduledAt</code>
+                  <code className={code}>
+                    type, name, email, university, company, role, jobUrl, country, researchFocus, whyFits, profileUrl, subject, body, scheduledAt
+                  </code>
                 </p>
                 <p>
-                  <code className="font-mono text-xs text-text">scheduledAt</code> is Karachi time,{" "}
-                  <code className="font-mono text-xs text-text">YYYY-MM-DD HH:mm</code>. Leave subject/body empty to use the selected template.
+                  <code className={code}>type</code> is <code className={code}>professor</code> or <code className={code}>company</code> (empty means
+                  professor). For companies, put the company in <code className={code}>company</code>, the job title in{" "}
+                  <code className={code}>role</code>, the posting link in <code className={code}>jobUrl</code>, and the recruiter (or “Hiring Team”) in{" "}
+                  <code className={code}>name</code>. <code className={code}>researchFocus</code> can hold your skills / stack.
+                </p>
+                <p>
+                  <code className={code}>scheduledAt</code> is Karachi time, <code className={code}>YYYY-MM-DD HH:mm</code>. Leave subject/body empty to
+                  use the selected template, which can use <code className={code}>{"{{company}}"}</code>, <code className={code}>{"{{role}}"}</code> and{" "}
+                  <code className={code}>{"{{jobUrl}}"}</code>.
                 </p>
               </div>
             </details>
@@ -309,6 +364,12 @@ export default function ImportPage() {
                   <span className="mr-1 font-mono">{preview.errorCount}</span> with errors
                 </Badge>
               )}
+              {attachCv && (
+                <Badge className="border border-border bg-surface text-muted">
+                  <IconPaperclip size={12} className="mr-1" />
+                  CV attached
+                </Badge>
+              )}
               <Button variant="primary" disabled={validRows.length === 0 || busy !== null} onClick={commit}>
                 {busy === "commit" ? "Importing…" : `Import ${validRows.length} valid row${validRows.length === 1 ? "" : "s"}`}
               </Button>
@@ -330,9 +391,10 @@ export default function ImportPage() {
             head={
               <>
                 <Th numeric>Row</Th>
-                <Th>Professor</Th>
+                <Th>Type</Th>
+                <Th>Contact</Th>
                 <Th>Email</Th>
-                <Th>University</Th>
+                <Th>University / company</Th>
                 <Th>Scheduled (raw)</Th>
                 <Th>Scheduled (PKT)</Th>
                 <Th>Subject</Th>
@@ -351,6 +413,9 @@ export default function ImportPage() {
                       {r.rowNumber}
                     </Td>
                     <Td className="whitespace-nowrap">
+                      <TypeCell r={r} />
+                    </Td>
+                    <Td className="whitespace-nowrap">
                       <span className="font-medium">{r.data.name || "—"}</span>
                       {r.professorExists && (
                         <Badge tone="scheduled" className="ml-2">
@@ -361,7 +426,10 @@ export default function ImportPage() {
                     <Td className="whitespace-nowrap">
                       <Mono className="text-muted">{r.data.email || "—"}</Mono>
                     </Td>
-                    <Td>{r.data.university || "—"}</Td>
+                    <Td>
+                      {r.data.university || r.data.company || "—"}
+                      {(r.role || r.data.role) && <span className="text-muted"> · {r.role || r.data.role}</span>}
+                    </Td>
                     <Td className="whitespace-nowrap">
                       <Mono className="text-muted">{r.data.scheduledAt || "—"}</Mono>
                     </Td>
@@ -410,7 +478,7 @@ export default function ImportPage() {
                   </tr>
                   {open && (
                     <tr>
-                      <td colSpan={8} className="border-b border-border bg-bg px-4 py-3">
+                      <td colSpan={9} className="border-b border-border bg-bg px-4 py-3">
                         {r.isHtml ? (
                           <EmailBody body={r.body} isHtml title={`Row ${r.rowNumber} email`} />
                         ) : (
@@ -431,5 +499,16 @@ export default function ImportPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+function TypeCell({ r }: { r: ImportPreviewRow }) {
+  const kind = rowKind(r);
+  if (!kind) return <Mono className="text-failed-fg">{r.data.type || "?"}</Mono>;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-muted">
+      <KindIcon kind={kind} />
+      {kind === "COMPANY" ? "Company" : "Professor"}
+    </span>
   );
 }

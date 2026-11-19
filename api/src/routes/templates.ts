@@ -3,7 +3,7 @@ import { z } from "zod";
 import { uid } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError, parseQuery, validateBody } from "../lib/http.js";
-import { renderTemplate, unknownPlaceholders } from "../lib/template.js";
+import { PLACEHOLDERS, renderTemplate, unknownPlaceholders } from "../lib/template.js";
 import { reqStr } from "../services/core/schemas.js";
 
 export const templatesRouter = Router();
@@ -39,6 +39,7 @@ const createSchema = z.object({
   body: bodyStr,
   isFollowUp: z.boolean().optional(),
   isHtml: z.boolean().optional(),
+  attachCv: z.boolean().optional(),
 });
 const patchSchema = createSchema.partial();
 
@@ -47,7 +48,7 @@ function assertPlaceholders(subject?: string, body?: string) {
   if (unknown.length) {
     throw new HttpError(400, `Unknown placeholder(s): ${unknown.map((u) => `{{${u}}}`).join(", ")}`, {
       unknownPlaceholders: unknown,
-      allowed: ["name", "university", "researchFocus", "whyFits"],
+      allowed: [...PLACEHOLDERS],
     });
   }
 }
@@ -71,8 +72,12 @@ templatesRouter.delete("/:id", async (req, res) => {
   const userId = uid(req);
   const [deleted] = await prisma.$transaction([
     prisma.template.deleteMany({ where: { id, userId } }), // emails.templateId → SetNull via FK
-    // Settings.followUpTemplateId has no FK; clear it if it pointed at this template.
+    // Settings follow-up template ids have no FK; clear them if they pointed at this template.
     prisma.settings.updateMany({ where: { userId, followUpTemplateId: id }, data: { followUpTemplateId: null } }),
+    prisma.settings.updateMany({
+      where: { userId, companyFollowUpTemplateId: id },
+      data: { companyFollowUpTemplateId: null },
+    }),
   ]);
   if (deleted.count === 0) throw new HttpError(404, "Template not found");
   res.status(204).end();
@@ -88,7 +93,7 @@ templatesRouter.post("/:id/preview", validateBody(previewSchema), async (req, re
     prisma.professor.findFirst({ where: { id: professorId, userId } }),
   ]);
   if (!t) throw new HttpError(404, "Template not found");
-  if (!p) throw new HttpError(404, "Professor not found");
+  if (!p) throw new HttpError(404, "Contact not found");
   res.json({
     subject: renderTemplate(t.subject, p),
     body: renderTemplate(t.body, p, { html: t.isHtml }),

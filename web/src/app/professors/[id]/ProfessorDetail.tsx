@@ -16,9 +16,11 @@ import { useToast } from "@/components/Toast";
 import {
   Button,
   Card,
+  CvClip,
   EmailStatusBadge,
   EmptyState,
   ErrorBox,
+  KindIcon,
   Modal,
   Mono,
   Notice,
@@ -43,6 +45,15 @@ function Row({ name, children }: { name: string; children: ReactNode }) {
   );
 }
 
+function ExternalUrl({ url }: { url: string }) {
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className={`${link} inline-flex items-center gap-1 font-mono text-[13px] font-normal break-all`}>
+      {url.replace(/^https?:\/\//, "")}
+      <IconExternal size={12} className="shrink-0" />
+    </a>
+  );
+}
+
 function MessageBlock({ e, sender, onChanged }: { e: Email; sender: string | null; onChanged: () => void }) {
   const cancelled = e.status === "CANCELLED";
   const showActions = e.status === "SCHEDULED" || e.status === "FAILED" || e.status === "CANCELLED";
@@ -52,6 +63,7 @@ function MessageBlock({ e, sender, onChanged }: { e: Email; sender: string | nul
         <EmailStatusBadge status={e.status} />
         <TypeChip followUpNo={e.followUpNo} />
         {e.isHtml && <HtmlBadge />}
+        {e.attachCv && <CvClip />}
         <div className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
           {e.status === "SENT" ? (
             <span>
@@ -133,7 +145,7 @@ export function ProfessorDetail() {
     setActionError(null);
     try {
       await api.updateProfessor(id, { status: s });
-      toast(`Status set to ${professorStatusLabel(s)}.`);
+      toast(`Status set to ${professorStatusLabel(s, prof?.kind)}.`);
       reload();
     } catch (e) {
       setActionError(errorMessage(e));
@@ -157,7 +169,7 @@ export function ProfessorDetail() {
     <div>
       <Link href="/professors" className="mb-3 inline-flex items-center gap-1 text-[13px] text-muted hover:text-text">
         <IconArrowLeft size={14} />
-        Professors
+        Contacts
       </Link>
       <ErrorBox error={error} onRetry={reload} />
       <ErrorBox error={actionError} />
@@ -168,13 +180,15 @@ export function ProfessorDetail() {
           <PageHeader
             title={
               <span className="flex flex-wrap items-center gap-2">
+                <KindIcon kind={prof.kind} size={16} />
                 {prof.name}
-                <ProfessorStatusBadge status={prof.status} />
+                <ProfessorStatusBadge status={prof.status} kind={prof.kind} />
               </span>
             }
             description={
               <>
                 {prof.university}
+                {prof.kind === "COMPANY" && prof.role && ` · ${prof.role}`}
                 {prof.country && ` · ${prof.country}`}
               </>
             }
@@ -182,7 +196,7 @@ export function ProfessorDetail() {
             <Select aria-label="Status" className="!w-auto" value={prof.status} onChange={(e) => changeStatus(e.target.value as ProfessorStatus)}>
               {PROFESSOR_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {professorStatusLabel(s)}
+                  {professorStatusLabel(s, prof.kind)}
                 </option>
               ))}
             </Select>
@@ -204,23 +218,25 @@ export function ProfessorDetail() {
                     {prof.email}
                   </a>
                 </Row>
-                <Row name="University">{prof.university}</Row>
-                <Row name="Country">{prof.country}</Row>
-                <Row name="Profile">
-                  {prof.profileUrl && (
-                    <a
-                      href={prof.profileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`${link} inline-flex items-center gap-1 font-mono text-[13px] font-normal break-all`}
-                    >
-                      {prof.profileUrl.replace(/^https?:\/\//, "")}
-                      <IconExternal size={12} className="shrink-0" />
-                    </a>
-                  )}
-                </Row>
-                <Row name="Research focus">{prof.researchFocus}</Row>
-                <Row name="Why I fit">{prof.whyFits}</Row>
+                {prof.kind === "COMPANY" ? (
+                  <>
+                    <Row name="Company">{prof.university}</Row>
+                    <Row name="Role">{prof.role}</Row>
+                    <Row name="Contact person">{prof.name}</Row>
+                    <Row name="Country">{prof.country}</Row>
+                    <Row name="Job link">{prof.jobUrl && <ExternalUrl url={prof.jobUrl} />}</Row>
+                    <Row name="Skills / stack">{prof.researchFocus}</Row>
+                    <Row name="Why you fit">{prof.whyFits}</Row>
+                  </>
+                ) : (
+                  <>
+                    <Row name="University">{prof.university}</Row>
+                    <Row name="Country">{prof.country}</Row>
+                    <Row name="Profile">{prof.profileUrl && <ExternalUrl url={prof.profileUrl} />}</Row>
+                    <Row name="Research focus">{prof.researchFocus}</Row>
+                    <Row name="Why I fit">{prof.whyFits}</Row>
+                  </>
+                )}
                 <Row name="Notes">{prof.notes}</Row>
                 <Row name="Added">
                   <Mono>{formatKarachi(prof.createdAt)}</Mono>
@@ -267,14 +283,14 @@ export function ProfessorDetail() {
             </section>
           </div>
 
-          <Modal open={editing} title="Edit professor" onClose={() => setEditing(false)} wide>
+          <Modal open={editing} title={prof.kind === "COMPANY" ? "Edit company" : "Edit professor"} onClose={() => setEditing(false)} wide>
             {editing && (
               <ProfessorForm
                 professor={prof}
                 onCancel={() => setEditing(false)}
                 onSaved={() => {
                   setEditing(false);
-                  toast("Professor saved.");
+                  toast("Contact saved.");
                   reload();
                 }}
               />

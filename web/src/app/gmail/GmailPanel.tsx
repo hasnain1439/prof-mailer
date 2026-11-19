@@ -209,7 +209,7 @@ function HowItWorks({ data }: { data: GmailStatus }) {
           : initial emails and follow-ups alike, and they appear in its Sent folder.
         </li>
         <li>
-          <strong className="font-medium text-text">Replies are read from the same inbox.</strong> When a professor replies in the thread, the email
+          <strong className="font-medium text-text">Replies are read from the same inbox.</strong> When a contact replies in the thread, the email
           is marked replied and further follow-ups stop.
         </li>
         <li>

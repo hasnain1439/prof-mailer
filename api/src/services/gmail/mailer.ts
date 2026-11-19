@@ -11,7 +11,7 @@ import { randomBytes } from "node:crypto";
 import { env } from "../../lib/env.js";
 import { HttpError } from "../../lib/http.js";
 import { htmlToText } from "../../lib/template.js";
-import { ImapThreadReader, getAppPasswordCreds, sendViaSmtp } from "./appPassword.js";
+import { type EmailAttachment, ImapThreadReader, getAppPasswordCreds, sendViaSmtp } from "./appPassword.js";
 import { appendDryRunMessage, getDryRunThread } from "./dryRunStore.js";
 import { getGmailAccount } from "./account.js";
 import { isSingleAddress } from "./mime.js";
@@ -25,6 +25,8 @@ export interface SendEmailInput {
   threadId?: string | null;
   inReplyTo?: string | null;
   references?: string[] | null;
+  /** Files to attach (e.g. the user's CV). */
+  attachments?: EmailAttachment[];
   /** Send time recorded in the DRY_RUN thread store (defaults to now); callers pass the same value they store as sentAt. */
   sentAt?: Date;
 }
@@ -76,6 +78,7 @@ export async function sendEmail(userId: string, input: SendEmailInput): Promise<
       `[DRY_RUN] user=${userId} would send to=${to} subject=${JSON.stringify(input.subject)} ` +
         `threadId=${input.threadId ?? "(new)"} inReplyTo=${inReplyTo ?? "(none)"} ` +
         `references=${references.length ? references.join(" ") : "(none)"} ` +
+        `attachment=${input.attachments?.length ? input.attachments.map((a) => a.filename).join(",") : "(none)"} ` +
         `body="${preview}${input.body.length > 80 ? "…" : ""}"`,
     );
     await appendDryRunMessage(gmailThreadId, {

@@ -12,6 +12,7 @@ import { IconClock, IconRefresh, IconUpload } from "@/components/icons";
 import {
   Avatar,
   Button,
+  CvClip,
   EmailStatusBadge,
   EmptyCard,
   ErrorBox,
@@ -23,6 +24,7 @@ import {
   Th,
   TypeChip,
   btnPrimary,
+  contactOrg,
   tr,
 } from "@/components/ui";
 
@@ -67,7 +69,7 @@ export default function QueuePage() {
               </Link>
             }
           >
-            Nothing is waiting to be sent. Import professors with a scheduled time to fill the queue.
+            Nothing is waiting to be sent. Import contacts with a scheduled time to fill the queue.
           </EmptyCard>
         ) : (
           <div className="overflow-hidden rounded-md border border-border bg-surface">
@@ -94,7 +96,7 @@ export default function QueuePage() {
               <Table
                 head={
                   <>
-                    <Th>Professor</Th>
+                    <Th>Contact</Th>
                     <Th>Subject</Th>
                     <Th>Scheduled</Th>
                     <Th>Status</Th>
@@ -113,6 +115,11 @@ export default function QueuePage() {
                               {e.professor.name}
                             </Link>
                             <Mono className="block truncate !text-xs text-muted">{e.professor.email}</Mono>
+                            {e.professor.kind === "COMPANY" && (
+                              <div className="truncate text-xs text-muted" title={contactOrg(e.professor)}>
+                                {contactOrg(e.professor)}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </Td>
@@ -120,6 +127,7 @@ export default function QueuePage() {
                         <div className="flex min-w-0 items-center gap-1.5">
                           <TypeChip followUpNo={e.followUpNo} />
                           {e.isHtml && <HtmlBadge />}
+                          {e.attachCv && <CvClip />}
                           <span className="truncate text-text" title={e.subject}>
                             {e.subject}
                           </span>

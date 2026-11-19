@@ -278,7 +278,7 @@ function AdminPanel() {
                 <Th>User</Th>
                 <Th>Status</Th>
                 <Th>Gmail</Th>
-                <Th numeric>Professors</Th>
+                <Th numeric>Contacts</Th>
                 <Th numeric>Sent</Th>
                 <Th numeric>Scheduled</Th>
                 <Th>Last sent</Th>

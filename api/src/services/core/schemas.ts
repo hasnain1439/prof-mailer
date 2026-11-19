@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const PROFESSOR_STATUSES = ["NOT_SENT", "SENT", "REPLIED", "INTERESTED", "DECLINED"] as const;
+export const PROFESSOR_STATUSES = ["NOT_SENT", "SENT", "REPLIED", "INTERESTED", "INTERVIEW", "DECLINED"] as const;
+export const CONTACT_KINDS = ["PROFESSOR", "COMPANY"] as const;
 export const EMAIL_STATUSES = ["SCHEDULED", "SENDING", "SENT", "FAILED", "CANCELLED"] as const;
 
 /** Trimmed non-empty string. */
@@ -25,4 +26,6 @@ export const professorSummarySelect = {
   email: true,
   university: true,
   status: true,
+  kind: true,
+  role: true,
 } as const;

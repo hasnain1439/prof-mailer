@@ -8,7 +8,7 @@ import { useApi } from "@/lib/useApi";
 import { EmailActions } from "@/components/EmailActions";
 import { EmailBody, HtmlBadge } from "@/components/EmailBody";
 import { IconInbox, IconRefresh, IconReply } from "@/components/icons";
-import { Avatar, Badge, Button, EmptyCard, ErrorBox, Mono, PageHeader, Table, TableSkeleton, Td, Th, TypeChip, tr } from "@/components/ui";
+import { Avatar, Badge, Button, CvClip, EmptyCard, ErrorBox, Mono, PageHeader, Table, TableSkeleton, Td, Th, TypeChip, contactOrg, tr } from "@/components/ui";
 
 type Tab = "SENT" | "CANCELLED";
 
@@ -22,7 +22,7 @@ export default function SentPage() {
     <div>
       <PageHeader
         title={tab === "SENT" ? "Sent" : "Cancelled"}
-        description={tab === "SENT" ? "Emails that have gone out, and whether the professor replied." : "Emails you cancelled. You can reschedule them."}
+        description={tab === "SENT" ? "Emails that have gone out, and whether the contact replied." : "Emails you cancelled. You can reschedule them."}
       >
         <div role="group" aria-label="Show" className="inline-flex h-8 items-center rounded-md border border-border bg-surface p-0.5">
           {(["SENT", "CANCELLED"] as Tab[]).map((t) => (
@@ -60,7 +60,7 @@ export default function SentPage() {
             <Table
               head={
                 <>
-                  <Th>Professor</Th>
+                  <Th>Contact</Th>
                   <Th>Subject</Th>
                   <Th>{tab === "SENT" ? "Sent" : "Was scheduled"}</Th>
                   <Th>{tab === "SENT" ? "Reply" : "Actions"}</Th>
@@ -77,7 +77,9 @@ export default function SentPage() {
                           <Link href={`/professors/${e.professor.id}`} className="font-medium text-text hover:text-accent">
                             {e.professor.name}
                           </Link>
-                          <div className="truncate text-xs text-muted">{e.professor.university}</div>
+                          <div className="truncate text-xs text-muted" title={contactOrg(e.professor)}>
+                            {contactOrg(e.professor)}
+                          </div>
                         </div>
                       </div>
                     </Td>
@@ -85,6 +87,7 @@ export default function SentPage() {
                       <div className="flex min-w-0 items-center gap-1.5">
                         <TypeChip followUpNo={e.followUpNo} />
                         {e.isHtml && <HtmlBadge />}
+                        {e.attachCv && <CvClip />}
                         <Link href={`/professors/${e.professor.id}`} className="truncate text-text hover:text-accent" title={e.subject}>
                           {e.subject}
                         </Link>

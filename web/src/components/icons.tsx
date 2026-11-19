@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   ArrowRight,
   Calendar,
+  Briefcase,
+  Building2,
   Check,
   CheckCircle2,
   Clock,
@@ -13,12 +15,14 @@ import {
   Eye,
   EyeOff,
   FileText,
+  GraduationCap,
   Inbox,
   Info,
   LayoutDashboard,
   LogOut,
   Mail,
   Menu,
+  Paperclip,
   Pencil,
   Plus,
   RefreshCw,
@@ -77,3 +81,7 @@ export const IconCalendar = wrap(Calendar);
 export const IconLogo = wrap(Mail);
 export const IconLogOut = wrap(LogOut);
 export const IconShield = wrap(ShieldCheck);
+export const IconBuilding = wrap(Building2);
+export const IconBriefcase = wrap(Briefcase);
+export const IconPaperclip = wrap(Paperclip);
+export const IconGraduation = wrap(GraduationCap);

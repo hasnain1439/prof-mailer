@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { api, errorMessage } from "@/lib/api";
-import type { SettingsInput, SettingsResponse } from "@/lib/types";
+import type { CvInfo, SettingsInput, SettingsResponse, Template } from "@/lib/types";
+import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { useAuth } from "@/components/Auth";
 import { useGmailStatus } from "@/components/GmailStatus";
-import { IconCheck } from "@/components/icons";
+import { IconCheck, IconDownload, IconFile, IconTrash, IconUpload } from "@/components/icons";
 import { useToast } from "@/components/Toast";
-import { Badge, Button, Card, ErrorBox, Loading, Mono, Notice, PageHeader, Select, input, link } from "@/components/ui";
+import { Badge, Button, Card, ErrorBox, Loading, Mono, Notice, PageHeader, Select, Skeleton, btnSecondary, btnSmall, input, link } from "@/components/ui";
 
 function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved: (s: SettingsResponse) => void }) {
   const toast = useToast();
@@ -19,6 +20,7 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
     maxFollowUps: String(initial.maxFollowUps),
     dailySendLimit: String(initial.dailySendLimit),
     followUpTemplateId: initial.followUpTemplateId ?? "",
+    companyFollowUpTemplateId: initial.companyFollowUpTemplateId ?? "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,7 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
         maxFollowUps: Number(form.maxFollowUps),
         dailySendLimit: Number(form.dailySendLimit),
         followUpTemplateId: form.followUpTemplateId || null,
+        companyFollowUpTemplateId: form.companyFollowUpTemplateId || null,
       };
       const res = await api.putSettings(body);
       setSaved(true);
@@ -82,9 +85,9 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
         <Section title="Sending" description="Caps how many emails go out per Karachi calendar day.">
           {num("dailySendLimit", "Daily send limit", 1, 50, "Max 50 per day", "emails")}
         </Section>
-        <Section title="Follow-ups" description="Automatically nudge professors who haven't replied.">
+        <Section title="Follow-ups" description="Automatically nudge contacts who haven't replied.">
           {num("followUpAfterDays", "Follow up after", 1, 60, "1–60 days without a reply", "days")}
-          {num("maxFollowUps", "Max follow-ups", 0, 10, "0–10 per professor (0 disables)", "per professor")}
+          {num("maxFollowUps", "Max follow-ups", 0, 10, "0–10 per contact (0 disables)", "per contact")}
           <FieldRow
             label="Follow-up template"
             htmlFor="s-tpl"
@@ -100,30 +103,37 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
                     and tick “Follow-up template”.
                   </span>
                 ) : (
-                  "Only templates marked as follow-up are listed."
+                  "Used for professors. Only templates marked as follow-up are listed."
                 )}
               </>
             }
           >
-            <Select
+            <TemplateSelect
               id="s-tpl"
-              className="max-w-sm"
+              templates={templates.data}
               value={form.followUpTemplateId}
-              onChange={(e) => {
+              emptyLabel="None"
+              onChange={(v) => {
                 setSaved(false);
-                setForm({ ...form, followUpTemplateId: e.target.value });
+                setForm({ ...form, followUpTemplateId: v });
               }}
-            >
-              <option value="">None</option>
-              {(templates.data ?? []).map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-              {form.followUpTemplateId && templates.data && !templates.data.some((t) => t.id === form.followUpTemplateId) && (
-                <option value={form.followUpTemplateId}>(unknown template)</option>
-              )}
-            </Select>
+            />
+          </FieldRow>
+          <FieldRow
+            label="Company follow-up template"
+            htmlFor="s-ctpl"
+            hint="Used for companies (job applications). If empty, the follow-up template above is used."
+          >
+            <TemplateSelect
+              id="s-ctpl"
+              templates={templates.data}
+              value={form.companyFollowUpTemplateId}
+              emptyLabel="Same as above"
+              onChange={(v) => {
+                setSaved(false);
+                setForm({ ...form, companyFollowUpTemplateId: v });
+              }}
+            />
           </FieldRow>
         </Section>
       </div>
@@ -139,6 +149,152 @@ function SettingsForm({ initial, onSaved }: { initial: SettingsResponse; onSaved
         </Button>
       </div>
     </form>
+  );
+}
+
+function TemplateSelect({
+  id,
+  templates,
+  value,
+  emptyLabel,
+  onChange,
+}: {
+  id: string;
+  templates: Template[] | null | undefined;
+  value: string;
+  emptyLabel: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Select id={id} className="max-w-sm" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{emptyLabel}</option>
+      {(templates ?? []).map((t) => (
+        <option key={t.id} value={t.id}>
+          {t.name}
+          {t.attachCv ? " (attaches CV)" : ""}
+        </option>
+      ))}
+      {value && templates && !templates.some((t) => t.id === value) && <option value={value}>(unknown template)</option>}
+    </Select>
+  );
+}
+
+const CV_MAX_BYTES = 5 * 1024 * 1024;
+const CV_EXT = /\.(pdf|docx?)$/i;
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Upload / replace / download / remove the one CV attached to emails whose template has "Attach my CV". */
+function CvCard() {
+  const toast = useToast();
+  const cv = useApi(() => api.getCv());
+  const [current, setCurrent] = useState<CvInfo | null | undefined>(undefined);
+  const [busy, setBusy] = useState<"upload" | "delete" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const info = current !== undefined ? current : cv.data?.cv;
+
+  async function upload(file: File | undefined) {
+    if (fileRef.current) fileRef.current.value = "";
+    if (!file) return;
+    setError(null);
+    if (!CV_EXT.test(file.name)) {
+      setError(`"${file.name}" isn't a PDF, DOC or DOCX file.`);
+      return;
+    }
+    if (file.size === 0) {
+      setError(`"${file.name}" is empty.`);
+      return;
+    }
+    if (file.size > CV_MAX_BYTES) {
+      setError(`"${file.name}" is ${formatBytes(file.size)}; the limit is 5 MB.`);
+      return;
+    }
+    setBusy("upload");
+    try {
+      const res = await api.uploadCv(file);
+      setCurrent(res.cv);
+      toast(info ? "CV replaced." : "CV uploaded.");
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove() {
+    if (!window.confirm("Remove your CV? Emails set to attach it will fail until you upload a new one.")) return;
+    setError(null);
+    setBusy("delete");
+    try {
+      await api.deleteCv();
+      setCurrent(null);
+      toast("CV removed.");
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Card title="CV" description="Attached to emails whose template has “Attach my CV” ticked. PDF, DOC or DOCX, max 5 MB.">
+      <ErrorBox error={cv.error} onRetry={cv.reload} />
+      <ErrorBox error={error} />
+      {cv.loading && info === undefined && <Skeleton className="h-10 w-full" />}
+      {info !== undefined && !cv.error && (
+        <div className="flex flex-wrap items-center gap-3">
+          {info ? (
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-muted">
+                <IconFile />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-medium text-text" title={info.filename}>
+                  {info.filename}
+                </p>
+                <p className="text-xs text-muted">
+                  <Mono className="!text-xs">{formatBytes(info.size)}</Mono> · updated <Mono className="!text-xs">{formatKarachi(info.updatedAt)}</Mono>
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="flex-1 text-[13px] text-muted">No CV uploaded yet.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {info && (
+              <a href={api.cvDownloadUrl} download className={`${btnSecondary} ${btnSmall}`}>
+                <IconDownload size={14} />
+                Download
+              </a>
+            )}
+            <Button size="sm" variant={info ? "secondary" : "primary"} disabled={busy !== null} onClick={() => fileRef.current?.click()}>
+              <IconUpload size={14} />
+              {busy === "upload" ? "Uploading…" : info ? "Replace" : "Upload CV"}
+            </Button>
+            {info && (
+              <Button size="sm" variant="danger" disabled={busy !== null} onClick={remove}>
+                <IconTrash size={14} />
+                {busy === "delete" ? "Removing…" : "Remove"}
+              </Button>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(e) => upload(e.target.files?.[0])}
+            />
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -186,7 +342,7 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Settings" description="Send limits and follow-up behaviour for your account. Server flags are read-only." />
+      <PageHeader title="Settings" description="Send limits, follow-up behaviour and your CV. Server flags are read-only." />
       <ErrorBox error={error} onRetry={reload} />
       {loading && !data && (
         <div className="grid max-w-6xl grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
@@ -196,9 +352,12 @@ export default function SettingsPage() {
       )}
       {data && s && (
         <div className="grid max-w-6xl grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
-          <Card title="Sending and follow-ups" flush>
-            <SettingsForm initial={data} onSaved={setLatest} />
-          </Card>
+          <div>
+            <Card title="Sending and follow-ups" flush>
+              <SettingsForm initial={data} onSaved={setLatest} />
+            </Card>
+            <CvCard />
+          </div>
           <div>
             <Card title="Account" description="Read-only">
               <dl className="-my-2 divide-y divide-border">

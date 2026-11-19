@@ -1,13 +1,17 @@
 // Mirrors docs/API_CONTRACT.md exactly. All timestamps are ISO-8601 UTC strings.
 
-export type ProfessorStatus = "NOT_SENT" | "SENT" | "REPLIED" | "INTERESTED" | "DECLINED";
+export type ProfessorStatus = "NOT_SENT" | "SENT" | "REPLIED" | "INTERESTED" | "INTERVIEW" | "DECLINED";
+export type ContactKind = "PROFESSOR" | "COMPANY";
 export type EmailStatus = "SCHEDULED" | "SENDING" | "SENT" | "FAILED" | "CANCELLED";
 
-export const PROFESSOR_STATUSES: ProfessorStatus[] = ["NOT_SENT", "SENT", "REPLIED", "INTERESTED", "DECLINED"];
+export const PROFESSOR_STATUSES: ProfessorStatus[] = ["NOT_SENT", "SENT", "REPLIED", "INTERESTED", "INTERVIEW", "DECLINED"];
+export const CONTACT_KINDS: ContactKind[] = ["PROFESSOR", "COMPANY"];
 export const EMAIL_STATUSES: EmailStatus[] = ["SCHEDULED", "SENDING", "SENT", "FAILED", "CANCELLED"];
 
+/** A contact: a professor, or (kind COMPANY) a company where `university` holds the company name. */
 export interface Professor {
   id: string;
+  kind: ContactKind;
   name: string;
   email: string;
   university: string;
@@ -15,6 +19,10 @@ export interface Professor {
   researchFocus: string | null;
   whyFits: string | null;
   profileUrl: string | null;
+  /** job title (companies) */
+  role: string | null;
+  /** job posting link (companies) */
+  jobUrl: string | null;
   status: ProfessorStatus;
   notes: string | null;
   createdAt: string;
@@ -34,6 +42,7 @@ export interface Template {
   body: string;
   isFollowUp: boolean;
   isHtml: boolean;
+  attachCv: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,6 +59,7 @@ export interface Email {
   repliedAt: string | null;
   error: string | null;
   isHtml: boolean;
+  attachCv: boolean;
   gmailThreadId: string | null;
   gmailMessageId: string | null;
   messageIdHeader: string | null;
@@ -60,7 +70,7 @@ export interface Email {
 }
 
 export interface EmailWithProfessor extends Email {
-  professor: { id: string; name: string; email: string; university: string; status: ProfessorStatus };
+  professor: { id: string; name: string; email: string; university: string; status: ProfessorStatus; kind?: ContactKind; role?: string | null };
 }
 
 export type ProfessorWithEmails = Professor & { emails: Email[] };
@@ -70,6 +80,7 @@ export interface SettingsResponse {
   maxFollowUps: number;
   dailySendLimit: number;
   followUpTemplateId: string | null;
+  companyFollowUpTemplateId: string | null;
   dryRun: boolean;
   testRecipientSet: boolean;
   timezone: "Asia/Karachi";
@@ -81,9 +92,11 @@ export interface SettingsInput {
   maxFollowUps: number;
   dailySendLimit: number;
   followUpTemplateId: string | null;
+  companyFollowUpTemplateId: string | null;
 }
 
 export interface ProfessorInput {
+  kind?: ContactKind;
   name: string;
   email: string;
   university: string;
@@ -91,6 +104,8 @@ export interface ProfessorInput {
   researchFocus?: string | null;
   whyFits?: string | null;
   profileUrl?: string | null;
+  role?: string | null;
+  jobUrl?: string | null;
   status?: ProfessorStatus;
   notes?: string | null;
 }
@@ -101,9 +116,15 @@ export interface TemplateInput {
   body: string;
   isFollowUp?: boolean;
   isHtml?: boolean;
+  attachCv?: boolean;
 }
 
 export interface ImportRowData {
+  /** raw "type" column ("professor" / "company" / "") */
+  type?: string;
+  company?: string;
+  role?: string;
+  jobUrl?: string;
   name: string;
   email: string;
   university: string;
@@ -128,6 +149,9 @@ export interface ImportPreviewRow {
   warnings: string[];
   professorExists: boolean;
   isHtml: boolean;
+  kind?: ContactKind;
+  role?: string;
+  jobUrl?: string;
 }
 
 export interface ImportPreview {
@@ -144,6 +168,7 @@ export interface ImportCommitResult {
 
 export interface Dashboard {
   counts: { scheduled: number; sentToday: number; replied: number; failed: number };
+  contacts?: { professors: number; companies: number };
   upcoming: EmailWithProfessor[];
   recentSent: EmailWithProfessor[];
   dryRun: boolean;
@@ -205,4 +230,11 @@ export interface GmailTestSendResult {
   dryRun?: boolean;
   gmailThreadId?: string;
   messageIdHeader?: string;
+}
+
+export interface CvInfo {
+  filename: string;
+  mimeType: string;
+  size: number;
+  updatedAt: string;
 }

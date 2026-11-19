@@ -1,11 +1,13 @@
 export interface TemplateVars {
   name: string;
   university: string;
+  role?: string | null;
+  jobUrl?: string | null;
   researchFocus?: string | null;
   whyFits?: string | null;
 }
 
-export const PLACEHOLDERS = ["name", "university", "researchFocus", "whyFits"] as const;
+export const PLACEHOLDERS = ["name", "university", "company", "role", "jobUrl", "researchFocus", "whyFits"] as const;
 
 export function escapeHtml(s: string): string {
   return s
@@ -17,14 +19,15 @@ export function escapeHtml(s: string): string {
 }
 
 /**
- * Replace {{name}}, {{university}}, {{researchFocus}}, {{whyFits}} (whitespace inside braces allowed).
+ * Replace {{name}}, {{university}} / {{company}}, {{role}}, {{jobUrl}}, {{researchFocus}}, {{whyFits}}
+ * (whitespace inside braces allowed).
  * With `html: true`, values are HTML-escaped so professor data can't break the markup.
  */
 export function renderTemplate(text: string, vars: TemplateVars, opts: { html?: boolean } = {}): string {
   return text.replace(
-    /\{\{\s*(name|university|researchFocus|whyFits)\s*\}\}/g,
-    (_m, key: keyof TemplateVars) => {
-      const v = vars[key];
+    /\{\{\s*(name|university|company|role|jobUrl|researchFocus|whyFits)\s*\}\}/g,
+    (_m, key: string) => {
+      const v = key === "company" ? vars.university : vars[key as keyof TemplateVars];
       const s = v == null ? "" : String(v);
       return opts.html ? escapeHtml(s) : s;
     },

@@ -19,22 +19,24 @@ const LAST_CHECK_KEY = "lastReplyCheckAt";
 let running = false;
 const loggedNotConnected = new Set<string>();
 
-/** Cancel SCHEDULED follow-ups for professors who replied or were marked INTERESTED/DECLINED (all users). */
+/** Cancel SCHEDULED follow-ups for contacts who replied or were marked INTERESTED/INTERVIEW/DECLINED (all users). */
 async function cancelFollowUpsForStoppedProfessors(): Promise<number> {
   const r = await prisma.email.updateMany({
     where: {
       status: "SCHEDULED",
       followUpNo: { gt: 0 },
-      professor: { status: { in: ["REPLIED", "INTERESTED", "DECLINED"] } },
+      professor: { status: { in: ["REPLIED", "INTERESTED", "INTERVIEW", "DECLINED"] } },
     },
     data: { status: "CANCELLED" },
   });
   return r.count;
 }
 
-async function pickFollowUpTemplate(userId: string, followUpTemplateId: string | null) {
-  if (followUpTemplateId) {
-    const t = await prisma.template.findFirst({ where: { id: followUpTemplateId, userId } });
+/** First existing template among the preferred ids, else any follow-up template. */
+async function pickFollowUpTemplate(userId: string, preferredIds: (string | null)[]) {
+  for (const id of preferredIds) {
+    if (!id) continue;
+    const t = await prisma.template.findFirst({ where: { id, userId } });
     if (t) return t;
   }
   return prisma.template.findFirst({ where: { userId, isFollowUp: true }, orderBy: { name: "asc" } });
@@ -65,7 +67,8 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
     else threads.set(key, [e]);
   }
 
-  let template: Awaited<ReturnType<typeof pickFollowUpTemplate>> | undefined;
+  // Follow-up template per contact kind (companies prefer companyFollowUpTemplateId), resolved lazily.
+  const templates = new Map<string, Awaited<ReturnType<typeof pickFollowUpTemplate>>>();
   let loggedNoTemplate = false;
   // One reader per user (one Gmail client / IMAP connection), opened lazily and closed after the loop.
   let reader: ThreadReader | null = null;
@@ -94,7 +97,7 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
               data: { repliedAt: reply.date },
             }),
             prisma.professor.updateMany({
-              where: { id: professor.id, userId, status: { notIn: ["INTERESTED", "DECLINED"] } },
+              where: { id: professor.id, userId, status: { notIn: ["INTERESTED", "INTERVIEW", "DECLINED"] } },
               data: { status: "REPLIED" },
             }),
           ]);
@@ -114,7 +117,15 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
         const existing = await prisma.email.count({ where: { parentId: head.id } });
         if (existing > 0) continue;
 
-        if (template === undefined) template = await pickFollowUpTemplate(userId, settings.followUpTemplateId);
+        let template = templates.get(professor.kind);
+        if (template === undefined) {
+          const preferred =
+            professor.kind === "COMPANY"
+              ? [settings.companyFollowUpTemplateId, settings.followUpTemplateId]
+              : [settings.followUpTemplateId];
+          template = await pickFollowUpTemplate(userId, preferred);
+          templates.set(professor.kind, template);
+        }
         if (!template) {
           if (!loggedNoTemplate) {
             console.warn(`[check-replies] user ${userId}: follow-up due but no follow-up template exists; skipping`);
@@ -127,6 +138,8 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
           {
             name: professor.name,
             university: professor.university,
+            role: professor.role,
+            jobUrl: professor.jobUrl,
             researchFocus: professor.researchFocus,
             whyFits: professor.whyFits,
           },
@@ -140,6 +153,7 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
             subject: followUpSubject(root.subject),
             body,
             isHtml: template.isHtml,
+            attachCv: template.attachCv,
             status: "SCHEDULED",
             scheduledAt: now,
             followUpNo: head.followUpNo + 1,

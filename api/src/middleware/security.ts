@@ -21,9 +21,11 @@ export function isAllowedOrigin(origin: string): boolean {
 /**
  * CSRF defence for cookie-authenticated mutations (cookies are SameSite=Lax as well):
  * - a present Origin header must be PUBLIC_URL (or localhost in dev);
- * - a request body must be JSON (multipart only for the import upload). HTML forms cannot send JSON.
+ * - a request body must be JSON (multipart only for the import and CV uploads). HTML forms cannot send JSON.
  * Mounted on /api, so req.path is relative to it. /jobs/* uses a bearer secret, not cookies.
  */
+const MULTIPART_PATHS = new Set(["/import/preview", "/cv"]);
+
 export const csrfGuard: RequestHandler = (req, res, next) => {
   if (!MUTATING.has(req.method)) return next();
   if (req.path.startsWith("/jobs/")) return next();
@@ -32,7 +34,7 @@ export const csrfGuard: RequestHandler = (req, res, next) => {
   const ct = (req.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
   if (!ct) return next(); // no body, e.g. POST /auth/logout
   if (ct === "application/json") return next();
-  if (ct === "multipart/form-data" && req.method === "POST" && req.path === "/import/preview") return next();
+  if (ct === "multipart/form-data" && req.method === "POST" && MULTIPART_PATHS.has(req.path)) return next();
   res.status(415).json({ error: "Content-Type must be application/json" });
 };
 

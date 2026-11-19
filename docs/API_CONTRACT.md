@@ -267,3 +267,35 @@ All admin routes require a verified, non-blocked session whose email is in `ADMI
 | GET | `/admin/stats` | | `{ users, verifiedUsers, blockedUsers, gmailConnected, emailsSentToday, emailsSentTotal, emailsScheduled }` |
 
 `AdminUser = { id, email, name, createdAt, emailVerified, blocked, blockedAt, isAdmin, gmailConnected, gmailEmail, professorCount, emailsSent, emailsScheduled, lastSentAt }`. `emailsScheduled` counts SCHEDULED + SENDING; `emailsSentToday` uses the Asia/Karachi calendar day. Password hashes, tokens and app passwords are never returned. Admin actions are logged as `[admin] <adminId> blocked|unblocked <userId>` (ids only).
+
+## v4: companies (job applications) and CV attachment
+The `Professor` model is now a **contact**: `kind: "PROFESSOR" | "COMPANY"` (default PROFESSOR). The REST paths stay `/professors` (the UI calls them "Contacts"). Migration `contacts_companies_cv` is already applied.
+
+**Contact fields** (Professor JSON gains): `kind`, `role: string|null`, `jobUrl: string|null`.
+- For companies, `university` holds the **company name** and `name` the recruiter / HR person (or "Hiring Team"); `role` = job title, `jobUrl` = posting link. `researchFocus` is optional for companies (can hold skills/stack); `whyFits` = why you fit the role.
+- Status gains `INTERVIEW` (order: NOT_SENT, SENT, REPLIED, INTERESTED, INTERVIEW, DECLINED). INTERVIEW behaves like INTERESTED: it is a stop status (send-due cancels due emails with "Contact marked interview", reply check never downgrades it to REPLIED). UI label for DECLINED on a company may read "Rejected"; the value stays DECLINED.
+- `POST/PATCH /professors` accept `kind`, `role`, `jobUrl` (optStr; `jobUrl` must be http(s) if given). `GET /professors?kind=PROFESSOR|COMPANY` filters (plus existing status/country/q; q also matches `role`). Error text says "contact" instead of "professor".
+- `EmailWithProfessor.professor` (summary select) gains `kind` and `role`.
+
+**Placeholders**: `{{name}}`, `{{university}}`, `{{company}}` (= university), `{{role}}`, `{{jobUrl}}`, `{{researchFocus}}`, `{{whyFits}}`. Unknown-placeholder 400 lists the new `allowed`.
+
+**Templates**: gain `attachCv: boolean` (default false) on create / patch / response.
+
+**Emails**: gain `attachCv: boolean`. Set from the template when an email is created (import with a template, follow-ups from the follow-up template). Import commit accepts optional `attachCv: boolean` that overrides for all rows (default: the chosen template's `attachCv`, else false). `PATCH /emails/:id` may also take `attachCv: boolean` (SCHEDULED only).
+
+**CV** (one per user, stored in Postgres as bytes; PDF, DOC or DOCX, max 5 MB, checked by extension + magic bytes: `%PDF` or `PK\x03\x04` for docx or `D0 CF 11 E0` for doc):
+| Method | Path | Body | Response |
+|---|---|---|---|
+| GET | `/cv` | | `{ cv: { filename, mimeType, size, updatedAt } \| null }` |
+| POST | `/cv` | multipart, field `file` | `{ cv: {...} }` (replaces any existing). 400 wrong type / too big / empty. |
+| GET | `/cv/download` | | the file (`Content-Disposition: attachment`), 404 if none |
+| DELETE | `/cv` | | 204 |
+Filename is sanitised (basename, no control chars, max 120 chars).
+
+**Sending**: when `email.attachCv` is true the send-due job loads the user's CV and attaches it (nodemailer `attachments`). If there is no CV the email becomes FAILED with error "CV attachment missing: upload your CV in Settings" (the daily counter is not used). DRY_RUN logs `attachment=<filename>` (or `(none)`), never the bytes. Test-send is unchanged (no attachment).
+
+**Settings**: gain `companyFollowUpTemplateId: string|null` (must be a follow-up template of the user, same rules as `followUpTemplateId`). Follow-ups for COMPANY contacts use it, falling back to `followUpTemplateId`, then any follow-up template. Follow-ups copy `attachCv` from the template used.
+
+**Import**: new optional columns `type` (alias `kind`; values `professor`/`company`, case-insensitive, empty = professor, anything else = row error), `company` (used as `university` when `university` is empty; the required check is "university or company"), `role`, `jobUrl`. Sample CSV includes a company row. Preview rows include `kind`, `role`, `jobUrl`. Upsert by (user, email) also updates kind/role/jobUrl.
+
+**Dashboard**: `GET /dashboard` gains `contacts: { professors: number, companies: number }`.

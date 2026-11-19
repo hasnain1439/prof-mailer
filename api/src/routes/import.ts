@@ -16,6 +16,7 @@ import {
 } from "../services/import/parse.js";
 import {
   normalizeEmail,
+  rowUniversity,
   validateImportRows,
   type ExistingProfessorInfo,
   type ImportTemplate,
@@ -59,7 +60,10 @@ const uploadFile: RequestHandler = (req, res, next) => {
 
 async function loadTemplate(userId: string, templateId: string | undefined): Promise<ImportTemplate | null> {
   if (!templateId) return null;
-  const t = await prisma.template.findFirst({ where: { id: templateId, userId }, select: { subject: true, body: true, isHtml: true } });
+  const t = await prisma.template.findFirst({
+    where: { id: templateId, userId },
+    select: { subject: true, body: true, isHtml: true, attachCv: true },
+  });
   if (!t) throw new HttpError(400, "Template not found", { templateId });
   return t;
 }
@@ -108,6 +112,10 @@ async function existingProfessors(
 importRouter.get("/sample.csv", (_req, res) => {
   const rows: ImportRowData[] = [
     {
+      type: "professor",
+      company: "",
+      role: "",
+      jobUrl: "",
       name: "Dr. Ada Example",
       email: "ada.example@cs.example.edu",
       university: "Example State University",
@@ -121,6 +129,10 @@ importRouter.get("/sample.csv", (_req, res) => {
       scheduledAt: "2026-11-20 09:30",
     },
     {
+      type: "professor",
+      company: "",
+      role: "",
+      jobUrl: "",
       name: "Prof. Ben Sample",
       email: "b.sample@physics.example.edu",
       university: "University of Example",
@@ -133,6 +145,10 @@ importRouter.get("/sample.csv", (_req, res) => {
       scheduledAt: "2026-11-20 10:15",
     },
     {
+      type: "",
+      company: "",
+      role: "",
+      jobUrl: "",
       name: "Dr. Chloe Placeholder",
       email: "chloe.placeholder@eng.example.edu",
       university: "Example Institute of Technology",
@@ -143,6 +159,23 @@ importRouter.get("/sample.csv", (_req, res) => {
       subject: "",
       body: "",
       scheduledAt: "2026-11-21 14:00",
+    },
+    {
+      type: "company",
+      name: "Hiring Team",
+      email: "careers@robotics.example.com",
+      university: "",
+      company: "Example Robotics GmbH",
+      role: "Junior Machine Learning Engineer",
+      jobUrl: "https://robotics.example.com/jobs/ml-engineer",
+      country: "Germany",
+      researchFocus: "Python, PyTorch, ROS",
+      whyFits: "I built a perception pipeline for warehouse robots in my final-year project",
+      profileUrl: "",
+      subject: "Application: {{role}} at {{company}}",
+      body:
+        "Dear {{name}},\n\nI am writing to apply for the {{role}} position at {{company}} ({{jobUrl}}). {{whyFits}}.\n\nMy CV is attached.\n\nBest regards,\nYour Name",
+      scheduledAt: "2026-11-22 11:00",
     },
   ];
   const csv = Papa.unparse({ fields: [...IMPORT_COLUMNS], data: rows.map((r) => IMPORT_COLUMNS.map((c) => r[c])) });
@@ -178,13 +211,18 @@ const cell = z
   .nullish()
   .transform((v) => (v == null ? "" : String(v).trim()));
 
-const rowSchema = z.object(
-  Object.fromEntries(IMPORT_COLUMNS.map((c) => [c, cell])) as Record<(typeof IMPORT_COLUMNS)[number], typeof cell>,
-);
+const rowSchema = z
+  .object({
+    ...(Object.fromEntries(IMPORT_COLUMNS.map((c) => [c, cell])) as Record<(typeof IMPORT_COLUMNS)[number], typeof cell>),
+    kind: cell, // alias of `type`
+  })
+  .transform(({ kind, ...r }) => ({ ...r, type: r.type || kind }));
 
 const commitSchema = z.object({
   rows: z.array(rowSchema).max(MAX_IMPORT_ROWS),
   templateId: z.string().trim().nullish(),
+  /** Overrides the template's attachCv for every row. */
+  attachCv: z.boolean().optional(),
 });
 
 importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
@@ -194,6 +232,7 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
 
   const parsed: ParsedRow[] = body.rows.map((data, i) => ({ rowNumber: i + 2, data }));
   const templateId = body.templateId || null;
+  const attachCv = body.attachCv ?? template?.attachCv ?? false;
 
   const result = await prisma.$transaction(
     async (tx) => {
@@ -213,11 +252,14 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
           ...(d.researchFocus ? { researchFocus: d.researchFocus } : {}),
           ...(d.whyFits ? { whyFits: d.whyFits } : {}),
           ...(d.profileUrl ? { profileUrl: d.profileUrl } : {}),
+          ...(row.role ? { role: row.role } : {}),
+          ...(row.jobUrl ? { jobUrl: row.jobUrl } : {}),
         };
+        const required = { name: d.name, university: rowUniversity(d), kind: row.kind };
         const prof = await tx.professor.upsert({
           where: { userId_email: { userId, email } },
-          create: { userId, email, name: d.name, university: d.university, ...optional },
-          update: { name: d.name, university: d.university, ...optional },
+          create: { userId, email, ...required, ...optional },
+          update: { ...required, ...optional },
           select: { id: true },
         });
         if (existing.has(email)) professorsUpdated++;
@@ -231,6 +273,7 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
             subject: row.subject,
             body: row.body,
             isHtml: row.isHtml,
+            attachCv,
             status: "SCHEDULED",
             scheduledAt: new Date(row.scheduledAtUtc!),
             followUpNo: 0,

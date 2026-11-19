@@ -16,7 +16,14 @@ enum ProfessorStatus {
   SENT
   REPLIED
   INTERESTED
+  INTERVIEW
   DECLINED
+}
+
+// A contact is either a professor (Master's admissions) or a company (job applications).
+enum ContactKind {
+  PROFESSOR
+  COMPANY
 }
 
 enum EmailStatus {
@@ -46,6 +53,7 @@ model User {
   emails          Email[]
   settings        Settings?
   gmailAccount    GmailAccount?
+  cv              UserCv?
 }
 
 enum AuthTokenType {
@@ -80,13 +88,18 @@ model Session {
   @@index([expiresAt])
 }
 
+// A contact (professor or company). For companies, `university` holds the company name and `name` the
+// recruiter / HR person (or a team name such as "Hiring Team").
 model Professor {
   id            String          @id @default(cuid())
   userId        String
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind          ContactKind     @default(PROFESSOR)
   name          String
   email         String
   university    String
+  role          String? // companies: the job title applied for
+  jobUrl        String? // companies: link to the job posting
   country       String?
   researchFocus String?
   whyFits       String?
@@ -101,6 +114,7 @@ model Professor {
   @@index([userId])
   @@index([status])
   @@index([country])
+  @@index([userId, kind])
 }
 
 model Template {
@@ -112,6 +126,8 @@ model Template {
   body       String
   isFollowUp Boolean  @default(false)
   isHtml     Boolean  @default(false)
+  // Attach the user's CV (UserCv) to emails created from this template.
+  attachCv   Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   emails     Email[]
@@ -131,6 +147,8 @@ model Email {
   subject         String
   body            String
   isHtml          Boolean     @default(false)
+  // Attach the user's CV at send time (copied from the template when the email is created).
+  attachCv        Boolean     @default(false)
   status          EmailStatus @default(SCHEDULED)
   scheduledAt     DateTime
   sentAt          DateTime?
@@ -154,16 +172,18 @@ model Email {
 
 // One row per user (created with defaults on first read).
 model Settings {
-  id                 String    @id @default(cuid())
-  userId             String    @unique
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  followUpAfterDays  Int       @default(3)
-  maxFollowUps       Int       @default(2)
-  dailySendLimit     Int       @default(20)
-  followUpTemplateId String?
+  id                        String    @id @default(cuid())
+  userId                    String    @unique
+  user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  followUpAfterDays         Int       @default(3)
+  maxFollowUps              Int       @default(2)
+  dailySendLimit            Int       @default(20)
+  followUpTemplateId        String?
+  // Follow-up template for COMPANY contacts (null = fall back to followUpTemplateId).
+  companyFollowUpTemplateId String?
   // Spacing between sends: the scheduler won't send for this user before this instant.
-  nextSendAfter      DateTime?
-  updatedAt          DateTime  @updatedAt
+  nextSendAfter             DateTime?
+  updatedAt                 DateTime  @updatedAt
 }
 
 // Global key/value state for the scheduler (e.g. lastReplyCheckAt), so restarts don't re-run jobs early.
@@ -188,4 +208,16 @@ model GmailAccount {
   appPasswordEnc String?
   connectedAt    DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+}
+
+// The user's CV (one per user), attached to emails whose attachCv is true. PDF/DOC/DOCX, max 5 MB.
+model UserCv {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename  String
+  mimeType  String
+  size      Int
+  data      Bytes
+  updatedAt DateTime @updatedAt
 }

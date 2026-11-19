@@ -20,7 +20,7 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "prof-mailer",
-  description: "Schedule and track Master's admissions emails to professors",
+  description: "Schedule and track outreach emails to professors and companies",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

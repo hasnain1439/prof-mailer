@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { PROFESSOR_STATUSES, type ProfessorListItem, type ProfessorStatus } from "@/lib/types";
+import { PROFESSOR_STATUSES, type ContactKind, type ProfessorListItem, type ProfessorStatus } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { IconPencil, IconPlus, IconSearch, IconTrash, IconUpload, IconUsers, IconX } from "@/components/icons";
@@ -14,6 +14,7 @@ import {
   EmptyCard,
   ErrorBox,
   Input,
+  KindIcon,
   Modal,
   Mono,
   PageHeader,
@@ -29,17 +30,26 @@ import {
   tr,
 } from "@/components/ui";
 
+const KIND_TABS: { value: ContactKind | ""; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "PROFESSOR", label: "Professors" },
+  { value: "COMPANY", label: "Companies" },
+];
+
 export default function ProfessorsPage() {
   const toast = useToast();
+  const [kind, setKind] = useState<ContactKind | "">("");
   const [status, setStatus] = useState<ProfessorStatus | "">("");
   const [country, setCountry] = useState("");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<ProfessorListItem | "new" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const list = useApi(() => api.listProfessors({ status, country, q: q.trim() }), [status, country, q]);
+  const list = useApi(() => api.listProfessors({ kind, status, country, q: q.trim() }), [kind, status, country, q]);
   const countries = useApi(() => api.countries());
-  const filtered = status !== "" || country !== "" || q.trim() !== "";
+  const filtered = kind !== "" || status !== "" || country !== "" || q.trim() !== "";
+  const plural = (n: number) =>
+    kind === "COMPANY" ? (n === 1 ? "company" : "companies") : `${kind === "PROFESSOR" ? "professor" : "contact"}${n === 1 ? "" : "s"}`;
 
   function afterChange() {
     list.reload();
@@ -50,13 +60,14 @@ export default function ProfessorsPage() {
     setQ("");
     setStatus("");
     setCountry("");
+    setKind("");
   }
 
   async function changeStatus(p: ProfessorListItem, s: ProfessorStatus) {
     setActionError(null);
     try {
       await api.updateProfessor(p.id, { status: s });
-      toast(`${p.name} marked as ${professorStatusLabel(s)}.`);
+      toast(`${p.name} marked as ${professorStatusLabel(s, p.kind)}.`);
       list.reload();
     } catch (e) {
       setActionError(errorMessage(e));
@@ -77,16 +88,36 @@ export default function ProfessorsPage() {
 
   return (
     <div>
-      <PageHeader title="Professors" description="Everyone you're reaching out to, with their status and email history.">
+      <PageHeader title="Contacts" description="Professors and companies you're reaching out to, with their status and email history.">
         <Link href="/import" className={btnSecondary}>
           <IconUpload />
           Import
         </Link>
         <Button variant="primary" onClick={() => setEditing("new")}>
           <IconPlus />
-          New professor
+          New contact
         </Button>
       </PageHeader>
+
+      <div role="tablist" aria-label="Contact type" className="mb-3 flex gap-1 border-b border-border">
+        {KIND_TABS.map((t) => {
+          const active = kind === t.value;
+          return (
+            <button
+              key={t.label}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setKind(t.value)}
+              className={`-mb-px h-8 border-b-2 px-2.5 text-[13px] font-medium transition-colors ${
+                active ? "border-accent text-text" : "border-transparent text-muted hover:text-text"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative w-full sm:w-72">
@@ -94,9 +125,9 @@ export default function ProfessorsPage() {
           <Input
             id="f-q"
             type="search"
-            aria-label="Search professors"
+            aria-label="Search contacts"
             className="pl-8"
-            placeholder="Search name, email or university"
+            placeholder="Search name, email, university, company or role"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -131,7 +162,7 @@ export default function ProfessorsPage() {
         )}
         {list.data && (
           <span className="ml-auto text-xs text-muted">
-            <Mono className="!text-xs text-text">{list.data.length}</Mono> professor{list.data.length === 1 ? "" : "s"}
+            <Mono className="!text-xs text-text">{list.data.length}</Mono> {plural(list.data.length)}
             {filtered && " matching filters"}
           </span>
         )}
@@ -144,13 +175,13 @@ export default function ProfessorsPage() {
       {list.data &&
         (list.data.length === 0 ? (
           filtered ? (
-            <EmptyCard icon={<IconSearch />} title="No professors match your filters" action={<Button onClick={clearFilters}>Clear filters</Button>}>
-              Try a different search term, status or country.
+            <EmptyCard icon={<IconSearch />} title="No contacts match your filters" action={<Button onClick={clearFilters}>Clear filters</Button>}>
+              Try a different type, search term, status or country.
             </EmptyCard>
           ) : (
             <EmptyCard
               icon={<IconUsers />}
-              title="No professors yet"
+              title="No contacts yet"
               action={
                 <>
                   <Link href="/import" className={btnPrimary}>
@@ -161,7 +192,7 @@ export default function ProfessorsPage() {
                 </>
               }
             >
-              Import a spreadsheet of professors to schedule emails in bulk, or add them one at a time.
+              Import a spreadsheet of professors or companies to schedule emails in bulk, or add them one at a time.
             </EmptyCard>
           )
         ) : (
@@ -171,7 +202,7 @@ export default function ProfessorsPage() {
                 <>
                   <Th>Name</Th>
                   <Th>Email</Th>
-                  <Th>University</Th>
+                  <Th>University / company</Th>
                   <Th>Status</Th>
                   <Th numeric>Emails</Th>
                   <Th>Last sent</Th>
@@ -185,9 +216,12 @@ export default function ProfessorsPage() {
               {list.data.map((p) => (
                 <tr key={p.id} className={tr}>
                   <Td className="whitespace-nowrap">
-                    <Link href={`/professors/${p.id}`} className="font-medium text-text underline-offset-2 hover:text-accent hover:underline">
-                      {p.name}
-                    </Link>
+                    <span className="inline-flex items-center gap-2">
+                      <KindIcon kind={p.kind} />
+                      <Link href={`/professors/${p.id}`} className="font-medium text-text underline-offset-2 hover:text-accent hover:underline">
+                        {p.name}
+                      </Link>
+                    </span>
                   </Td>
                   <Td className="max-w-64 truncate">
                     <Mono className="text-muted">{p.email}</Mono>
@@ -195,6 +229,7 @@ export default function ProfessorsPage() {
                   <Td className="max-w-72">
                     <div className="truncate">
                       {p.university}
+                      {p.kind === "COMPANY" && p.role && <span className="text-muted"> · {p.role}</span>}
                       {p.country && <span className="text-muted"> · {p.country}</span>}
                     </div>
                   </Td>
@@ -207,7 +242,7 @@ export default function ProfessorsPage() {
                     >
                       {PROFESSOR_STATUSES.map((s) => (
                         <option key={s} value={s}>
-                          {professorStatusLabel(s)}
+                          {professorStatusLabel(s, p.kind)}
                         </option>
                       ))}
                     </select>
@@ -242,7 +277,7 @@ export default function ProfessorsPage() {
           </div>
         ))}
 
-      <Modal open={editing !== null} title={editing === "new" ? "New professor" : "Edit professor"} onClose={() => setEditing(null)} wide>
+      <Modal open={editing !== null} title={editing === "new" ? "New contact" : editing?.kind === "COMPANY" ? "Edit company" : "Edit professor"} onClose={() => setEditing(null)} wide>
         {editing !== null && (
           <ProfessorForm
             key={editing === "new" ? "new" : editing.id}

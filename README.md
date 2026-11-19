@@ -1,6 +1,6 @@
 # prof-mailer
 
-An app for emailing university professors about Master's admissions. You create an account with your email and a password, connect the Gmail account you send from with a Google App Password, import professors from a CSV or XLSX file, schedule personalised emails, send them through your own Gmail account, detect replies, and send polite follow-ups in the same thread. Each user has their own professors, templates, queue, settings and connected Gmail.
+An app for emailing university professors about Master's admissions, and companies about jobs. You create an account with your email and a password, connect the Gmail account you send from with a Google App Password, import professors from a CSV or XLSX file, schedule personalised emails, send them through your own Gmail account, detect replies, and send polite follow-ups in the same thread. Each user has their own professors, templates, queue, settings and connected Gmail.
 
 - `api/`: Express, TypeScript, Prisma 6 and Postgres (Neon), with node-cron jobs running in the same process. Local port **4100**.
 - `web/`: Next.js (App Router) and Tailwind. Local port **3100**. The browser only talks to the web origin; Next.js rewrites `/api/*` to the API (`API_ORIGIN`), so the session cookie is first-party.
@@ -160,6 +160,15 @@ Sending rules for each user: at most one email per scheduler tick, at least a ra
    - If a professor replied, they are marked **REPLIED** and their pending follow-ups are cancelled.
    - If there is no reply after `followUpAfterDays`, a follow-up is scheduled in the **same Gmail thread** ("Re: …").
 6. **Sent / Professors**: view history and each professor's thread. You can also mark professors INTERESTED or DECLINED manually.
+
+## 8. Companies (job applications) and CV
+
+- **Contacts** holds both professors and companies. Use the Professor / Company switch in the form, or the `type` column (`professor` / `company`) in an import file.
+- For a company, fill in **Company**, **Role**, **Contact person** (HR or recruiter name, or "Hiring Team"), the email, an optional **Job link**, and **Why you fit**. Import columns: `type`, `company`, `role`, `jobUrl` (the sample CSV has a company row).
+- Template placeholders for jobs: `{{company}}`, `{{role}}`, `{{jobUrl}}` (plus `{{name}}` and `{{whyFits}}`). Example subject: `Application: {{role}} at {{company}}`.
+- **CV**: upload it once in **Settings** (PDF, DOC or DOCX, up to 5 MB). Tick **Attach my CV** on a template (or in Import) and every email made from it carries the CV. If the CV is missing at send time the email is marked FAILED with a clear message.
+- **Settings → Company follow-up template**: follow-ups to companies use it (otherwise the normal follow-up template).
+- Statuses: **Interview** (stops further emails, like Interested) and **Rejected** (shown for companies; same as Declined).
 
 ## Useful commands
 

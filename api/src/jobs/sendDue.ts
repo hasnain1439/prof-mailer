@@ -2,6 +2,7 @@ import { env } from "../lib/env.js";
 import { prisma } from "../lib/prisma.js";
 import { MAX_DAILY_SEND_LIMIT, getSettings } from "../lib/settings.js";
 import { karachiDayRange } from "../lib/time.js";
+import type { EmailAttachment } from "../services/gmail/appPassword.js";
 import { GmailNotConnectedError, isGmailConnected, sendEmail } from "../services/gmail/mailer.js";
 import { randomDelayMs, safeErrorMessage } from "./util.js";
 
@@ -14,12 +15,14 @@ export interface SendDueResult {
 }
 
 const STALE_SENDING_MS = 10 * 60 * 1000;
-const STOP_STATUSES = new Set(["REPLIED", "INTERESTED", "DECLINED"]);
+const STOP_STATUSES = new Set(["REPLIED", "INTERESTED", "INTERVIEW", "DECLINED"] as const);
+type StopStatus = typeof STOP_STATUSES extends Set<infer T> ? T : never;
+const CV_MISSING = "CV attachment missing: upload your CV in Settings";
 /** Due follow-ups of stopped professors are cancelled while looking for the one email to send. */
 const MAX_CANDIDATES_PER_USER = 20;
 
 function stopReason(status: string): string {
-  return status === "REPLIED" ? "Professor already replied" : `Professor marked ${status.toLowerCase()}`;
+  return status === "REPLIED" ? "Contact already replied" : `Contact marked ${status.toLowerCase()}`;
 }
 
 let running = false;
@@ -72,7 +75,7 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
   // Cancel due emails for stopped professors first, so they leave the queue even when the user has no capacity left.
   for (const status of STOP_STATUSES) {
     await prisma.email.updateMany({
-      where: { ...dueWhere, professor: { status: status as "REPLIED" | "INTERESTED" | "DECLINED" } },
+      where: { ...dueWhere, professor: { status } },
       data: { status: "CANCELLED", error: stopReason(status) },
     });
   }
@@ -119,13 +122,25 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
 
     // Fresh professor status (may have changed since the query).
     const prof = await prisma.professor.findFirst({ where: { id: email.professorId, userId }, select: { status: true } });
-    // Hold back first emails AND follow-ups once the professor replied / was marked INTERESTED or DECLINED.
-    if (!prof || STOP_STATUSES.has(prof.status)) {
+    // Hold back first emails AND follow-ups once the contact replied / was marked INTERESTED, INTERVIEW or DECLINED.
+    if (!prof || STOP_STATUSES.has(prof.status as StopStatus)) {
       await prisma.email.update({
         where: { id: email.id },
-        data: { status: "CANCELLED", error: prof ? stopReason(prof.status) : "Professor not found" },
+        data: { status: "CANCELLED", error: prof ? stopReason(prof.status) : "Contact not found" },
       });
       continue;
+    }
+
+    // CV attachment: without a CV the email fails without sending (no daily quota or spacing used).
+    let attachments: EmailAttachment[] | undefined;
+    if (email.attachCv) {
+      const cv = await prisma.userCv.findUnique({ where: { userId } });
+      if (!cv) {
+        await prisma.email.update({ where: { id: email.id }, data: { status: "FAILED", error: CV_MISSING } });
+        result.failed++;
+        continue;
+      }
+      attachments = [{ filename: cv.filename, contentType: cv.mimeType, content: Buffer.from(cv.data) }];
     }
 
     try {
@@ -138,6 +153,7 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
         body: email.body,
         isHtml: email.isHtml,
         sentAt: sendTime,
+        ...(attachments ? { attachments } : {}),
         ...threading,
       });
       await prisma.email.update({

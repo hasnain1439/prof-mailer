@@ -194,6 +194,12 @@ export async function getAppPasswordCreds(userId: string): Promise<AppPasswordCr
 // ---------------------------------------------------------------------------------------------
 // send
 
+export interface EmailAttachment {
+  filename: string;
+  contentType: string;
+  content: Buffer;
+}
+
 export interface SmtpSendInput {
   to: string;
   subject: string;
@@ -203,6 +209,7 @@ export interface SmtpSendInput {
   threadId?: string | null;
   inReplyTo?: string | null;
   references?: string[] | null;
+  attachments?: EmailAttachment[];
 }
 
 export async function sendViaSmtp(
@@ -223,6 +230,7 @@ export async function sendViaSmtp(
       date: new Date(),
       ...(input.inReplyTo ? { inReplyTo: sanitizeHeaderValue(input.inReplyTo) } : {}),
       ...(refs.length ? { references: refs } : {}),
+      ...(input.attachments?.length ? { attachments: input.attachments } : {}),
     });
   } catch (err) {
     throw wrap("SMTP", err);

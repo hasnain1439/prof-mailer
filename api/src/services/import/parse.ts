@@ -4,9 +4,13 @@ import * as XLSX from "xlsx";
 /** Pure file parsing for the import feature (no DB, no env). */
 
 export const IMPORT_COLUMNS = [
+  "type",
   "name",
   "email",
   "university",
+  "company",
+  "role",
+  "jobUrl",
   "country",
   "researchFocus",
   "whyFits",
@@ -25,16 +29,18 @@ export interface ParsedRow {
   data: ImportRowData;
 }
 
-export const REQUIRED_COLUMNS: readonly ImportColumn[] = ["name", "email", "university", "scheduledAt"];
+/** `university` OR `company` must also be present (checked separately). */
+export const REQUIRED_COLUMNS: readonly ImportColumn[] = ["name", "email", "scheduledAt"];
 export const MAX_IMPORT_ROWS = 2000;
 
 /** Thrown for problems with the file as a whole (route maps it to 400). */
 export class ImportParseError extends Error {}
 
 /** Lowercased, separator-free header key → canonical column name. */
-const HEADER_MAP: Record<string, ImportColumn> = Object.fromEntries(
-  IMPORT_COLUMNS.map((c) => [c.toLowerCase(), c]),
-) as Record<string, ImportColumn>;
+const HEADER_MAP: Record<string, ImportColumn> = {
+  ...(Object.fromEntries(IMPORT_COLUMNS.map((c) => [c.toLowerCase(), c])) as Record<string, ImportColumn>),
+  kind: "type",
+};
 
 /** Map a raw header cell to a canonical column (case-insensitive; ignores spaces, `_`, `-`). */
 export function canonicalHeader(raw: string): ImportColumn | null {
@@ -83,7 +89,8 @@ function rowsFromMatrix(
   const colMap: (ImportColumn | null)[] = header.map((h) => canonicalHeader(cellToString(h)));
 
   const present = new Set(colMap.filter((c): c is ImportColumn => c !== null));
-  const missing = REQUIRED_COLUMNS.filter((c) => !present.has(c));
+  const missing: string[] = REQUIRED_COLUMNS.filter((c) => !present.has(c));
+  if (!present.has("university") && !present.has("company")) missing.push("university (or company)");
   if (missing.length) {
     throw new ImportParseError(
       `Missing required column(s): ${missing.join(", ")}. Expected header: ${IMPORT_COLUMNS.join(", ")}`,

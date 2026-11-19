@@ -2,6 +2,8 @@ import type {
   AdminStats,
   AdminUser,
   AuthUser,
+  ContactKind,
+  CvInfo,
   Dashboard,
   Email,
   EmailStatus,
@@ -168,7 +170,7 @@ export const api = {
   dashboard: () => request<Dashboard>("/dashboard"),
 
   // Professors
-  listProfessors: (q: { status?: ProfessorStatus | ""; country?: string; q?: string } = {}) =>
+  listProfessors: (q: { status?: ProfessorStatus | ""; country?: string; q?: string; kind?: ContactKind | "" } = {}) =>
     request<ProfessorListItem[]>("/professors", { query: q }),
   countries: () => request<string[]>("/professors/countries"),
   getProfessor: (id: string) => request<ProfessorWithEmails>(`/professors/${encodeURIComponent(id)}`),
@@ -199,10 +201,10 @@ export const api = {
     if (templateId) form.append("templateId", templateId);
     return request<ImportPreview>("/import/preview", { method: "POST", form });
   },
-  importCommit: (rows: ImportRowData[], templateId?: string) =>
+  importCommit: (rows: ImportRowData[], templateId?: string, attachCv?: boolean) =>
     request<ImportCommitResult>("/import/commit", {
       method: "POST",
-      json: templateId ? { rows, templateId } : { rows },
+      json: { rows, ...(templateId ? { templateId } : {}), ...(attachCv !== undefined ? { attachCv } : {}) },
     }),
 
   // Emails
@@ -211,12 +213,22 @@ export const api = {
       query: { status: q.status?.join(","), professorId: q.professorId, limit: q.limit },
     }),
   cancelEmail: (id: string) => request<Email>(`/emails/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
-  updateEmail: (id: string, body: { scheduledAt: string; subject?: string; body?: string }) =>
+  updateEmail: (id: string, body: { scheduledAt: string; subject?: string; body?: string; attachCv?: boolean }) =>
     request<Email>(`/emails/${encodeURIComponent(id)}`, { method: "PATCH", json: body }),
 
   // Settings
   getSettings: () => request<SettingsResponse>("/settings"),
   putSettings: (body: SettingsInput) => request<SettingsResponse>("/settings", { method: "PUT", json: body }),
+
+  // CV (one per user)
+  getCv: () => request<{ cv: CvInfo | null }>("/cv"),
+  uploadCv: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<{ cv: CvInfo }>("/cv", { method: "POST", form });
+  },
+  deleteCv: () => request<void>("/cv", { method: "DELETE" }),
+  cvDownloadUrl: `${API_URL}/cv/download`,
 
   // Gmail
   gmailStatus: () => request<GmailStatus>("/gmail/status"),

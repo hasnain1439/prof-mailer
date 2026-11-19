@@ -7,7 +7,7 @@ import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { EmailActions } from "@/components/EmailActions";
 import { useGmailStatus } from "@/components/GmailStatus";
-import { IconArrowRight, IconCheck, IconClock, IconInbox, IconRefresh, IconReply } from "@/components/icons";
+import { IconArrowRight, IconBuilding, IconCheck, IconClock, IconGraduation, IconInbox, IconRefresh, IconReply } from "@/components/icons";
 import {
   Badge,
   Button,
@@ -20,6 +20,7 @@ import {
   Skeleton,
   TypeChip,
   btnPrimary,
+  contactOrg,
   btnSecondary,
   btnSmall,
   link,
@@ -116,7 +117,7 @@ function GettingStarted() {
     {
       done: templates.data.some((t) => !t.isFollowUp),
       title: "Create an initial email template",
-      help: "The first email each professor receives.",
+      help: "The first email each contact receives.",
       href: "/templates",
       cta: "Create template",
     },
@@ -131,8 +132,8 @@ function GettingStarted() {
     },
     {
       done: professors.data.length > 0,
-      title: "Import professors",
-      help: "Upload a CSV/XLSX of professors and schedule their emails.",
+      title: "Import contacts",
+      help: "Upload a CSV/XLSX of professors or companies and schedule their emails.",
       href: "/import",
       cta: "Import",
     },
@@ -245,6 +246,22 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {data?.contacts && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border bg-surface px-3 py-2 text-[13px]">
+          <span className="text-muted">Contacts</span>
+          <Link href="/professors" className="inline-flex items-center gap-1.5 text-text hover:text-accent">
+            <IconGraduation size={14} className="text-muted" />
+            <Mono>{data.contacts.professors}</Mono>
+            {data.contacts.professors === 1 ? "professor" : "professors"}
+          </Link>
+          <Link href="/professors" className="inline-flex items-center gap-1.5 text-text hover:text-accent">
+            <IconBuilding size={14} className="text-muted" />
+            <Mono>{data.contacts.companies}</Mono>
+            {data.contacts.companies === 1 ? "company" : "companies"}
+          </Link>
+        </div>
+      )}
+
       <GettingStarted />
 
       {loading && !data && (
@@ -264,11 +281,11 @@ export default function DashboardPage() {
                 title="Nothing scheduled"
                 action={
                   <Link href="/import" className={`${btnPrimary} ${btnSmall}`}>
-                    Import professors
+                    Import contacts
                   </Link>
                 }
               >
-                Import a list of professors to schedule your first emails.
+                Import a list of professors or companies to schedule your first emails.
               </EmptyState>
             ) : (
               <ul className="divide-y divide-border">
@@ -281,7 +298,7 @@ export default function DashboardPage() {
                         </Link>
                         <TypeChip followUpNo={e.followUpNo} />
                       </div>
-                      <p className="truncate text-[13px] text-muted" title={`${e.subject} · ${e.professor.university}`}>
+                      <p className="truncate text-[13px] text-muted" title={`${e.subject} · ${contactOrg(e.professor)}`}>
                         {e.subject}
                       </p>
                     </div>
