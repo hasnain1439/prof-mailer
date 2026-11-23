@@ -6,7 +6,8 @@
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 import { isAdminEmail, revokeAllSessions } from "../lib/auth.js";
-import { HttpError, parseQuery } from "../lib/http.js";
+import { HttpError, parseQuery, validateBody } from "../lib/http.js";
+import { DEFAULT_NOTICE, getNotice, noticeInput, saveNotice } from "../services/core/notice.js";
 import { prisma } from "../lib/prisma.js";
 import { karachiDayRange } from "../lib/time.js";
 
@@ -147,4 +148,15 @@ adminRouter.get("/stats", async (_req, res) => {
       prisma.email.count({ where: { status: { in: ["SCHEDULED", "SENDING"] } } }),
     ]);
   res.json({ users, verifiedUsers, blockedUsers, gmailConnected, emailsSentToday, emailsSentTotal, emailsScheduled });
+});
+
+// App-wide notice shown to every user on the dashboard (services/core/notice.ts).
+adminRouter.get("/notice", async (_req, res) => {
+  res.json({ notice: await getNotice(), defaultNotice: DEFAULT_NOTICE });
+});
+
+adminRouter.put("/notice", validateBody(noticeInput), async (req, res) => {
+  const notice = await saveNotice(req.body as z.infer<typeof noticeInput>);
+  console.log(`[admin] notice updated by ${req.user!.id}`);
+  res.json({ notice });
 });

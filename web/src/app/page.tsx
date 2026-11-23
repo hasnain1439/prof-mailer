@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { EmailActions } from "@/components/EmailActions";
+import { NoticeBanner } from "@/components/AppNotice";
 import { useGmailStatus } from "@/components/GmailStatus";
 import { IconArrowRight, IconBuilding, IconCheck, IconClock, IconGraduation, IconInbox, IconRefresh, IconReply } from "@/components/icons";
 import {
@@ -233,6 +234,7 @@ export default function DashboardPage() {
 
       <SendingFromBanner />
       <ErrorBox error={error} onRetry={reload} />
+      <NoticeBanner />
       <DueReminders />
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">

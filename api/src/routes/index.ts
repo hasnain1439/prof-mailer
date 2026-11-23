@@ -14,6 +14,7 @@ import { cvRouter } from "./cv.js";
 import { remindersRouter } from "./reminders.js";
 import { analyticsRouter } from "./analytics.js";
 import { aiRouter } from "./ai.js";
+import { getNotice } from "../services/core/notice.js";
 import { dashboardRouter } from "./dashboard.js";
 import { appPasswordHandlers, gmailRouter } from "./gmail.js";
 import { jobsRouter } from "./jobs.js";
@@ -48,6 +49,10 @@ apiRouter.use("/cv", cvRouter);
 apiRouter.use("/reminders", remindersRouter);
 apiRouter.use("/analytics", analyticsRouter);
 apiRouter.use("/ai", aiRouter);
+apiRouter.get("/notice", async (_req, res) => {
+  const n = await getNotice();
+  res.json({ notice: n.enabled ? n : null });
+});
 apiRouter.use("/dashboard", dashboardRouter);
 apiRouter.post("/gmail/app-password", appPasswordLimiter, ...appPasswordHandlers);
 apiRouter.use("/gmail", gmailRouter);

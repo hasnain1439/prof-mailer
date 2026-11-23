@@ -300,3 +300,11 @@ export interface AiDraft {
   body: string;
   whyFits: string;
 }
+
+/** App-wide notice from the admin (plain text). */
+export interface AppNotice {
+  enabled: boolean;
+  title: string;
+  body: string;
+  updatedAt: string;
+}

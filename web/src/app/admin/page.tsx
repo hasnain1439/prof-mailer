@@ -28,6 +28,7 @@ import {
   Th,
   tr,
 } from "@/components/ui";
+import { NoticeEditor } from "@/components/AppNotice";
 
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -295,6 +296,8 @@ function AdminPanel() {
           </Table>
         </Card>
       )}
+
+      <NoticeEditor />
 
       <ConfirmDialog
         pending={pending}

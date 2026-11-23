@@ -1,6 +1,7 @@
 import type {
   AdminStats,
   AiDraft,
+  AppNotice,
   Analytics,
   AdminUser,
   AuthUser,
@@ -265,6 +266,12 @@ export const api = {
   aiStatus: () => request<{ enabled: boolean }>("/ai/status"),
   aiDraft: (body: { contactId: string; templateId?: string | null; instructions?: string | null }) =>
     request<AiDraft>("/ai/draft", { method: "POST", json: body }),
+
+  // App-wide notice
+  notice: () => request<{ notice: AppNotice | null }>("/notice"),
+  adminNotice: () => request<{ notice: AppNotice; defaultNotice: AppNotice }>("/admin/notice"),
+  adminSaveNotice: (body: { enabled: boolean; title: string; body: string }) =>
+    request<{ notice: AppNotice }>("/admin/notice", { method: "PUT", json: body }),
 
   // Admin (404 unless the signed-in user is an admin)
   adminStats: () => request<AdminStats>("/admin/stats"),
