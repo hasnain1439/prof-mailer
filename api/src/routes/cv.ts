@@ -7,7 +7,7 @@ import { HttpError } from "../lib/http.js";
 /** The user's CV (one per user, stored as bytes), attached to emails with attachCv. */
 export const cvRouter = Router();
 
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024; // Vercel rejects request bodies over 4.5 MB
 const MAX_NAME = 120;
 
 // Allowed types: extension → MIME type + magic bytes the content must start with.
@@ -53,7 +53,7 @@ const uploadFile: RequestHandler = (req, res, next) => {
     if (!err) return next();
     if (err instanceof HttpError) return next(err);
     if (err instanceof multer.MulterError) {
-      const msg = err.code === "LIMIT_FILE_SIZE" ? "File is too large (max 5 MB)" : `Upload error: ${err.message}`;
+      const msg = err.code === "LIMIT_FILE_SIZE" ? "File is too large (max 4 MB)" : `Upload error: ${err.message}`;
       return next(new HttpError(400, msg));
     }
     next(err);

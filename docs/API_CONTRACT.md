@@ -78,7 +78,7 @@ CSV/XLSX columns (header row, case-insensitive): `name, email, university, count
 | Method | Path | Body | Response |
 |---|---|---|---|
 | GET | `/import/sample.csv` | | `text/csv` attachment `prof-mailer-sample.csv` (3 example rows, with fictional `@example.edu` emails; one row with empty subject/body to show template use) |
-| POST | `/import/preview` | multipart: `file` (.csv/.xlsx, max 5 MB), optional field `templateId` | `ImportPreview` |
+| POST | `/import/preview` | multipart: `file` (.csv/.xlsx, max 4 MB), optional field `templateId` | `ImportPreview` |
 | POST | `/import/commit` | `{ rows: ImportRowData[], templateId?: string }` | `{ professorsCreated, professorsUpdated, emailsCreated }` |
 
 ```ts
@@ -283,7 +283,7 @@ The `Professor` model is now a **contact**: `kind: "PROFESSOR" | "COMPANY"` (def
 
 **Emails**: gain `attachCv: boolean`. Set from the template when an email is created (import with a template, follow-ups from the follow-up template). Import commit accepts optional `attachCv: boolean` that overrides for all rows (default: the chosen template's `attachCv`, else false). `PATCH /emails/:id` may also take `attachCv: boolean` (SCHEDULED only).
 
-**CV** (one per user, stored in Postgres as bytes; PDF, DOC or DOCX, max 5 MB, checked by extension + magic bytes: `%PDF` or `PK\x03\x04` for docx or `D0 CF 11 E0` for doc):
+**CV** (one per user, stored in Postgres as bytes; PDF, DOC or DOCX, max 4 MB, checked by extension + magic bytes: `%PDF` or `PK\x03\x04` for docx or `D0 CF 11 E0` for doc):
 | Method | Path | Body | Response |
 |---|---|---|---|
 | GET | `/cv` | | `{ cv: { filename, mimeType, size, updatedAt } \| null }` |

@@ -24,7 +24,7 @@ import {
 
 export const importRouter = Router();
 
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024; // Vercel rejects request bodies over 4.5 MB
 const CSV_MIMES = new Set(["text/csv", "application/csv", "text/plain", "application/vnd.ms-excel", "application/octet-stream"]);
 const XLSX_MIMES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -51,7 +51,7 @@ const uploadFile: RequestHandler = (req, res, next) => {
     if (!err) return next();
     if (err instanceof HttpError) return next(err);
     if (err instanceof multer.MulterError) {
-      const msg = err.code === "LIMIT_FILE_SIZE" ? "File is too large (max 5 MB)" : `Upload error: ${err.message}`;
+      const msg = err.code === "LIMIT_FILE_SIZE" ? "File is too large (max 4 MB)" : `Upload error: ${err.message}`;
       return next(new HttpError(400, msg));
     }
     next(err);

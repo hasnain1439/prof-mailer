@@ -179,7 +179,7 @@ function TemplateSelect({
   );
 }
 
-const CV_MAX_BYTES = 5 * 1024 * 1024;
+const CV_MAX_BYTES = 4 * 1024 * 1024;
 const CV_EXT = /\.(pdf|docx?)$/i;
 
 function formatBytes(n: number): string {
@@ -211,7 +211,7 @@ function CvCard() {
       return;
     }
     if (file.size > CV_MAX_BYTES) {
-      setError(`"${file.name}" is ${formatBytes(file.size)}; the limit is 5 MB.`);
+      setError(`"${file.name}" is ${formatBytes(file.size)}; the limit is 4 MB.`);
       return;
     }
     setBusy("upload");
@@ -242,7 +242,7 @@ function CvCard() {
   }
 
   return (
-    <Card title="CV" description="Attached to emails whose template has “Attach my CV” ticked. PDF, DOC or DOCX, max 5 MB.">
+    <Card title="CV" description="Attached to emails whose template has “Attach my CV” ticked. PDF, DOC or DOCX, max 4 MB.">
       <ErrorBox error={cv.error} onRetry={cv.reload} />
       <ErrorBox error={error} />
       {cv.loading && info === undefined && <Skeleton className="h-10 w-full" />}

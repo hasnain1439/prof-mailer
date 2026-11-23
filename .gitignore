@@ -9,3 +9,4 @@ dist/
 
 # local secrets (encryption key for stored Gmail app password)
 .data/
+.vercel/

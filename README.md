@@ -6,7 +6,7 @@ An app for emailing university professors about Master's admissions, and compani
 - `web/`: Next.js (App Router) and Tailwind. Local port **3100**. The browser only talks to the web origin; Next.js rewrites `/api/*` to the API (`API_ORIGIN`), so the session cookie is first-party.
 - `docs/API_CONTRACT.md`: the REST contract (the "v3" section at the end supersedes the earlier Google sections).
 
-Production shape: **web on Vercel**, **API on Render (free)**, **database on Neon**, and **cron-job.org** pinging the API.
+Production shape: **two Vercel projects from this repo** (`web/` and `api/`), **database on Neon**, and **cron-job.org** calling the API's scheduler tick.
 
 All times are stored in UTC and shown in **Asia/Karachi** (PKT, UTC+5). The `scheduledAt` column in an import file is Karachi local time.
 
@@ -70,7 +70,7 @@ Open <http://localhost:3100>, sign up, and open the verification link (printed i
 
 ### System mail (verification and password reset)
 
-Account emails are sent from **your own mailbox** (the app owner's), for example a `no-reply@programmingbridge.org` address at your mail provider. Put its SMTP settings in `api/.env` (and Render):
+Account emails are sent from **your own mailbox** (the app owner's), for example a `no-reply@programmingbridge.org` address at your mail provider. Put its SMTP settings in `api/.env` (and the Vercel API project):
 
 | Variable | Example |
 |---|---|
@@ -82,7 +82,7 @@ Account emails are sent from **your own mailbox** (the app owner's), for example
 
 - Without `SMTP_HOST` (local development only) the API prints the verification / reset link in its console instead of sending it. In production the API refuses to start without SMTP settings.
 - These emails are sent even when `DRY_RUN=true`, so people can sign up while professor emails are still dry-run.
-- **Hosting note:** Render's **free** plan blocks outbound SMTP ports 25, 465 and 587. Use a host or plan that allows SMTP (for example **Render Starter**), or, only if your mail provider supports it, `SMTP_PORT=2525`. Gmail's `smtp.gmail.com` does **not** accept port 2525, so the per-user Gmail App Password sending below also needs SMTP-allowed hosting.
+- **Hosting note:** Vercel Functions allow outbound SMTP on ports 465 and 587 (only 25 is blocked), so system mail and Gmail App Password sending work there. Render's **free** plan blocks SMTP.
 
 ### User flow
 
@@ -100,53 +100,57 @@ Account emails are sent from **your own mailbox** (the app owner's), for example
 There is no separate admin password. To become an admin:
 
 1. Sign up and verify your account normally.
-2. Put your login email in the API env var `ADMIN_EMAILS` (comma-separated for several admins, e.g. `you@example.org,other@example.org`). Locally in `api/.env`, on Render in the service's environment.
-3. Restart the API (Render restarts on env changes). Reload the web app: an **Admin** item appears under Setup.
+2. Put your login email in the API env var `ADMIN_EMAILS` (comma-separated for several admins, e.g. `you@example.org,other@example.org`). Locally in `api/.env`, in production in the Vercel API project's environment variables.
+3. Restart the API (on Vercel: redeploy after changing env vars). Reload the web app: an **Admin** item appears under Setup.
 
 The Admin page shows totals (users, verified, blocked, Gmail connected, emails sent today / in total, scheduled) and every account with its counts. **Block** signs the user out everywhere and stops them from signing in; their scheduled emails stay in the queue but the scheduler skips them until you **Unblock**. Admins can't block themselves or other admins. Removing an email from `ADMIN_EMAILS` (and restarting) removes admin rights.
 
-## 3. Deploy the API on Render
+## 3. Deploy on Vercel (two projects)
 
-The repo has a Blueprint at `render.yaml`. It runs the API from `api/` on the free plan, runs `prisma migrate deploy` on every build, and uses `/api/health` as the health check.
+The API (`api/`) runs as one Vercel Function (`api/api/index.js` → the compiled Express app; config in `api/vercel.json`). The build runs `prisma migrate deploy` and `tsc`. There is no always-on process on Vercel, so the scheduler runs when cron-job.org calls `/api/jobs/tick` (section 5).
 
-1. Render dashboard → **New → Blueprint** → pick this repository.
-2. Fill in the secret env vars it asks for:
-   - `DATABASE_URL`, `DIRECT_URL` (Neon)
-   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (section 2)
-   - `ENCRYPTION_KEY`, `CRON_SECRET` (random, see the command above)
-   - `API_PROXY_SECRET`: another long random string. Put the **same value** on Vercel. It lets the API trust the browser IP that Vercel forwards (used for rate limits); without it, everyone behind Vercel shares one rate-limit bucket.
-   - `PUBLIC_URL` = your Vercel URL, for example `https://prof-mailer.vercel.app` (no trailing slash)
-   - `ADMIN_EMAILS` (optional): your login email, to get the Admin page (see [Admins](#admins))
-3. The plain values are preset: `NODE_ENV=production`, `DRY_RUN=true`, `SCHEDULER_ENABLED=true`.
+Push the repo to GitHub first, then:
 
-Notes:
-- The free plan sleeps after about 15 minutes without traffic. The cron-job.org ping (section 5) keeps it awake so the in-process scheduler keeps running.
-- Render's free plan blocks outbound SMTP (25/465/587). System mail and Gmail App Password sending both need SMTP, so use a plan that allows it (for example Starter). The Blueprint says `plan: free`; change it if you deploy there.
+### 3a. API project
 
-## 4. Deploy the web app on Vercel
+1. Vercel → **Add New → Project** → import the repository. **Root Directory: `api`**. Framework preset: **Other** (the `vercel.json` sets the build).
+2. Environment variables (Production). Easiest: open `api/.env`, copy its content and paste it into Vercel's environment variable form (it accepts a pasted `.env`), then change / add:
+   - `NODE_ENV` = `production`
+   - `PUBLIC_URL` = the web URL from step 3b, for example `https://prof-mailer.vercel.app` (no trailing slash). If you don't know it yet, put the expected URL and fix it after 3b (then redeploy).
+   - `ENCRYPTION_KEY` = the content of `api/.data/secret.key` if you want Gmail App Passwords saved locally to keep working (local and production share the Neon database); otherwise a new 64-hex key (then reconnect Gmail).
+   - `CRON_SECRET` and `API_PROXY_SECRET` = two new long random strings (command above).
+   - Keep `DATABASE_URL`, `DIRECT_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `ADMIN_EMAILS`, `DRY_RUN=true`.
+   - Remove `PORT`, `DEV_LOGIN_ENABLED` (ignored in production anyway).
+3. Deploy. Check `https://<api-project>.vercel.app/api/health` returns `{"status":"ok","db":"up"}`.
 
-1. Vercel → **Add New → Project** → import this repository and set **Root Directory** to `web`.
+### 3b. Web project
+
+1. **Add New → Project** → the same repository, **Root Directory: `web`** (Next.js is detected).
 2. Environment variables:
-   - `API_ORIGIN` = your Render URL, for example `https://prof-mailer-api.onrender.com`. It is read at build time, so redeploy after changing it.
-   - `API_PROXY_SECRET` = the same value as on Render.
-3. Deploy, then make sure `PUBLIC_URL` on Render is exactly this Vercel URL. Verification and reset links use it.
+   - `API_ORIGIN` = the API project URL, for example `https://prof-mailer-api.vercel.app`. It is read at build time, so redeploy after changing it.
+   - `API_PROXY_SECRET` = the same value as in the API project.
+3. Deploy. Make sure `PUBLIC_URL` in the API project is exactly this URL (verification and reset links use it, and mutating requests must come from it). Use the production URL, not a preview URL.
 
-Mutating requests must come from `PUBLIC_URL` (the API checks the `Origin` header), so use the production Vercel URL, not a preview URL.
+Limits on Vercel: uploads (CV, import files) are capped at 4 MB, and a scheduler tick may run up to 300 s.
 
-## 5. cron-job.org
+## 4. Alternative: API on Render
 
-Create two jobs at <https://cron-job.org>:
+`render.yaml` still describes the API as a Render web service with the in-process scheduler. Render's free plan blocks SMTP, so use a paid plan there. The web project stays on Vercel with `API_ORIGIN` pointing to Render.
 
-1. **Keep-alive**: `GET https://<render-url>/api/health` every **10 minutes**.
-2. **Optional backup tick**: `GET https://<render-url>/api/jobs/tick` every **10 minutes** with the request header `Authorization: Bearer <CRON_SECRET>`. It runs send-due and, if the last check was at least 60 minutes ago, check-replies. It is safe alongside the in-process scheduler, which has a mutex and stores the last reply check in the database.
+## 5. cron-job.org (required on Vercel)
+
+Create a job at <https://cron-job.org>:
+
+- URL `https://<api-project>.vercel.app/api/jobs/tick`, method GET, **every 5 minutes**, request header `Authorization: Bearer <CRON_SECRET>`.
+- Each tick sends at most one due email per user (with the 30–120 s spacing and the daily limit) and, if the last check was at least 60 minutes ago, checks replies and schedules follow-ups. Every 1–5 minutes is fine; more often sends a full day's limit sooner.
 
 ## 6. Switching DRY_RUN off
 
 1. Each user connects Gmail on the **Gmail** page (App Password) and uses **Send test email**. It only ever goes to that user's own login address.
 2. Review the **Queue** carefully. Anything scheduled in the past is sent on the next tick.
-3. Set `DRY_RUN=false` (in Render: Environment, then save, which redeploys; locally: `api/.env`, then restart the API). The header's "DRY RUN" badge disappears.
+3. Set `DRY_RUN=false` (Vercel API project: Settings → Environment Variables, then redeploy; locally: `api/.env`, then restart the API). The header's "DRY RUN" badge disappears.
 
-To stop all sending at any time, set `DRY_RUN=true` again, or set `SCHEDULER_ENABLED=false` and pause the cron-job.org tick.
+To stop all sending at any time, set `DRY_RUN=true` again (and redeploy), or pause the cron-job.org job.
 
 Sending rules for each user: at most one email per scheduler tick, at least a random 30–120 s between sends, and no more than `dailySendLimit` per Karachi day. The limit can be set up to 50.
 
@@ -166,7 +170,7 @@ Sending rules for each user: at most one email per scheduler tick, at least a ra
 - The sidebar has separate **Professors** and **Companies** pages. Each has its own **New** button and an **Import** button that opens the import page for that type.
 - **Import** has a Professors / Companies switch, and each one downloads its own sample (`prof-mailer-professors-sample.csv` or `prof-mailer-companies-sample.csv`). Company columns: `company, role, name, email, jobUrl, country, skills, whyFits, subject, body, scheduledAt` (`name` = recruiter / HR person or "Hiring Team"). A file of the wrong type shows "company is required" / "university is required" on every row.
 - Template placeholders for jobs: `{{company}}`, `{{role}}`, `{{jobUrl}}` (plus `{{name}}` and `{{whyFits}}`). Example subject: `Application: {{role}} at {{company}}`.
-- **CV**: upload it once in **Settings** (PDF, DOC or DOCX, up to 5 MB). Tick **Attach my CV** on a template (or in Import) and every email made from it carries the CV. If the CV is missing at send time the email is marked FAILED with a clear message.
+- **CV**: upload it once in **Settings** (PDF, DOC or DOCX, up to 4 MB). Tick **Attach my CV** on a template (or in Import) and every email made from it carries the CV. If the CV is missing at send time the email is marked FAILED with a clear message.
 - **Settings → Company follow-up template**: follow-ups to companies use it (otherwise the normal follow-up template).
 - Statuses: **Interview** (stops further emails, like Interested) and **Rejected** (shown for companies; same as Declined).
 

@@ -1,10 +1,9 @@
 /**
- * DRY_RUN thread store: a JSON file (api/.dryrun/threads.json, gitignored) that stands in for
- * Gmail threads so simulated sends and replies survive restarts.
+ * DRY_RUN thread store: stands in for Gmail threads so simulated sends and replies survive restarts.
+ * Kept in the database (AppState rows "dryrun:thread:<threadId>") so it also works on serverless hosts
+ * such as Vercel, where the filesystem is read-only.
  */
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { prisma } from "../../lib/prisma.js";
 
 export interface DryRunMessage {
   direction: "outbound" | "inbound";
@@ -17,49 +16,30 @@ export interface DryRunMessage {
   references?: string[];
 }
 
-interface StoreShape {
-  threads: Record<string, DryRunMessage[]>;
-}
+const key = (threadId: string) => `dryrun:thread:${threadId}`;
 
-// src/services/gmail -> api/  (same depth under dist/)
-const DIR = fileURLToPath(new URL("../../../.dryrun/", import.meta.url));
-const FILE = path.join(DIR, "threads.json");
-
-let queue: Promise<unknown> = Promise.resolve();
-
-/** Serialise all store operations so concurrent writes never clobber each other. */
-function serial<T>(fn: () => Promise<T>): Promise<T> {
-  const next = queue.then(fn, fn);
-  queue = next.catch(() => undefined);
-  return next;
-}
-
-async function load(): Promise<StoreShape> {
+function parse(value: string | null | undefined): DryRunMessage[] {
+  if (!value) return [];
   try {
-    const parsed = JSON.parse(await readFile(FILE, "utf8")) as Partial<StoreShape>;
-    return { threads: parsed && typeof parsed.threads === "object" && parsed.threads ? parsed.threads : {} };
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { threads: {} };
-    console.error("[DRY_RUN] thread store unreadable, starting empty:", (err as Error).message);
-    return { threads: {} };
+    const v = JSON.parse(value) as unknown;
+    return Array.isArray(v) ? (v as DryRunMessage[]) : [];
+  } catch {
+    return [];
   }
 }
 
-async function save(store: StoreShape): Promise<void> {
-  await mkdir(DIR, { recursive: true });
-  const tmp = `${FILE}.${process.pid}.tmp`;
-  await writeFile(tmp, JSON.stringify(store, null, 2), "utf8");
-  await rename(tmp, FILE);
-}
-
-export function appendDryRunMessage(threadId: string, msg: DryRunMessage): Promise<void> {
-  return serial(async () => {
-    const store = await load();
-    (store.threads[threadId] ??= []).push(msg);
-    await save(store);
+export async function appendDryRunMessage(threadId: string, msg: DryRunMessage): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    // Row lock so two concurrent appends to the same thread don't overwrite each other.
+    await tx.$executeRaw`INSERT INTO "AppState" ("key", "value", "updatedAt") VALUES (${key(threadId)}, '[]', now()) ON CONFLICT ("key") DO NOTHING`;
+    const rows = await tx.$queryRaw<{ value: string }[]>`SELECT "value" FROM "AppState" WHERE "key" = ${key(threadId)} FOR UPDATE`;
+    const msgs = parse(rows[0]?.value);
+    msgs.push(msg);
+    await tx.appState.update({ where: { key: key(threadId) }, data: { value: JSON.stringify(msgs) } });
   });
 }
 
-export function getDryRunThread(threadId: string): Promise<DryRunMessage[]> {
-  return serial(async () => (await load()).threads[threadId] ?? []);
+export async function getDryRunThread(threadId: string): Promise<DryRunMessage[]> {
+  const row = await prisma.appState.findUnique({ where: { key: key(threadId) } });
+  return parse(row?.value);
 }
