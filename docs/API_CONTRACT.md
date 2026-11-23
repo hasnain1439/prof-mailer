@@ -305,3 +305,11 @@ Filename is sanitised (basename, no control chars, max 120 chars).
 - Import preview (form field) and commit (body) accept `type: "professor" | "company"`. Rows with an empty `type` get that kind; rows of the other kind are errors, and the matching column is required (`company` for companies, `university` for professors).
 - Header aliases: `skills` → researchFocus, `contact person` → name, `job link` → jobUrl.
 - Web: `/professors` and `/companies` (+ `/companies/:id`), import at `/import?type=company`.
+
+## v5: reminders, reply notices, analytics, AI drafts
+
+- **Reminders** (signed in): `GET /reminders?status=open|due|done|all&contactId=` → `Reminder[]` (with `contact` summary); `POST /reminders {title, note?, dueAt (UTC ISO), contactId?}`; `PATCH /reminders/:id {title?, note?, dueAt?, contactId?, done?}` (a new `dueAt` re-arms the notification); `DELETE /reminders/:id`. When `dueAt` passes, the tick (`/jobs/tick`, or the in-process scheduler every minute) emails the user once via system mail.
+- **Reply notices**: when the reply checker finds replies, the user gets one system email per run listing them.
+- **Analytics**: `GET /analytics?kind=PROFESSOR|COMPANY` → `{ totals {sent, replied, replyRate, followUpsSent, avgReplyHours}, byKind, byTemplate, byCountry, byOrg, weekly[12] }`, over first emails (followUpNo 0, SENT); replied = `repliedAt` set.
+- **AI drafts**: `GET /ai/status` → `{enabled}` (true when `ANTHROPIC_API_KEY` is set). `POST /ai/draft {contactId, templateId?, instructions?}` → `{subject, body, whyFits}` (Claude, nothing saved; 503 when not configured, rate limited).
+- **Schedule one email**: `POST /emails {professorId, subject, body, isHtml?, attachCv?, scheduledAt}` → 201 `EmailWithProfessor`; 409 if the contact already has a scheduled or sent first email.

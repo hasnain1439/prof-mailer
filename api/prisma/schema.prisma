@@ -54,6 +54,7 @@ model User {
   settings        Settings?
   gmailAccount    GmailAccount?
   cv              UserCv?
+  reminders       Reminder[]
 }
 
 enum AuthTokenType {
@@ -109,6 +110,7 @@ model Professor {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   emails        Email[]
+  reminders     Reminder[]
 
   @@unique([userId, email])
   @@index([userId])
@@ -220,4 +222,25 @@ model UserCv {
   size      Int
   data      Bytes
   updatedAt DateTime @updatedAt
+}
+
+// A personal reminder, optionally tied to a professor or company. When dueAt passes the tick job
+// emails the user once (notifiedAt). Done reminders (doneAt) are never emailed.
+model Reminder {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId  String?
+  contact    Professor? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  title      String
+  note       String?
+  dueAt      DateTime
+  doneAt     DateTime?
+  notifiedAt DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([userId, doneAt, dueAt])
+  @@index([dueAt, notifiedAt])
+  @@index([contactId])
 }

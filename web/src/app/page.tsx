@@ -195,6 +195,29 @@ function CardLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
+/** Overdue (due, not done) reminders; renders nothing when there are none. */
+function DueReminders() {
+  const { data } = useApi(() => api.listReminders({ status: "due" }));
+  if (!data || data.length === 0) return null;
+  return (
+    <Notice
+      tone="warning"
+      title={`${data.length} reminder${data.length === 1 ? "" : "s"} due`}
+      action={
+        <Link href="/reminders" className={`text-xs ${link}`}>
+          Open reminders
+        </Link>
+      }
+    >
+      {data
+        .slice(0, 3)
+        .map((r) => `• ${r.title}${r.contact ? ` (${r.contact.name})` : ""}`)
+        .join("\n")}
+      {data.length > 3 ? `\n…and ${data.length - 3} more` : ""}
+    </Notice>
+  );
+}
+
 export default function DashboardPage() {
   const { data, error, loading, reload } = useApi(() => api.dashboard());
   const sentPct = data ? Math.min(100, (data.counts.sentToday / Math.max(1, data.dailySendLimit)) * 100) : 0;
@@ -210,6 +233,7 @@ export default function DashboardPage() {
 
       <SendingFromBanner />
       <ErrorBox error={error} onRetry={reload} />
+      <DueReminders />
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {!data ? (

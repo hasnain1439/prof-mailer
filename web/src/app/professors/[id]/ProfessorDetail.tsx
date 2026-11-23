@@ -7,10 +7,12 @@ import { api, errorMessage } from "@/lib/api";
 import { PROFESSOR_STATUSES, type Email, type ProfessorStatus } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
+import { AiDraftForm } from "@/components/AiDraft";
 import { EmailActions } from "@/components/EmailActions";
+import { ContactReminders } from "@/components/Reminders";
 import { EmailBody, HtmlBadge } from "@/components/EmailBody";
 import { useGmailStatus } from "@/components/GmailStatus";
-import { IconArrowLeft, IconExternal, IconInbox, IconPencil, IconReply, IconTrash, IconUpload } from "@/components/icons";
+import { IconArrowLeft, IconExternal, IconInbox, IconPencil, IconReply, IconSparkles, IconTrash, IconUpload } from "@/components/icons";
 import { ProfessorForm } from "@/components/ProfessorForm";
 import { useToast } from "@/components/Toast";
 import {
@@ -139,6 +141,8 @@ export function ProfessorDetail() {
   const gmail = useGmailStatus();
   const { data: prof, error, loading, reload } = useApi(() => api.getProfessor(id), [id]);
   const [editing, setEditing] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const ai = useApi(() => api.aiStatus(), []);
   const [actionError, setActionError] = useState<string | null>(null);
 
   async function changeStatus(s: ProfessorStatus) {
@@ -164,10 +168,15 @@ export function ProfessorDetail() {
   }
 
   const sender = gmail.data?.connected ? gmail.data.email : null;
+  // AI drafts only a first email: hide it once one is scheduled or sent.
+  const hasFirstEmail = !!prof?.emails.some((e) => e.followUpNo === 0 && (e.status === "SCHEDULED" || e.status === "SENDING" || e.status === "SENT"));
 
   return (
     <div>
-      <Link href={prof?.kind === "COMPANY" ? "/companies" : "/professors"} className="mb-3 inline-flex items-center gap-1 text-[13px] text-muted hover:text-text">
+      <Link
+        href={prof?.kind === "COMPANY" ? "/companies" : "/professors"}
+        className="mb-3 inline-flex items-center gap-1 text-[13px] text-muted hover:text-text"
+      >
         <IconArrowLeft size={14} />
         {prof?.kind === "COMPANY" ? "Companies" : "Professors"}
       </Link>
@@ -200,6 +209,12 @@ export function ProfessorDetail() {
                 </option>
               ))}
             </Select>
+            {ai.data?.enabled && !hasFirstEmail && (
+              <Button variant="primary" onClick={() => setAiOpen(true)}>
+                <IconSparkles size={14} />
+                Write with AI
+              </Button>
+            )}
             <Button onClick={() => setEditing(true)}>
               <IconPencil size={14} />
               Edit
@@ -211,44 +226,48 @@ export function ProfessorDetail() {
           </PageHeader>
 
           <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[22rem_1fr]">
-            <Card title="Profile" flush className="lg:sticky lg:top-4">
-              <dl>
-                <Row name="Email">
-                  <a href={`mailto:${prof.email}`} className={`${link} font-mono text-[13px] font-normal break-all`}>
-                    {prof.email}
-                  </a>
-                </Row>
-                {prof.kind === "COMPANY" ? (
-                  <>
-                    <Row name="Company">{prof.university}</Row>
-                    <Row name="Role">{prof.role}</Row>
-                    <Row name="Contact person">{prof.name}</Row>
-                    <Row name="Country">{prof.country}</Row>
-                    <Row name="Job link">{prof.jobUrl && <ExternalUrl url={prof.jobUrl} />}</Row>
-                    <Row name="Skills / stack">{prof.researchFocus}</Row>
-                    <Row name="Why you fit">{prof.whyFits}</Row>
-                  </>
-                ) : (
-                  <>
-                    <Row name="University">{prof.university}</Row>
-                    <Row name="Country">{prof.country}</Row>
-                    <Row name="Profile">{prof.profileUrl && <ExternalUrl url={prof.profileUrl} />}</Row>
-                    <Row name="Research focus">{prof.researchFocus}</Row>
-                    <Row name="Why I fit">{prof.whyFits}</Row>
-                  </>
-                )}
-                <Row name="Notes">{prof.notes}</Row>
-                <Row name="Added">
-                  <Mono>{formatKarachi(prof.createdAt)}</Mono>
-                </Row>
-              </dl>
-            </Card>
+            <div className="lg:sticky lg:top-4">
+              <Card title="Profile" flush>
+                <dl>
+                  <Row name="Email">
+                    <a href={`mailto:${prof.email}`} className={`${link} font-mono text-[13px] font-normal break-all`}>
+                      {prof.email}
+                    </a>
+                  </Row>
+                  {prof.kind === "COMPANY" ? (
+                    <>
+                      <Row name="Company">{prof.university}</Row>
+                      <Row name="Role">{prof.role}</Row>
+                      <Row name="Contact person">{prof.name}</Row>
+                      <Row name="Country">{prof.country}</Row>
+                      <Row name="Job link">{prof.jobUrl && <ExternalUrl url={prof.jobUrl} />}</Row>
+                      <Row name="Skills / stack">{prof.researchFocus}</Row>
+                      <Row name="Why you fit">{prof.whyFits}</Row>
+                    </>
+                  ) : (
+                    <>
+                      <Row name="University">{prof.university}</Row>
+                      <Row name="Country">{prof.country}</Row>
+                      <Row name="Profile">{prof.profileUrl && <ExternalUrl url={prof.profileUrl} />}</Row>
+                      <Row name="Research focus">{prof.researchFocus}</Row>
+                      <Row name="Why I fit">{prof.whyFits}</Row>
+                    </>
+                  )}
+                  <Row name="Notes">{prof.notes}</Row>
+                  <Row name="Added">
+                    <Mono>{formatKarachi(prof.createdAt)}</Mono>
+                  </Row>
+                </dl>
+              </Card>
+              <ContactReminders contactId={prof.id} />
+            </div>
 
             <section className="min-w-0">
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-sm font-semibold text-text">Conversation</h2>
                 <p className="text-xs text-muted">
-                  <Mono className="!text-xs">{prof.emails.length}</Mono> email{prof.emails.length === 1 ? "" : "s"}
+                  <Mono className="!text-xs">{prof.emails.length}</Mono> email
+                  {prof.emails.length === 1 ? "" : "s"}
                   {sender && (
                     <>
                       {" "}
@@ -282,6 +301,19 @@ export function ProfessorDetail() {
               )}
             </section>
           </div>
+
+          <Modal open={aiOpen} title={`Write with AI · ${prof.name}`} onClose={() => setAiOpen(false)} wide>
+            {aiOpen && (
+              <AiDraftForm
+                contact={prof}
+                onCancel={() => setAiOpen(false)}
+                onScheduled={() => {
+                  setAiOpen(false);
+                  reload();
+                }}
+              />
+            )}
+          </Modal>
 
           <Modal open={editing} title={prof.kind === "COMPANY" ? "Edit company" : "Edit professor"} onClose={() => setEditing(false)} wide>
             {editing && (

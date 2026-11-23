@@ -1,6 +1,9 @@
 // App icons: lucide-react at 16px / stroke 1.75 by default. Names are kept stable for callers.
 import {
   AlertTriangle,
+  BarChart3,
+  Bell,
+  Sparkles,
   ArrowLeft,
   ArrowRight,
   Calendar,
@@ -85,3 +88,6 @@ export const IconBuilding = wrap(Building2);
 export const IconBriefcase = wrap(Briefcase);
 export const IconPaperclip = wrap(Paperclip);
 export const IconGraduation = wrap(GraduationCap);
+export const IconBell = wrap(Bell);
+export const IconChart = wrap(BarChart3);
+export const IconSparkles = wrap(Sparkles);

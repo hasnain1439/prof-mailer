@@ -9,6 +9,7 @@
  */
 import nodemailer, { type Transporter } from "nodemailer";
 import { env } from "../../lib/env.js";
+import { formatKarachi } from "../../lib/time.js";
 
 const TIMEOUT_MS = 15_000;
 const APP_NAME = "prof-mailer";
@@ -127,5 +128,65 @@ export function sendAlreadyRegisteredEmail(to: string, name: string | null, logi
       html: layout(lines),
     },
     "already-registered notice",
+  );
+}
+
+/**
+ * Reminder notice. Title, note and contact are the user's own text and only ever go to the user's own
+ * verified address, so they are included (escaped in the HTML by layout()).
+ */
+export function sendReminderEmail(
+  to: string,
+  r: { title: string; note: string | null; dueAt: Date; contact: string | null },
+): Promise<boolean> {
+  const url = `${env.PUBLIC_URL}/reminders`;
+  const lines = [
+    `Reminder: ${r.title}`,
+    `Due ${formatKarachi(r.dueAt)} PKT${r.contact ? ` · ${r.contact}` : ""}`,
+    ...(r.note ? [r.note] : []),
+  ];
+  return deliver(
+    {
+      to,
+      subject: `Reminder: ${r.title}`.slice(0, 200),
+      text: `${lines.join("\n\n")}\n\n${url}\n`,
+      html: layout(lines, { url, label: "Open reminders" }),
+    },
+    "reminder",
+  );
+}
+
+export interface ReplyNotice {
+  contactId: string;
+  kind: "PROFESSOR" | "COMPANY";
+  name: string;
+  org: string;
+  subject: string;
+}
+
+/** "You got a reply" notice for replies found by the reply checker; one email per run per user. */
+export function sendReplyNoticeEmail(to: string, replies: ReplyNotice[]): Promise<boolean> {
+  const first = replies[0]!;
+  const who = (r: ReplyNotice) => `${r.name} (${r.org})`;
+  const subject =
+    replies.length === 1 ? `New reply from ${who(first)}` : `${replies.length} new replies, including ${who(first)}`;
+  const items = replies.slice(0, 20).map((r) => `• ${who(r)}: "${r.subject}"`);
+  const more = replies.length > 20 ? [`…and ${replies.length - 20} more.`] : [];
+  const path = replies.length === 1 ? `/${first.kind === "COMPANY" ? "companies" : "professors"}/${first.contactId}` : "/sent";
+  const url = `${env.PUBLIC_URL}${path}`;
+  const lines = [
+    replies.length === 1 ? "You got a reply:" : `You got ${replies.length} replies:`,
+    ...items,
+    ...more,
+    "Read it in Gmail; follow-ups to these contacts were stopped.",
+  ];
+  return deliver(
+    {
+      to,
+      subject: subject.slice(0, 200),
+      text: `${lines.join("\n")}\n\n${url}\n`,
+      html: layout(lines, { url, label: replies.length === 1 ? "Open contact" : "Open sent emails" }),
+    },
+    "reply notice",
   );
 }

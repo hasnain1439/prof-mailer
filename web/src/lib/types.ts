@@ -243,3 +243,60 @@ export interface CvInfo {
 export function contactHref(p: { id: string; kind?: ContactKind }): string {
   return `${p.kind === "COMPANY" ? "/companies" : "/professors"}/${encodeURIComponent(p.id)}`;
 }
+
+/** Contact fields embedded in reminders and emails. */
+export interface ContactSummary {
+  id: string;
+  name: string;
+  email: string;
+  university: string;
+  status: ProfessorStatus;
+  kind: ContactKind;
+  role: string | null;
+}
+
+export interface Reminder {
+  id: string;
+  title: string;
+  note: string | null;
+  dueAt: string;
+  doneAt: string | null;
+  notifiedAt: string | null;
+  contactId: string | null;
+  contact: ContactSummary | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReminderInput {
+  title: string;
+  note?: string | null;
+  /** UTC ISO */
+  dueAt: string;
+  contactId?: string | null;
+}
+
+export interface AnalyticsBucket {
+  key: string;
+  label: string;
+  sent: number;
+  replied: number;
+  /** percent, one decimal */
+  replyRate: number;
+}
+
+export interface Analytics {
+  totals: { sent: number; replied: number; replyRate: number; followUpsSent: number; avgReplyHours: number | null };
+  byKind: AnalyticsBucket[];
+  byTemplate: AnalyticsBucket[];
+  byCountry: AnalyticsBucket[];
+  byOrg: AnalyticsBucket[];
+  /** 12 Karachi weeks (Monday start), oldest first */
+  weekly: { weekStart: string; sent: number; replied: number }[];
+}
+
+export interface AiDraft {
+  subject: string;
+  body: string;
+  whyFits: string;
+}

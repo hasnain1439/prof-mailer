@@ -97,3 +97,53 @@ emailsRouter.patch("/:id", validateBody(patchSchema), async (req, res) => {
   if (r.count === 0) throw new HttpError(409, "Email status changed; please refresh");
   res.json(await getEmailOr404(userId, id));
 });
+
+// Schedule a first email to one existing contact (e.g. an AI draft the user reviewed). Same rules as
+// import: one first email per contact; follow-ups are created by the reply checker, not here.
+const createSchema = z.object({
+  professorId: z.string().min(1),
+  subject: z.string().trim().min(1).max(300),
+  body: z.string().refine((s) => s.trim() !== "", "Required"),
+  isHtml: z.boolean().optional(),
+  attachCv: z.boolean().optional(),
+  scheduledAt: z.iso.datetime({ offset: true }).transform((s) => new Date(s)),
+});
+
+emailsRouter.post("/", validateBody(createSchema), async (req, res) => {
+  const data = req.body as z.infer<typeof createSchema>;
+  const userId = uid(req);
+  const prof = await prisma.professor.findFirst({ where: { id: data.professorId, userId }, select: { id: true } });
+  if (!prof) throw new HttpError(404, "Contact not found");
+  const existing = await prisma.email.findFirst({
+    where: {
+      userId,
+      professorId: prof.id,
+      followUpNo: 0,
+      OR: [{ status: { in: ["SCHEDULED", "SENDING"] } }, { status: "SENT" }],
+    },
+    select: { status: true },
+  });
+  if (existing) {
+    throw new HttpError(
+      409,
+      existing.status === "SENT"
+        ? "This contact was already emailed; follow-ups are sent automatically"
+        : "This contact already has a scheduled email; edit it in the Queue",
+    );
+  }
+  const e = await prisma.email.create({
+    data: {
+      userId,
+      professorId: prof.id,
+      subject: data.subject,
+      body: data.body,
+      isHtml: data.isHtml ?? false,
+      attachCv: data.attachCv ?? false,
+      status: "SCHEDULED",
+      scheduledAt: data.scheduledAt,
+      followUpNo: 0,
+    },
+    include: { professor: { select: professorSummarySelect } },
+  });
+  res.status(201).json(e);
+});

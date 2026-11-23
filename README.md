@@ -183,3 +183,10 @@ npm run build            # tsc -> dist/ (npm start runs node dist/index.js)
 npx prisma studio        # browse the DB
 npx prisma migrate dev   # after editing prisma/schema.prisma
 ```
+
+## 9. Reminders, reply notices, analytics, AI drafts
+
+- **Reminders** (menu → Reminders, or the Reminders box on a professor/company page): anything with a date, optionally linked to a contact. You get an email (from the system mailbox) when it is due; overdue ones also show on the dashboard. On Vercel this runs on the cron-job.org tick.
+- **Reply notices**: when a professor or company replies, you get an email telling you who replied.
+- **Analytics** (menu → Analytics): reply rate overall, per week, per template, per country and per university/company.
+- **Write with AI** (button on a contact page, before the first email): Claude writes a personal email and a "why I fit" line from the contact's profile, optionally based on one of your templates. You edit it and schedule it; it then goes through the normal queue. Needs `ANTHROPIC_API_KEY` on the API (get one at console.anthropic.com); without it the button is hidden.

@@ -1,5 +1,7 @@
 import type {
   AdminStats,
+  AiDraft,
+  Analytics,
   AdminUser,
   AuthUser,
   ContactKind,
@@ -19,6 +21,8 @@ import type {
   ProfessorListItem,
   ProfessorStatus,
   ProfessorWithEmails,
+  Reminder,
+  ReminderInput,
   SettingsInput,
   SettingsResponse,
   Template,
@@ -241,6 +245,26 @@ export const api = {
   gmailDisconnect: () => request<void>("/gmail/disconnect", { method: "POST" }),
   gmailTestSend: (body: { subject?: string; body?: string } = {}) =>
     request<GmailTestSendResult>("/gmail/test-send", { method: "POST", json: body }),
+
+  /** Schedule a first email to one contact (409 if it already has one). */
+  createEmail: (body: { professorId: string; subject: string; body: string; isHtml?: boolean; attachCv?: boolean; scheduledAt: string }) =>
+    request<EmailWithProfessor>("/emails", { method: "POST", json: body }),
+
+  // Reminders
+  listReminders: (q: { status?: "open" | "due" | "done" | "all"; contactId?: string } = {}) =>
+    request<Reminder[]>("/reminders", { query: q }),
+  createReminder: (body: ReminderInput) => request<Reminder>("/reminders", { method: "POST", json: body }),
+  updateReminder: (id: string, body: Partial<ReminderInput> & { done?: boolean }) =>
+    request<Reminder>(`/reminders/${encodeURIComponent(id)}`, { method: "PATCH", json: body }),
+  deleteReminder: (id: string) => request<void>(`/reminders/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  // Analytics
+  analytics: (kind?: ContactKind) => request<Analytics>("/analytics", { query: { kind } }),
+
+  // AI drafts (Claude)
+  aiStatus: () => request<{ enabled: boolean }>("/ai/status"),
+  aiDraft: (body: { contactId: string; templateId?: string | null; instructions?: string | null }) =>
+    request<AiDraft>("/ai/draft", { method: "POST", json: body }),
 
   // Admin (404 unless the signed-in user is an admin)
   adminStats: () => request<AdminStats>("/admin/stats"),

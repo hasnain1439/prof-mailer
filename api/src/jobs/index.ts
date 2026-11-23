@@ -3,10 +3,12 @@ import cron from "node-cron";
 import { pruneExpiredSessions } from "../lib/auth.js";
 import { maybeRunCheckReplies, type CheckRepliesResult } from "./checkReplies.js";
 import { resetStaleSending, runSendDue, type SendDueResult } from "./sendDue.js";
+import { runDueReminders, type RemindersResult } from "./reminders.js";
 import { safeErrorMessage } from "./util.js";
 
 export { runSendDue, resetStaleSending } from "./sendDue.js";
 export { runCheckReplies, maybeRunCheckReplies } from "./checkReplies.js";
+export { runDueReminders } from "./reminders.js";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -30,13 +32,23 @@ function logCheckReplies(r: CheckRepliesResult | null) {
   }
 }
 
-/** External cron tick: send-due, plus check-replies when the last check is >= 60 min old. */
-export async function runTick(): Promise<{ sendDue: SendDueResult; checkReplies: CheckRepliesResult | null }> {
+function logReminders(r: RemindersResult) {
+  if (r.due > 0) console.log(`[reminders] due=${r.due} notified=${r.notified} failed=${r.failed}`);
+}
+
+/** External cron tick: send-due, due reminders, plus check-replies when the last check is >= 60 min old. */
+export async function runTick(): Promise<{
+  sendDue: SendDueResult;
+  reminders: RemindersResult;
+  checkReplies: CheckRepliesResult | null;
+}> {
   const sendDue = await runSendDue();
   logSendDue(sendDue);
+  const reminders = await runDueReminders();
+  logReminders(reminders);
   const checkReplies = await maybeRunCheckReplies(HOUR_MS);
   logCheckReplies(checkReplies);
-  return { sendDue, checkReplies };
+  return { sendDue, reminders, checkReplies };
 }
 
 export function startScheduler(): void {
@@ -57,6 +69,18 @@ export function startScheduler(): void {
       }
     },
     { name: "send-due", noOverlap: true },
+  );
+
+  cron.schedule(
+    "* * * * *",
+    async () => {
+      try {
+        logReminders(await runDueReminders());
+      } catch (err) {
+        console.error(`[reminders] run failed: ${safeErrorMessage(err)}`);
+      }
+    },
+    { name: "reminders", noOverlap: true },
   );
 
   // Polled every 10 min but gated on the persisted lastReplyCheckAt (same 60-min gate as /jobs/tick),
@@ -87,5 +111,5 @@ export function startScheduler(): void {
     { name: "session-prune", noOverlap: true },
   );
 
-  console.log("[scheduler] started: send-due every minute, check-replies when >= 60 min since the last check (polled every 10 min)");
+  console.log("[scheduler] started: send-due and reminders every minute, check-replies when >= 60 min since the last check (polled every 10 min)");
 }

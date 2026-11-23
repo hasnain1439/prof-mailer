@@ -5,6 +5,7 @@ import { getSettings } from "../lib/settings.js";
 import { renderTemplate } from "../lib/template.js";
 import { createThreadReader, isGmailConnected, type ThreadReader } from "../services/gmail/mailer.js";
 import { parseFromAddress } from "../services/gmail/mime.js";
+import { sendReplyNoticeEmail, type ReplyNotice } from "../services/mail/system.js";
 import { DAY_MS, followUpSubject, safeErrorMessage } from "./util.js";
 
 export interface CheckRepliesResult {
@@ -72,6 +73,8 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
   let loggedNoTemplate = false;
   // One reader per user (one Gmail client / IMAP connection), opened lazily and closed after the loop.
   let reader: ThreadReader | null = null;
+  // Replies found in this run, emailed to the user once at the end.
+  const notices: ReplyNotice[] = [];
 
   try {
     for (const [threadId, emails] of threads) {
@@ -106,6 +109,13 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
             data: { status: "CANCELLED" },
           });
           result.followUpsCancelled += c.count;
+          notices.push({
+            contactId: professor.id,
+            kind: professor.kind,
+            name: professor.name,
+            org: professor.university,
+            subject: root.subject,
+          });
           continue;
         }
 
@@ -168,6 +178,11 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
     }
   } finally {
     if (reader) await (reader as ThreadReader).close().catch(() => undefined);
+  }
+
+  if (notices.length > 0) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (user) await sendReplyNoticeEmail(user.email, notices);
   }
 }
 
