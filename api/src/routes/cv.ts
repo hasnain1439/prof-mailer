@@ -3,6 +3,7 @@ import multer from "multer";
 import { uid } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../lib/http.js";
+import { deleteCvObject, putCvObject, r2Enabled, readCv } from "../services/storage/cvStore.js";
 
 /** The user's CV (one per user, stored as bytes), attached to emails with attachCv. */
 export const cvRouter = Router();
@@ -76,11 +77,14 @@ cvRouter.post("/", uploadFile, async (req, res) => {
   if (!type || !type.magic.every((b, i) => file.buffer[i] === b)) throw new HttpError(400, TYPE_ERROR);
 
   const userId = uid(req);
+  const previous = await prisma.userCv.findUnique({ where: { userId }, select: { storageKey: true } });
+  const storageKey = r2Enabled ? await putCvObject(userId, file.buffer, type.mime) : null;
   const data = {
     filename: sanitizeFilename(file.originalname, ext),
     mimeType: type.mime,
     size: file.buffer.length,
-    data: new Uint8Array(file.buffer),
+    data: storageKey ? null : new Uint8Array(file.buffer),
+    storageKey,
   };
   const cv = await prisma.userCv.upsert({
     where: { userId },
@@ -88,20 +92,25 @@ cvRouter.post("/", uploadFile, async (req, res) => {
     update: data,
     select: cvMeta,
   });
+  if (previous?.storageKey && previous.storageKey !== storageKey) await deleteCvObject(previous.storageKey);
   res.json({ cv });
 });
 
 cvRouter.get("/download", async (req, res) => {
   const cv = await prisma.userCv.findUnique({ where: { userId: uid(req) } });
   if (!cv) throw new HttpError(404, "No CV uploaded");
+  const body = await readCv(cv);
   res.attachment(cv.filename);
   res.setHeader("Content-Type", cv.mimeType);
-  res.setHeader("Content-Length", String(cv.size));
+  res.setHeader("Content-Length", String(body.length));
   res.setHeader("Cache-Control", "private, no-store");
-  res.end(Buffer.from(cv.data));
+  res.end(body);
 });
 
 cvRouter.delete("/", async (req, res) => {
-  await prisma.userCv.deleteMany({ where: { userId: uid(req) } });
+  const userId = uid(req);
+  const cv = await prisma.userCv.findUnique({ where: { userId }, select: { storageKey: true } });
+  await prisma.userCv.deleteMany({ where: { userId } });
+  await deleteCvObject(cv?.storageKey);
   res.status(204).end();
 });

@@ -189,4 +189,5 @@ npx prisma migrate dev   # after editing prisma/schema.prisma
 - **Reminders** (menu → Reminders, or the Reminders box on a professor/company page): anything with a date, optionally linked to a contact. You get an email (from the system mailbox) when it is due; overdue ones also show on the dashboard. On Vercel this runs on the cron-job.org tick.
 - **Reply notices**: when a professor or company replies, you get an email telling you who replied.
 - **Analytics** (menu → Analytics): reply rate overall, per week, per template, per country and per university/company.
+- **CV storage**: CVs are kept in the database by default. Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` on the API to store new uploads in a private Cloudflare R2 bucket (older CVs keep working).
 - **Write with AI** (button on a contact page, before the first email): Claude writes a personal email and a "why I fit" line from the contact's profile, optionally based on one of your templates. You edit it and schedule it; it then goes through the normal queue. Needs `ANTHROPIC_API_KEY` on the API (get one at console.anthropic.com); without it the button is hidden.

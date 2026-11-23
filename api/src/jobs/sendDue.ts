@@ -5,6 +5,7 @@ import { karachiDayRange } from "../lib/time.js";
 import type { EmailAttachment } from "../services/gmail/appPassword.js";
 import { GmailNotConnectedError, isGmailConnected, sendEmail } from "../services/gmail/mailer.js";
 import { randomDelayMs, safeErrorMessage } from "./util.js";
+import { readCv } from "../services/storage/cvStore.js";
 
 export interface SendDueResult {
   processed: number;
@@ -140,7 +141,19 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
         result.failed++;
         continue;
       }
-      attachments = [{ filename: cv.filename, contentType: cv.mimeType, content: Buffer.from(cv.data) }];
+      let content: Buffer;
+      try {
+        content = await readCv(cv);
+      } catch (err) {
+        console.error(`[send-due] CV read failed: ${safeErrorMessage(err)}`);
+        await prisma.email.update({
+          where: { id: email.id },
+          data: { status: "FAILED", error: "Could not read your CV file; upload it again in Settings" },
+        });
+        result.failed++;
+        continue;
+      }
+      attachments = [{ filename: cv.filename, contentType: cv.mimeType, content }];
     }
 
     try {

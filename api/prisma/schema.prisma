@@ -219,9 +219,11 @@ model UserCv {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   filename  String
   mimeType  String
-  size      Int
-  data      Bytes
-  updatedAt DateTime @updatedAt
+  size       Int
+  // Stored in the database (data) or, when R2 is configured, in Cloudflare R2 (storageKey; data null).
+  data       Bytes?
+  storageKey String?
+  updatedAt  DateTime @updatedAt
 }
 
 // A personal reminder, optionally tied to a professor or company. When dueAt passes the tick job
