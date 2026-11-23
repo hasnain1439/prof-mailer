@@ -72,7 +72,7 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
   return (
     <Card
       title="Connect your Gmail"
-      description="prof-mailer sends from your Gmail with a Google App Password, and checks the same inbox for replies. It takes about two minutes."
+      description="ApplyReach sends from your Gmail with a Google App Password, and checks the same inbox for replies. It takes about two minutes."
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <form onSubmit={submit} className="space-y-3" autoComplete="off">
@@ -131,7 +131,7 @@ function AppPasswordCard({ onConnected }: { onConnected: () => void }) {
               <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className={link}>
                 myaccount.google.com/apppasswords <IconExternal size={12} className="inline" />
               </a>{" "}
-              and create one named <Code>prof-mailer</Code>.
+              and create one named <Code>ApplyReach</Code>.
             </li>
             <li>Paste the 16-letter password here and click Connect Gmail.</li>
           </ol>

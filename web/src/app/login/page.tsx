@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { LoginCard, LoginPanel } from "./LoginPanel";
 
 export const metadata: Metadata = {
-  title: "Sign in · prof-mailer",
+  title: "Sign in · ApplyReach",
 };
 
 export default function LoginPage() {

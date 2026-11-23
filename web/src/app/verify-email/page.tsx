@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { VerifyEmailPanel, VerifyingCard } from "./VerifyEmailPanel";
 
 export const metadata: Metadata = {
-  title: "Verify email · prof-mailer",
+  title: "Verify email · ApplyReach",
 };
 
 export default function VerifyEmailPage() {

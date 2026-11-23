@@ -12,7 +12,7 @@ import { env } from "../../lib/env.js";
 import { formatKarachi } from "../../lib/time.js";
 
 const TIMEOUT_MS = 15_000;
-const APP_NAME = "prof-mailer";
+const APP_NAME = "ApplyReach";
 
 let transport: Transporter | null = null;
 

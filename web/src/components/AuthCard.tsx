@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState, type ComponentProps, type ReactNode } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { IconEye, IconEyeOff, IconLogo } from "./icons";
+import { IconEye, IconEyeOff } from "./icons";
+import { Logo } from "./Logo";
 import { Button, Notice, input, link } from "./ui";
 
 /** Public auth pages (login, signup, verify, reset): no sidebar, a small centered bordered card. */
@@ -12,10 +13,7 @@ export function AuthCard({ title, description, children }: { title: string; desc
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm rounded-md border border-border bg-surface p-6">
         <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-on-accent">
-            <IconLogo size={14} />
-          </span>
-          <span className="text-sm font-semibold text-text">prof-mailer</span>
+          <Logo />
         </div>
         <h1 className="mt-4 text-[15px] font-semibold text-text">{title}</h1>
         {description && <p className="mt-1 text-[13px] text-muted">{description}</p>}

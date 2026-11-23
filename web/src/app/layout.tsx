@@ -19,7 +19,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "prof-mailer",
+  title: "ApplyReach",
   description: "Schedule and track outreach emails to professors and companies",
 };
 

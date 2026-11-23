@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { ResetPasswordCard, ResetPasswordPanel } from "./ResetPasswordPanel";
 
 export const metadata: Metadata = {
-  title: "Choose a new password · prof-mailer",
+  title: "Choose a new password · ApplyReach",
 };
 
 export default function ResetPasswordPage() {

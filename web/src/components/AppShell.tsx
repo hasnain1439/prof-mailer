@@ -5,7 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { AuthProvider, isPublicPath, useAuth } from "./Auth";
 import { GmailStatusProvider, useGmailStatus } from "./GmailStatus";
-import { IconLogOut, IconLogo, IconMenu, IconRefresh, IconX } from "./icons";
+import { Logo } from "./Logo";
+import { IconLogOut, IconMenu, IconRefresh, IconX } from "./icons";
 import { Nav, NavLinks } from "./Nav";
 import { SendingFrom } from "./SendingFrom";
 import { ThemeToggle } from "./ThemeToggle";
@@ -15,10 +16,7 @@ import { Button, Loading, Notice, Skeleton, initials } from "./ui";
 function Brand({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <Link href="/" onClick={onNavigate} className="flex items-center gap-2 rounded-md">
-      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-on-accent">
-        <IconLogo size={14} />
-      </span>
-      <span className="text-sm font-semibold text-text">prof-mailer</span>
+      <Logo />
     </Link>
   );
 }
