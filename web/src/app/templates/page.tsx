@@ -43,6 +43,14 @@ const PLACEHOLDERS = [
   { key: "{{jobUrl}}", help: "Job posting link (companies)" },
   { key: "{{researchFocus}}", help: "Research focus (companies: skills / stack)" },
   { key: "{{whyFits}}", help: "Why you fit their group or role" },
+  { key: "{{myName}}", help: "Your name (Settings → Your profile)" },
+  { key: "{{myTitle}}", help: "Your title, e.g. Full Stack Developer" },
+  { key: "{{mySummary}}", help: "Your experience paragraph" },
+  { key: "{{myEducation}}", help: "Your degree and university" },
+  { key: "{{myEmail}}", help: "Your contact email (defaults to your Gmail)" },
+  { key: "{{myPhone}}", help: "Your phone" },
+  { key: "{{myLinkedIn}}", help: "Your LinkedIn URL" },
+  { key: "{{myPortfolio}}", help: "Your portfolio or GitHub URL" },
 ];
 
 interface Draft {

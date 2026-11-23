@@ -23,6 +23,7 @@ import type {
   ProfessorStatus,
   ProfessorWithEmails,
   Reminder,
+  SenderProfile,
   ReminderInput,
   SettingsInput,
   SettingsResponse,
@@ -228,6 +229,8 @@ export const api = {
   // Settings
   getSettings: () => request<SettingsResponse>("/settings"),
   putSettings: (body: SettingsInput) => request<SettingsResponse>("/settings", { method: "PUT", json: body }),
+  getSenderProfile: () => request<{ profile: SenderProfile }>("/settings/profile"),
+  saveSenderProfile: (body: SenderProfile) => request<{ profile: SenderProfile }>("/settings/profile", { method: "PUT", json: body }),
 
   // CV (one per user)
   getCv: () => request<{ cv: CvInfo | null }>("/cv"),

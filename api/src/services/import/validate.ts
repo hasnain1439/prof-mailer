@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { formatKarachi, parseKarachiLocal } from "../../lib/time.js";
-import { renderTemplate, unknownPlaceholders, type TemplateVars } from "../../lib/template.js";
+import { renderTemplate, unknownPlaceholders, type SenderProfile, type TemplateVars } from "../../lib/template.js";
 import type { ImportRowData, ParsedRow } from "./parse.js";
 
 /** Pure import-row validation (no DB). */
@@ -90,6 +90,7 @@ export function validateImportRows(
   template: ImportTemplate | null,
   existing: ReadonlyMap<string, ExistingProfessorInfo>,
   expectedKind?: ContactKind,
+  sender?: SenderProfile | null,
 ): ImportPreviewRow[] {
   const seen = new Map<string, number>(); // email → first rowNumber
 
@@ -145,6 +146,7 @@ export function validateImportRows(
       jobUrl: data.jobUrl,
       researchFocus: data.researchFocus,
       whyFits: data.whyFits,
+      sender,
     };
 
     return {

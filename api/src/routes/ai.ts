@@ -12,6 +12,7 @@ import { uid } from "../lib/auth.js";
 import { HttpError, validateBody } from "../lib/http.js";
 import { prisma } from "../lib/prisma.js";
 import { rateLimit } from "../middleware/security.js";
+import { loadSenderProfile } from "../services/core/sender.js";
 
 export const aiRouter = Router();
 
@@ -47,7 +48,7 @@ Two kinds of recipient:
 - COMPANY: the sender is applying for a job. Connect the sender's skills to the role and the company. Mention that the CV is attached only if the input says a CV will be attached.
 
 Rules:
-- Plain text body, no markdown, no placeholders like [Name] or {{...}}. Use only facts given in the input; never invent publications, grades, projects or experience.
+- Plain text body, no markdown, no placeholders like [Name] or {{...}}. Use only facts given in the input (the sender's title, education, summary and links are in "sender"); never invent publications, grades, projects or experience.
 - 120-200 words unless the user's instructions ask otherwise. Short paragraphs. One clear ask at the end.
 - Greeting uses the recipient's name ("Dear Professor <Last name>," for professors, "Dear <Name>," for companies). Sign off with the sender's name if given.
 - Subject: specific, under 80 characters.
@@ -63,11 +64,12 @@ aiRouter.post(
     const userId = uid(req);
     const anthropic = getClient();
 
-    const [contact, template, user, cv] = await Promise.all([
+    const [contact, template, user, cv, profile] = await Promise.all([
       prisma.professor.findFirst({ where: { id: contactId, userId } }),
       templateId ? prisma.template.findFirst({ where: { id: templateId, userId } }) : null,
       prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
       prisma.userCv.findUnique({ where: { userId }, select: { filename: true } }),
+      loadSenderProfile(userId),
     ]);
     if (!contact) throw new HttpError(404, "Contact not found");
     if (templateId && !template) throw new HttpError(404, "Template not found");
@@ -85,7 +87,11 @@ aiRouter.post(
         profileUrl: contact.profileUrl,
         notes: contact.notes,
       },
-      sender: { name: user?.name ?? null, cvWillBeAttached: Boolean(cv) && contact.kind === "COMPANY" },
+      sender: {
+        ...profile,
+        name: profile.myName ?? user?.name ?? null,
+        cvWillBeAttached: Boolean(cv) && contact.kind === "COMPANY",
+      },
       referenceTemplate: template ? { subject: template.subject, body: template.body } : null,
       userInstructions: instructions ?? null,
     };

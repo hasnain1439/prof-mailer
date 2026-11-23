@@ -21,6 +21,7 @@ import {
   type ExistingProfessorInfo,
   type ImportTemplate,
 } from "../services/import/validate.js";
+import { loadSenderProfile } from "../services/core/sender.js";
 
 export const importRouter = Router();
 
@@ -245,7 +246,13 @@ importRouter.post("/preview", uploadFile, async (req, res) => {
     if (e instanceof ImportParseError) throw new HttpError(400, e.message);
     throw e;
   }
-  const rows = validateImportRows(parsed, template, await existingProfessors(prisma, userId, parsed), expectedKindOf(req.body?.type));
+  const rows = validateImportRows(
+    parsed,
+    template,
+    await existingProfessors(prisma, userId, parsed),
+    expectedKindOf(req.body?.type),
+    await loadSenderProfile(userId),
+  );
   const errorCount = rows.filter((r) => r.errors.length > 0).length;
   res.json({ rows, validCount: rows.length - errorCount, errorCount });
 });
@@ -280,12 +287,13 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
   const parsed: ParsedRow[] = body.rows.map((data, i) => ({ rowNumber: i + 2, data }));
   const templateId = body.templateId || null;
   const attachCv = body.attachCv ?? template?.attachCv ?? false;
+  const sender = await loadSenderProfile(userId);
 
   const result = await prisma.$transaction(
     async (tx) => {
       // Re-validate against the DB inside the transaction (same rules as the preview, incl. re-import errors).
       const existing = await existingProfessors(tx, userId, parsed);
-      const valid = validateImportRows(parsed, template, existing, expectedKindOf(body.type)).filter((r) => r.errors.length === 0);
+      const valid = validateImportRows(parsed, template, existing, expectedKindOf(body.type), sender).filter((r) => r.errors.length === 0);
       let professorsCreated = 0;
       let professorsUpdated = 0;
       let emailsCreated = 0;

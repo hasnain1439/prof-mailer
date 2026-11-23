@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { HttpError, parseQuery, validateBody } from "../lib/http.js";
 import { PLACEHOLDERS, renderTemplate, unknownPlaceholders } from "../lib/template.js";
 import { reqStr } from "../services/core/schemas.js";
+import { loadSenderProfile } from "../services/core/sender.js";
 
 export const templatesRouter = Router();
 
@@ -88,15 +89,16 @@ const previewSchema = z.object({ professorId: reqStr });
 templatesRouter.post("/:id/preview", validateBody(previewSchema), async (req, res) => {
   const { professorId } = req.body as z.infer<typeof previewSchema>;
   const userId = uid(req);
-  const [t, p] = await Promise.all([
+  const [t, p, sender] = await Promise.all([
     prisma.template.findFirst({ where: { id: req.params.id as string, userId } }),
     prisma.professor.findFirst({ where: { id: professorId, userId } }),
+    loadSenderProfile(userId),
   ]);
   if (!t) throw new HttpError(404, "Template not found");
   if (!p) throw new HttpError(404, "Contact not found");
   res.json({
-    subject: renderTemplate(t.subject, p),
-    body: renderTemplate(t.body, p, { html: t.isHtml }),
+    subject: renderTemplate(t.subject, { ...p, sender }),
+    body: renderTemplate(t.body, { ...p, sender }, { html: t.isHtml }),
     isHtml: t.isHtml,
   });
 });

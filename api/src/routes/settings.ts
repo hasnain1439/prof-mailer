@@ -5,8 +5,21 @@ import { prisma } from "../lib/prisma.js";
 import { MAX_DAILY_SEND_LIMIT } from "../lib/settings.js";
 import { HttpError, validateBody } from "../lib/http.js";
 import { buildSettingsResponse } from "../services/core/settings.js";
+import { getStoredSenderProfile, senderProfileInput } from "../services/core/sender.js";
 
 export const settingsRouter = Router();
+
+// Sender profile ({{myName}}, {{myTitle}}, ... in templates).
+settingsRouter.get("/profile", async (req, res) => {
+  res.json({ profile: await getStoredSenderProfile(uid(req)) });
+});
+
+settingsRouter.put("/profile", validateBody(senderProfileInput), async (req, res) => {
+  const data = req.body as z.infer<typeof senderProfileInput>;
+  const userId = uid(req);
+  await prisma.settings.upsert({ where: { userId }, update: data, create: { userId, ...data } });
+  res.json({ profile: await getStoredSenderProfile(userId) });
+});
 
 settingsRouter.get("/", async (req, res) => {
   res.json(await buildSettingsResponse(uid(req)));

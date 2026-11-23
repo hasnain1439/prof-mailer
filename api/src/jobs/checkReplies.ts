@@ -7,6 +7,8 @@ import { createThreadReader, isGmailConnected, type ThreadReader } from "../serv
 import { parseFromAddress } from "../services/gmail/mime.js";
 import { sendReplyNoticeEmail, type ReplyNotice } from "../services/mail/system.js";
 import { DAY_MS, followUpSubject, safeErrorMessage } from "./util.js";
+import type { SenderProfile } from "../lib/template.js";
+import { loadSenderProfile } from "../services/core/sender.js";
 
 export interface CheckRepliesResult {
   threadsChecked: number;
@@ -75,6 +77,8 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
   let reader: ThreadReader | null = null;
   // Replies found in this run, emailed to the user once at the end.
   const notices: ReplyNotice[] = [];
+  // Sender profile for follow-up templates, loaded on first use.
+  let sender: SenderProfile | undefined;
 
   try {
     for (const [threadId, emails] of threads) {
@@ -152,6 +156,7 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
             jobUrl: professor.jobUrl,
             researchFocus: professor.researchFocus,
             whyFits: professor.whyFits,
+            sender: (sender ??= await loadSenderProfile(userId)),
           },
           { html: template.isHtml },
         );

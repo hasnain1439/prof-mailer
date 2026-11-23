@@ -185,6 +185,15 @@ model Settings {
   companyFollowUpTemplateId String?
   // Spacing between sends: the scheduler won't send for this user before this instant.
   nextSendAfter             DateTime?
+  // Sender profile, filled into templates as {{myName}}, {{myTitle}}, ... (services/core/sender.ts).
+  myName                    String?
+  myTitle                   String?
+  myEmail                   String?
+  myPhone                   String?
+  myLinkedIn                String?
+  myPortfolio               String?
+  myEducation               String?
+  mySummary                 String?
   updatedAt                 DateTime  @updatedAt
 }
 

@@ -308,3 +308,15 @@ export interface AppNotice {
   body: string;
   updatedAt: string;
 }
+
+/** Settings → Your profile; filled into templates as {{myName}} etc. */
+export interface SenderProfile {
+  myName: string | null;
+  myTitle: string | null;
+  myEmail: string | null;
+  myPhone: string | null;
+  myLinkedIn: string | null;
+  myPortfolio: string | null;
+  myEducation: string | null;
+  mySummary: string | null;
+}

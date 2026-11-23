@@ -1,3 +1,26 @@
+/** The sender's own details (Settings → Your profile), filled into {{myName}} etc. */
+export interface SenderProfile {
+  myName?: string | null;
+  myTitle?: string | null;
+  myEmail?: string | null;
+  myPhone?: string | null;
+  myLinkedIn?: string | null;
+  myPortfolio?: string | null;
+  myEducation?: string | null;
+  mySummary?: string | null;
+}
+
+export const SENDER_KEYS = [
+  "myName",
+  "myTitle",
+  "myEmail",
+  "myPhone",
+  "myLinkedIn",
+  "myPortfolio",
+  "myEducation",
+  "mySummary",
+] as const satisfies readonly (keyof SenderProfile)[];
+
 export interface TemplateVars {
   name: string;
   university: string;
@@ -5,9 +28,12 @@ export interface TemplateVars {
   jobUrl?: string | null;
   researchFocus?: string | null;
   whyFits?: string | null;
+  sender?: SenderProfile | null;
 }
 
-export const PLACEHOLDERS = ["name", "university", "company", "role", "jobUrl", "researchFocus", "whyFits"] as const;
+const CONTACT_KEYS = ["name", "university", "company", "role", "jobUrl", "researchFocus", "whyFits"] as const;
+export const PLACEHOLDERS = [...CONTACT_KEYS, ...SENDER_KEYS] as const;
+const PLACEHOLDER_RE = new RegExp(String.raw`\{\{\s*(${PLACEHOLDERS.join("|")})\s*\}\}`, "g");
 
 export function escapeHtml(s: string): string {
   return s
@@ -20,18 +46,20 @@ export function escapeHtml(s: string): string {
 
 /**
  * Replace {{name}}, {{university}} / {{company}}, {{role}}, {{jobUrl}}, {{researchFocus}}, {{whyFits}}
- * (whitespace inside braces allowed).
+ * and the sender's {{myName}}, {{myTitle}}, ... (whitespace inside braces allowed).
  * With `html: true`, values are HTML-escaped so professor data can't break the markup.
  */
 export function renderTemplate(text: string, vars: TemplateVars, opts: { html?: boolean } = {}): string {
-  return text.replace(
-    /\{\{\s*(name|university|company|role|jobUrl|researchFocus|whyFits)\s*\}\}/g,
-    (_m, key: string) => {
-      const v = key === "company" ? vars.university : vars[key as keyof TemplateVars];
-      const s = v == null ? "" : String(v);
-      return opts.html ? escapeHtml(s) : s;
-    },
-  );
+  return text.replace(PLACEHOLDER_RE, (_m, key: string) => {
+    const v = key.startsWith("my")
+      ? vars.sender?.[key as keyof SenderProfile]
+      : key === "company"
+        ? vars.university
+        : vars[key as Exclude<keyof TemplateVars, "sender">];
+    const s = v == null ? "" : String(v);
+    // In HTML, keep the line breaks of multi-line values such as {{mySummary}}.
+    return opts.html ? escapeHtml(s).replace(/\r?\n/g, "<br>") : s;
+  });
 }
 
 /** Placeholders present in text that are not supported. */

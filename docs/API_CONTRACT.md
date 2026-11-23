@@ -313,3 +313,9 @@ Filename is sanitised (basename, no control chars, max 120 chars).
 - **Analytics**: `GET /analytics?kind=PROFESSOR|COMPANY` → `{ totals {sent, replied, replyRate, followUpsSent, avgReplyHours}, byKind, byTemplate, byCountry, byOrg, weekly[12] }`, over first emails (followUpNo 0, SENT); replied = `repliedAt` set.
 - **AI drafts**: `GET /ai/status` → `{enabled}` (true when `ANTHROPIC_API_KEY` is set). `POST /ai/draft {contactId, templateId?, instructions?}` → `{subject, body, whyFits}` (Claude, nothing saved; 503 when not configured, rate limited).
 - **Schedule one email**: `POST /emails {professorId, subject, body, isHtml?, attachCv?, scheduledAt}` → 201 `EmailWithProfessor`; 409 if the contact already has a scheduled or sent first email.
+
+## v6: sender profile placeholders
+
+- `GET /settings/profile` → `{ profile: { myName, myTitle, myEmail, myPhone, myLinkedIn, myPortfolio, myEducation, mySummary } }` (all nullable). `PUT /settings/profile` with any of these (omitted = unchanged, "" / null = cleared; LinkedIn/portfolio must be http(s) URLs).
+- Templates accept `{{myName}}`, `{{myTitle}}`, `{{myEmail}}`, `{{myPhone}}`, `{{myLinkedIn}}`, `{{myPortfolio}}`, `{{myEducation}}`, `{{mySummary}}` everywhere the contact placeholders work (import, preview, follow-ups). Empty `myName` falls back to the account name, empty `myEmail` to the connected Gmail, then the login email. In HTML templates values are escaped and new lines become `<br>`.
+- `GET /notice` → `{ notice | null }` (signed in); admin `GET/PUT /admin/notice {enabled, title, body}`.

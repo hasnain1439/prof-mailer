@@ -9,6 +9,7 @@ import { useApi } from "@/lib/useApi";
 import { useAuth } from "@/components/Auth";
 import { useGmailStatus } from "@/components/GmailStatus";
 import { IconCheck, IconDownload, IconFile, IconTrash, IconUpload } from "@/components/icons";
+import { SenderProfileCard } from "@/components/SenderProfile";
 import { useToast } from "@/components/Toast";
 import { Badge, Button, Card, ErrorBox, Loading, Mono, Notice, PageHeader, Select, Skeleton, btnSecondary, btnSmall, input, link } from "@/components/ui";
 
@@ -342,7 +343,7 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Settings" description="Send limits, follow-up behaviour and your CV. Server flags are read-only." />
+      <PageHeader title="Settings" description="Send limits, follow-ups, your profile for templates and your CV. Server flags are read-only." />
       <ErrorBox error={error} onRetry={reload} />
       {loading && !data && (
         <div className="grid max-w-6xl grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
@@ -356,6 +357,7 @@ export default function SettingsPage() {
             <Card title="Sending and follow-ups" flush>
               <SettingsForm initial={data} onSaved={setLatest} />
             </Card>
+            <SenderProfileCard />
             <CvCard />
           </div>
           <div>
