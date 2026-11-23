@@ -6,6 +6,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import "../../lib/env.js"; // loads .env before the R2_* variables are read
 
 const ACCOUNT_ID = (process.env.R2_ACCOUNT_ID ?? "").trim();
 const ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID ?? "").trim();
