@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, Suspense, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { api, errorMessage, type ImportType } from "@/lib/api";
-import type { ContactKind, ImportCommitResult, ImportPreview, ImportPreviewRow } from "@/lib/types";
+import { cvFor, type ContactKind, type ImportCommitResult, type ImportPreview, type ImportPreviewRow } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { IconBuilding, IconGraduation, IconAlert, IconArrowRight, IconCheck, IconDownload, IconFile, IconPaperclip, IconX } from "@/components/icons";
@@ -110,7 +110,7 @@ function ImportInner() {
   const tc = TYPE_COPY[type];
   const templates = useApi(() => api.listTemplates(false));
   const cv = useApi(() => api.getCv());
-  const hasCv = cv.data ? cv.data.cv !== null : null;
+  const hasCv = cv.data ? cvFor(cv.data, type === "company" ? "COMPANY" : "PROFESSOR") !== null : null;
   // null = follow the chosen template's attachCv
   const [attachCvOverride, setAttachCvOverride] = useState<boolean | null>(null);
   const [file, setFile] = useState<File | null>(null);

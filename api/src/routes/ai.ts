@@ -68,7 +68,7 @@ aiRouter.post(
       prisma.professor.findFirst({ where: { id: contactId, userId } }),
       templateId ? prisma.template.findFirst({ where: { id: templateId, userId } }) : null,
       prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
-      prisma.userCv.findUnique({ where: { userId }, select: { filename: true } }),
+      prisma.userCv.findFirst({ where: { userId }, select: { filename: true } }),
       loadSenderProfile(userId),
     ]);
     if (!contact) throw new HttpError(404, "Contact not found");

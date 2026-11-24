@@ -232,7 +232,11 @@ export interface GmailTestSendResult {
   messageIdHeader?: string;
 }
 
+export type CvSlot = "general" | "professor" | "company";
+
 export interface CvInfo {
+  /** null = general CV */
+  kind?: ContactKind | null;
   filename: string;
   mimeType: string;
   size: number;
@@ -319,4 +323,16 @@ export interface SenderProfile {
   myPortfolio: string | null;
   myEducation: string | null;
   mySummary: string | null;
+}
+
+export interface CvList {
+  /** Any CV (older clients) */
+  cv: CvInfo | null;
+  cvs: Record<CvSlot, CvInfo | null>;
+}
+
+/** CV that would be attached for a contact of this kind (own slot, else general). */
+export function cvFor(list: CvList | undefined, kind: ContactKind): CvInfo | null | undefined {
+  if (!list) return undefined;
+  return (kind === "COMPANY" ? list.cvs.company : list.cvs.professor) ?? list.cvs.general;
 }

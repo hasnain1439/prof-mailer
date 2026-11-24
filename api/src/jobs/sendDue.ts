@@ -5,7 +5,7 @@ import { karachiDayRange } from "../lib/time.js";
 import type { EmailAttachment } from "../services/gmail/appPassword.js";
 import { GmailNotConnectedError, isGmailConnected, sendEmail } from "../services/gmail/mailer.js";
 import { randomDelayMs, safeErrorMessage } from "./util.js";
-import { readCv } from "../services/storage/cvStore.js";
+import { findCvFor, readCv } from "../services/storage/cvStore.js";
 
 export interface SendDueResult {
   processed: number;
@@ -18,7 +18,7 @@ export interface SendDueResult {
 const STALE_SENDING_MS = 10 * 60 * 1000;
 const STOP_STATUSES = new Set(["REPLIED", "INTERESTED", "INTERVIEW", "DECLINED"] as const);
 type StopStatus = typeof STOP_STATUSES extends Set<infer T> ? T : never;
-const CV_MISSING = "CV attachment missing: upload your CV in Settings";
+const CV_MISSING = "CV attachment missing: upload a CV for this contact type (or a general CV) in Settings";
 /** Due follow-ups of stopped professors are cancelled while looking for the one email to send. */
 const MAX_CANDIDATES_PER_USER = 20;
 
@@ -109,7 +109,7 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
     where: dueWhere,
     orderBy: { scheduledAt: "asc" },
     take: MAX_CANDIDATES_PER_USER,
-    include: { professor: { select: { id: true, email: true, status: true } } },
+    include: { professor: { select: { id: true, email: true, status: true, kind: true } } },
   });
 
   for (const email of candidates) {
@@ -135,7 +135,7 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
     // CV attachment: without a CV the email fails without sending (no daily quota or spacing used).
     let attachments: EmailAttachment[] | undefined;
     if (email.attachCv) {
-      const cv = await prisma.userCv.findUnique({ where: { userId } });
+      const cv = await findCvFor(userId, email.professor.kind);
       if (!cv) {
         await prisma.email.update({ where: { id: email.id }, data: { status: "FAILED", error: CV_MISSING } });
         result.failed++;

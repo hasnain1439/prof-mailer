@@ -1,11 +1,12 @@
+import type { ContactKind } from "@prisma/client";
 import { Router, type RequestHandler } from "express";
 import multer from "multer";
 import { uid } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../lib/http.js";
-import { deleteCvObject, putCvObject, r2Enabled, readCv } from "../services/storage/cvStore.js";
+import { deleteCvObject, findSlot, putCvObject, r2Enabled, readCv } from "../services/storage/cvStore.js";
 
-/** The user's CV (one per user, stored as bytes), attached to emails with attachCv. */
+/** The user's CVs: one for professors, one for companies and a general fallback, attached to emails with attachCv. */
 export const cvRouter = Router();
 
 const MAX_BYTES = 4 * 1024 * 1024; // Vercel rejects request bodies over 4.5 MB
@@ -61,11 +62,23 @@ const uploadFile: RequestHandler = (req, res, next) => {
   });
 };
 
-const cvMeta = { filename: true, mimeType: true, size: true, updatedAt: true } as const;
+const cvMeta = { kind: true, filename: true, mimeType: true, size: true, updatedAt: true } as const;
+
+/**
+ * CV slot from ?for=professor|company; anything else (or nothing) is the general CV, which is used
+ * for a contact when there is no CV for its kind.
+ */
+function slotOf(v: unknown): ContactKind | null {
+  return v === "professor" ? "PROFESSOR" : v === "company" ? "COMPANY" : null;
+}
+
 
 cvRouter.get("/", async (req, res) => {
-  const cv = await prisma.userCv.findUnique({ where: { userId: uid(req) }, select: cvMeta });
-  res.json({ cv });
+  const rows = await prisma.userCv.findMany({ where: { userId: uid(req) }, select: cvMeta });
+  const by = (k: ContactKind | null) => rows.find((r) => r.kind === k) ?? null;
+  const cvs = { general: by(null), professor: by("PROFESSOR"), company: by("COMPANY") };
+  // `cv` kept for older clients: any CV.
+  res.json({ cv: cvs.general ?? cvs.professor ?? cvs.company, cvs });
 });
 
 cvRouter.post("/", uploadFile, async (req, res) => {
@@ -77,7 +90,8 @@ cvRouter.post("/", uploadFile, async (req, res) => {
   if (!type || !type.magic.every((b, i) => file.buffer[i] === b)) throw new HttpError(400, TYPE_ERROR);
 
   const userId = uid(req);
-  const previous = await prisma.userCv.findUnique({ where: { userId }, select: { storageKey: true } });
+  const kind = slotOf(req.query.for ?? req.body?.for);
+  const previous = await findSlot(userId, kind);
   const storageKey = r2Enabled ? await putCvObject(userId, file.buffer, type.mime) : null;
   const data = {
     filename: sanitizeFilename(file.originalname, ext),
@@ -86,18 +100,15 @@ cvRouter.post("/", uploadFile, async (req, res) => {
     data: storageKey ? null : new Uint8Array(file.buffer),
     storageKey,
   };
-  const cv = await prisma.userCv.upsert({
-    where: { userId },
-    create: { userId, ...data },
-    update: data,
-    select: cvMeta,
-  });
+  const cv = previous
+    ? await prisma.userCv.update({ where: { id: previous.id }, data, select: cvMeta })
+    : await prisma.userCv.create({ data: { userId, kind, ...data }, select: cvMeta });
   if (previous?.storageKey && previous.storageKey !== storageKey) await deleteCvObject(previous.storageKey);
   res.json({ cv });
 });
 
 cvRouter.get("/download", async (req, res) => {
-  const cv = await prisma.userCv.findUnique({ where: { userId: uid(req) } });
+  const cv = await findSlot(uid(req), slotOf(req.query.for));
   if (!cv) throw new HttpError(404, "No CV uploaded");
   const body = await readCv(cv);
   res.attachment(cv.filename);
@@ -108,9 +119,10 @@ cvRouter.get("/download", async (req, res) => {
 });
 
 cvRouter.delete("/", async (req, res) => {
-  const userId = uid(req);
-  const cv = await prisma.userCv.findUnique({ where: { userId }, select: { storageKey: true } });
-  await prisma.userCv.deleteMany({ where: { userId } });
-  await deleteCvObject(cv?.storageKey);
+  const cv = await findSlot(uid(req), slotOf(req.query.for));
+  if (cv) {
+    await prisma.userCv.delete({ where: { id: cv.id } });
+    await deleteCvObject(cv.storageKey);
+  }
   res.status(204).end();
 });

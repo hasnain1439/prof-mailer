@@ -7,6 +7,8 @@ import type {
   AuthUser,
   ContactKind,
   CvInfo,
+  CvList,
+  CvSlot,
   Dashboard,
   Email,
   EmailStatus,
@@ -233,14 +235,14 @@ export const api = {
   saveSenderProfile: (body: SenderProfile) => request<{ profile: SenderProfile }>("/settings/profile", { method: "PUT", json: body }),
 
   // CV (one per user)
-  getCv: () => request<{ cv: CvInfo | null }>("/cv"),
-  uploadCv: (file: File) => {
+  getCv: () => request<CvList>("/cv"),
+  uploadCv: (file: File, slot: CvSlot = "general") => {
     const form = new FormData();
     form.append("file", file);
-    return request<{ cv: CvInfo }>("/cv", { method: "POST", form });
+    return request<{ cv: CvInfo }>("/cv", { method: "POST", form, query: { for: slot } });
   },
-  deleteCv: () => request<void>("/cv", { method: "DELETE" }),
-  cvDownloadUrl: `${API_URL}/cv/download`,
+  deleteCv: (slot: CvSlot = "general") => request<void>("/cv", { method: "DELETE", query: { for: slot } }),
+  cvDownloadUrl: (slot: CvSlot = "general") => `${API_URL}/cv/download?for=${slot}`,
 
   // Gmail
   gmailStatus: () => request<GmailStatus>("/gmail/status"),

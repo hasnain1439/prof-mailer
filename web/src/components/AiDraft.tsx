@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { karachiInputFromNow, karachiInputToUtcIso } from "@/lib/time";
-import type { Professor } from "@/lib/types";
+import { cvFor, type Professor } from "@/lib/types";
 import { useApi } from "@/lib/useApi";
 import { IconRefresh, IconSparkles } from "./icons";
 import { useToast } from "./Toast";
@@ -31,7 +31,7 @@ export function AiDraftForm({ contact, onScheduled, onCancel }: { contact: Profe
   const [scheduling, setScheduling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const hasCv = !!cv.data?.cv;
+  const hasCv = !!cvFor(cv.data, contact.kind);
 
   async function generate() {
     setGenerating(true);

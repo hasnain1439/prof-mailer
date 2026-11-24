@@ -53,7 +53,7 @@ model User {
   emails          Email[]
   settings        Settings?
   gmailAccount    GmailAccount?
-  cv              UserCv?
+  cvs             UserCv[]
   reminders       Reminder[]
 }
 
@@ -223,16 +223,21 @@ model GmailAccount {
 
 // The user's CV (one per user), attached to emails whose attachCv is true. PDF/DOC/DOCX, max 5 MB.
 model UserCv {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  filename  String
-  mimeType  String
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Which contacts this CV goes to: PROFESSOR (e.g. Europass), COMPANY (job CV), or null = general,
+  // used when there is no CV for the contact's kind. At most one CV per (userId, kind) (enforced in code).
+  kind       ContactKind?
+  filename   String
+  mimeType   String
   size       Int
   // Stored in the database (data) or, when R2 is configured, in Cloudflare R2 (storageKey; data null).
   data       Bytes?
   storageKey String?
-  updatedAt  DateTime @updatedAt
+  updatedAt  DateTime     @updatedAt
+
+  @@index([userId])
 }
 
 // A personal reminder, optionally tied to a professor or company. When dueAt passes the tick job

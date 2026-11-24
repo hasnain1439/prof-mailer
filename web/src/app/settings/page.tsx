@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { api, errorMessage } from "@/lib/api";
-import type { CvInfo, SettingsInput, SettingsResponse, Template } from "@/lib/types";
+import type { CvInfo, CvSlot, SettingsInput, SettingsResponse, Template } from "@/lib/types";
 import { formatKarachi } from "@/lib/time";
 import { useApi } from "@/lib/useApi";
 import { useAuth } from "@/components/Auth";
@@ -189,15 +189,19 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Upload / replace / download / remove the one CV attached to emails whose template has "Attach my CV". */
-function CvCard() {
+const SLOT_COPY: Record<CvSlot, { title: string; hint: string }> = {
+  professor: { title: "CV for professors", hint: "Attached to emails to professors, e.g. your Europass or academic CV." },
+  company: { title: "CV for job applications", hint: "Attached to emails to companies." },
+  general: { title: "General CV", hint: "Used when the CV for that contact type is missing." },
+};
+
+/** One CV slot: upload / replace / download / remove. */
+function CvSlotRow({ slot, info, onChanged }: { slot: CvSlot; info: CvInfo | null; onChanged: (cv: CvInfo | null) => void }) {
   const toast = useToast();
-  const cv = useApi(() => api.getCv());
-  const [current, setCurrent] = useState<CvInfo | null | undefined>(undefined);
   const [busy, setBusy] = useState<"upload" | "delete" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const info = current !== undefined ? current : cv.data?.cv;
+  const copy = SLOT_COPY[slot];
 
   async function upload(file: File | undefined) {
     if (fileRef.current) fileRef.current.value = "";
@@ -217,9 +221,9 @@ function CvCard() {
     }
     setBusy("upload");
     try {
-      const res = await api.uploadCv(file);
-      setCurrent(res.cv);
-      toast(info ? "CV replaced." : "CV uploaded.");
+      const res = await api.uploadCv(file, slot);
+      onChanged(res.cv);
+      toast(info ? `${copy.title} replaced.` : `${copy.title} uploaded.`);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -228,13 +232,13 @@ function CvCard() {
   }
 
   async function remove() {
-    if (!window.confirm("Remove your CV? Emails set to attach it will fail until you upload a new one.")) return;
+    if (!window.confirm(`Remove your ${copy.title.toLowerCase()}?`)) return;
     setError(null);
     setBusy("delete");
     try {
-      await api.deleteCv();
-      setCurrent(null);
-      toast("CV removed.");
+      await api.deleteCv(slot);
+      onChanged(null);
+      toast(`${copy.title} removed.`);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -243,58 +247,76 @@ function CvCard() {
   }
 
   return (
-    <Card title="CV" description="Attached to emails whose template has “Attach my CV” ticked. PDF, DOC or DOCX, max 4 MB.">
-      <ErrorBox error={cv.error} onRetry={cv.reload} />
+    <div className="border-b border-border py-3 first:pt-0 last:border-b-0 last:pb-0">
+      <p className="text-[13px] font-semibold text-text">{copy.title}</p>
+      <p className="mb-2 text-xs text-muted">{copy.hint}</p>
       <ErrorBox error={error} />
-      {cv.loading && info === undefined && <Skeleton className="h-10 w-full" />}
-      {info !== undefined && !cv.error && (
-        <div className="flex flex-wrap items-center gap-3">
-          {info ? (
-            <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-muted">
-                <IconFile />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-[13px] font-medium text-text" title={info.filename}>
-                  {info.filename}
-                </p>
-                <p className="text-xs text-muted">
-                  <Mono className="!text-xs">{formatBytes(info.size)}</Mono> · updated <Mono className="!text-xs">{formatKarachi(info.updatedAt)}</Mono>
-                </p>
-              </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {info ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-bg text-muted">
+              <IconFile />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-medium text-text" title={info.filename}>
+                {info.filename}
+              </p>
+              <p className="text-xs text-muted">
+                <Mono className="!text-xs">{formatBytes(info.size)}</Mono> · updated <Mono className="!text-xs">{formatKarachi(info.updatedAt)}</Mono>
+              </p>
             </div>
-          ) : (
-            <p className="flex-1 text-[13px] text-muted">No CV uploaded yet.</p>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {info && (
-              <a href={api.cvDownloadUrl} download className={`${btnSecondary} ${btnSmall}`}>
-                <IconDownload size={14} />
-                Download
-              </a>
-            )}
-            <Button size="sm" variant={info ? "secondary" : "primary"} disabled={busy !== null} onClick={() => fileRef.current?.click()}>
-              <IconUpload size={14} />
-              {busy === "upload" ? "Uploading…" : info ? "Replace" : "Upload CV"}
-            </Button>
-            {info && (
-              <Button size="sm" variant="danger" disabled={busy !== null} onClick={remove}>
-                <IconTrash size={14} />
-                {busy === "delete" ? "Removing…" : "Remove"}
-              </Button>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-              onChange={(e) => upload(e.target.files?.[0])}
-            />
           </div>
+        ) : (
+          <p className="flex-1 text-[13px] text-muted">Not uploaded.</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {info && (
+            <a href={api.cvDownloadUrl(slot)} download className={`${btnSecondary} ${btnSmall}`}>
+              <IconDownload size={14} />
+              Download
+            </a>
+          )}
+          <Button size="sm" variant={info ? "secondary" : "primary"} disabled={busy !== null} onClick={() => fileRef.current?.click()}>
+            <IconUpload size={14} />
+            {busy === "upload" ? "Uploading…" : info ? "Replace" : "Upload"}
+          </Button>
+          {info && (
+            <Button size="sm" variant="danger" disabled={busy !== null} onClick={remove}>
+              <IconTrash size={14} />
+              {busy === "delete" ? "Removing…" : "Remove"}
+            </Button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={(e) => upload(e.target.files?.[0])}
+          />
         </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+/** CVs attached to emails whose template (or import) has "Attach my CV": one per contact type, plus a general fallback. */
+function CvCard() {
+  const cv = useApi(() => api.getCv());
+  const [overrides, setOverrides] = useState<Partial<Record<CvSlot, CvInfo | null>>>({});
+  const get = (slot: CvSlot): CvInfo | null => (slot in overrides ? overrides[slot]! : (cv.data?.cvs[slot] ?? null));
+  // The general slot is only shown when it holds a CV (older single-CV accounts).
+  const slots: CvSlot[] = get("general") ? ["professor", "company", "general"] : ["professor", "company"];
+
+  return (
+    <Card title="CVs" description="Attached to emails with “Attach my CV”. The right CV is picked by contact type. PDF, DOC or DOCX, max 4 MB each.">
+      <ErrorBox error={cv.error} onRetry={cv.reload} />
+      {cv.loading && !cv.data && <Skeleton className="h-10 w-full" />}
+      {cv.data &&
+        slots.map((slot) => (
+          <CvSlotRow key={slot} slot={slot} info={get(slot)} onChanged={(info) => setOverrides((o) => ({ ...o, [slot]: info }))} />
+        ))}
     </Card>
   );
 }

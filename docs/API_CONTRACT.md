@@ -319,3 +319,9 @@ Filename is sanitised (basename, no control chars, max 120 chars).
 - `GET /settings/profile` → `{ profile: { myName, myTitle, myEmail, myPhone, myLinkedIn, myPortfolio, myEducation, mySummary } }` (all nullable). `PUT /settings/profile` with any of these (omitted = unchanged, "" / null = cleared; LinkedIn/portfolio must be http(s) URLs).
 - Templates accept `{{myName}}`, `{{myTitle}}`, `{{myEmail}}`, `{{myPhone}}`, `{{myLinkedIn}}`, `{{myPortfolio}}`, `{{myEducation}}`, `{{mySummary}}` everywhere the contact placeholders work (import, preview, follow-ups). Empty `myName` falls back to the account name, empty `myEmail` to the connected Gmail, then the login email. In HTML templates values are escaped and new lines become `<br>`.
 - `GET /notice` → `{ notice | null }` (signed in); admin `GET/PUT /admin/notice {enabled, title, body}`.
+
+## v7: one CV per contact type
+
+- `GET /cv` → `{ cv, cvs: { general, professor, company } }` (each `CvInfo | null`, `cv` = any, for older clients).
+- `POST /cv?for=professor|company` (multipart `file`) uploads or replaces that slot; no `for` = the general CV. `GET /cv/download?for=…`, `DELETE /cv?for=…` likewise.
+- Sending: an email with `attachCv` gets the CV for its contact's kind, else the general CV, else it fails with "CV attachment missing".

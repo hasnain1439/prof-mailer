@@ -6,7 +6,9 @@
  */
 import { randomBytes } from "node:crypto";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import type { ContactKind } from "@prisma/client";
 import "../../lib/env.js"; // loads .env before the R2_* variables are read
+import { prisma } from "../../lib/prisma.js";
 
 const ACCOUNT_ID = (process.env.R2_ACCOUNT_ID ?? "").trim();
 const ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID ?? "").trim();
@@ -52,4 +54,14 @@ export async function readCv(cv: { data: Uint8Array | null; storageKey: string |
   }
   if (cv.data) return Buffer.from(cv.data);
   throw new Error("CV has no stored file");
+}
+
+/** The CV in one slot: PROFESSOR, COMPANY, or null for the general CV. */
+export function findSlot(userId: string, kind: ContactKind | null) {
+  return prisma.userCv.findFirst({ where: { userId, kind } });
+}
+
+/** The CV attached to emails for a contact of this kind: its own slot, else the general CV. */
+export async function findCvFor(userId: string, kind: ContactKind) {
+  return (await findSlot(userId, kind)) ?? (await findSlot(userId, null));
 }
