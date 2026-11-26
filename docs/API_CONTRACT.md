@@ -325,3 +325,11 @@ Filename is sanitised (basename, no control chars, max 120 chars).
 - `GET /cv` → `{ cv, cvs: { general, professor, company } }` (each `CvInfo | null`, `cv` = any, for older clients).
 - `POST /cv?for=professor|company` (multipart `file`) uploads or replaces that slot; no `for` = the general CV. `GET /cv/download?for=…`, `DELETE /cv?for=…` likewise.
 - Sending: an email with `attachCv` gets the CV for its contact's kind, else the general CV, else it fails with "CV attachment missing".
+
+## v8: CC/BCC, extra documents, separate-thread replies, Google sign-in, open tracking
+
+- **CC/BCC**: `cc` / `bcc` (comma-separated, max 10 each) on templates, `POST /emails`, `PATCH /emails/:id`, and import columns `cc`, `bcc` (a row value overrides the template). Follow-ups copy the first email's CC/BCC.
+- **Documents**: `GET /files`, `POST /files` (multipart `file` + `label`; PDF/DOC/DOCX, 4 MB, max 5), `GET /files/:id/download`, `DELETE /files/:id`. Templates and `POST /emails` take `attachFileIds`; they are attached besides the CV. A deleted document is skipped at send time.
+- **Replies**: a reply is any message in the thread after the first send from someone other than the user (not a bounce), or a new email from the contact's address after the first send.
+- **Google sign-in**: `GET /auth/google/status` → `{enabled}`; `GET /auth/google/start` → Google; callback `GET /auth/google/callback` signs in (or creates) the account with the Google-verified email. Needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`; redirect URI `{PUBLIC_URL}/api/auth/google/callback`.
+- **Open tracking**: `trackOpens` on templates / `POST /emails` (HTML only) adds a pixel `GET /t/o/:token.gif` (public); emails expose `openedAt`, `openCount`. Approximate.

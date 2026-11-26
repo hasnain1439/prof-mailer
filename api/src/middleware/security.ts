@@ -24,7 +24,7 @@ export function isAllowedOrigin(origin: string): boolean {
  * - a request body must be JSON (multipart only for the import and CV uploads). HTML forms cannot send JSON.
  * Mounted on /api, so req.path is relative to it. /jobs/* uses a bearer secret, not cookies.
  */
-const MULTIPART_PATHS = new Set(["/import/preview", "/cv"]);
+const MULTIPART_PATHS = new Set(["/import/preview", "/cv", "/files"]);
 
 export const csrfGuard: RequestHandler = (req, res, next) => {
   if (!MUTATING.has(req.method)) return next();

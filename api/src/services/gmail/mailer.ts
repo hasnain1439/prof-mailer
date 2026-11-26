@@ -27,6 +27,9 @@ export interface SendEmailInput {
   references?: string[] | null;
   /** Files to attach (e.g. the user's CV). */
   attachments?: EmailAttachment[];
+  /** Comma-separated CC / BCC addresses. */
+  cc?: string | null;
+  bcc?: string | null;
   /** Send time recorded in the DRY_RUN thread store (defaults to now); callers pass the same value they store as sentAt. */
   sentAt?: Date;
 }
@@ -78,6 +81,7 @@ export async function sendEmail(userId: string, input: SendEmailInput): Promise<
       `[DRY_RUN] user=${userId} would send to=${to} subject=${JSON.stringify(input.subject)} ` +
         `threadId=${input.threadId ?? "(new)"} inReplyTo=${inReplyTo ?? "(none)"} ` +
         `references=${references.length ? references.join(" ") : "(none)"} ` +
+        `cc=${input.cc || "(none)"} bcc=${input.bcc || "(none)"} ` +
         `attachment=${input.attachments?.length ? input.attachments.map((a) => a.filename).join(",") : "(none)"} ` +
         `body="${preview}${input.body.length > 80 ? "…" : ""}"`,
     );
@@ -115,6 +119,8 @@ export async function sendTestEmail(userId: string, ownEmail: string, opts: { su
 /** Reads threads for one user during a check-replies run; close() when done. */
 export interface ThreadReader {
   getThreadMessages(threadId: string): Promise<ThreadMessage[]>;
+  /** Messages from this address received after `since`, in any thread (replies sent as a new email). */
+  getMessagesFrom(address: string, since: Date): Promise<ThreadMessage[]>;
   close(): Promise<void>;
 }
 
@@ -131,9 +137,13 @@ async function dryRunThreadMessages(threadId: string): Promise<ThreadMessage[]> 
 
 /** Thread reader for one user: DRY_RUN store, or IMAP (one connection reused for the run). */
 export async function createThreadReader(userId: string): Promise<ThreadReader> {
-  if (env.DRY_RUN) return { getThreadMessages: dryRunThreadMessages, close: async () => undefined };
+  if (env.DRY_RUN) return { getThreadMessages: dryRunThreadMessages, getMessagesFrom: async () => [], close: async () => undefined };
   const creds = await getAppPasswordCreds(userId);
   if (!creds) throw new GmailNotConnectedError();
   const reader = new ImapThreadReader(creds);
-  return { getThreadMessages: (id) => reader.getThreadMessages(id), close: () => reader.close() };
+  return {
+    getThreadMessages: (id) => reader.getThreadMessages(id),
+    getMessagesFrom: (address, since) => reader.getMessagesFrom(address, since),
+    close: () => reader.close(),
+  };
 }

@@ -41,6 +41,8 @@ model User {
   name            String?
   // "scrypt$N$r$p$<salt b64>$<hash b64>" (src/lib/password.ts)
   passwordHash    String? // null until the user sets it on the verification page
+  // Google account id ("sub") for Sign in with Google.
+  googleId        String?       @unique
   emailVerifiedAt DateTime?
   // Set by an admin: no sign-in, no API access, the scheduler skips the user's emails.
   blockedAt       DateTime?
@@ -54,6 +56,7 @@ model User {
   settings        Settings?
   gmailAccount    GmailAccount?
   cvs             UserCv[]
+  files           UserFile[]
   reminders       Reminder[]
 }
 
@@ -129,7 +132,14 @@ model Template {
   isFollowUp Boolean  @default(false)
   isHtml     Boolean  @default(false)
   // Attach the user's CV (UserCv) to emails created from this template.
-  attachCv   Boolean  @default(false)
+  attachCv      Boolean  @default(false)
+  // Extra documents (UserFile ids, e.g. a transcript) attached to emails from this template.
+  attachFileIds String[] @default([])
+  // Default CC / BCC for emails from this template (comma-separated addresses).
+  cc            String?
+  bcc           String?
+  // Add an open-tracking pixel (HTML emails only).
+  trackOpens    Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   emails     Email[]
@@ -151,6 +161,15 @@ model Email {
   isHtml          Boolean     @default(false)
   // Attach the user's CV at send time (copied from the template when the email is created).
   attachCv        Boolean     @default(false)
+  attachFileIds   String[]    @default([])
+  // Comma-separated CC / BCC addresses.
+  cc              String?
+  bcc             String?
+  // Open tracking (HTML only): pixel token, first open and count.
+  trackOpens      Boolean     @default(false)
+  openToken       String?     @unique
+  openedAt        DateTime?
+  openCount       Int         @default(0)
   status          EmailStatus @default(SCHEDULED)
   scheduledAt     DateTime
   sentAt          DateTime?
@@ -259,4 +278,20 @@ model Reminder {
   @@index([userId, doneAt, dueAt])
   @@index([dueAt, notifiedAt])
   @@index([contactId])
+}
+
+// Extra documents a user can attach besides the CV (transcript, cover letter, ...).
+model UserFile {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String
+  filename   String
+  mimeType   String
+  size       Int
+  data       Bytes?
+  storageKey String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
 }

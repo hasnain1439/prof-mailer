@@ -28,8 +28,17 @@ function s3(): S3Client {
 }
 
 /** Upload a CV; returns its object key. Only call when r2Enabled. */
-export async function putCvObject(userId: string, body: Buffer, contentType: string): Promise<string> {
-  const key = `cv/${userId}/${Date.now()}-${randomBytes(6).toString("hex")}`;
+export function putCvObject(userId: string, body: Buffer, contentType: string): Promise<string> {
+  return putObject("cv", userId, body, contentType);
+}
+
+/** Upload an extra document (transcript, ...); returns its object key. Only call when r2Enabled. */
+export function putFileObject(userId: string, body: Buffer, contentType: string): Promise<string> {
+  return putObject("files", userId, body, contentType);
+}
+
+async function putObject(prefix: string, userId: string, body: Buffer, contentType: string): Promise<string> {
+  const key = `${prefix}/${userId}/${Date.now()}-${randomBytes(6).toString("hex")}`;
   await s3().send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body, ContentType: contentType }));
   return key;
 }

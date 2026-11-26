@@ -30,6 +30,7 @@ import type {
   SettingsInput,
   SettingsResponse,
   Template,
+  UserFile,
   TemplateInput,
 } from "./types";
 
@@ -225,7 +226,7 @@ export const api = {
       query: { status: q.status?.join(","), professorId: q.professorId, limit: q.limit },
     }),
   cancelEmail: (id: string) => request<Email>(`/emails/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
-  updateEmail: (id: string, body: { scheduledAt: string; subject?: string; body?: string; attachCv?: boolean }) =>
+  updateEmail: (id: string, body: { scheduledAt?: string; subject?: string; body?: string; attachCv?: boolean; cc?: string | null; bcc?: string | null }) =>
     request<Email>(`/emails/${encodeURIComponent(id)}`, { method: "PATCH", json: body }),
 
   // Settings
@@ -244,6 +245,21 @@ export const api = {
   deleteCv: (slot: CvSlot = "general") => request<void>("/cv", { method: "DELETE", query: { for: slot } }),
   cvDownloadUrl: (slot: CvSlot = "general") => `${API_URL}/cv/download?for=${slot}`,
 
+  // Extra documents (transcript, ...)
+  listFiles: () => request<UserFile[]>("/files"),
+  uploadFile: (file: File, label: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("label", label);
+    return request<UserFile>("/files", { method: "POST", form });
+  },
+  deleteFile: (id: string) => request<void>(`/files/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  fileDownloadUrl: (id: string) => `${API_URL}/files/${encodeURIComponent(id)}/download`,
+
+  // Sign in with Google
+  googleStatus: () => request<{ enabled: boolean }>("/auth/google/status", { allowUnauthorized: true }),
+  googleStartUrl: `${API_URL}/auth/google/start`,
+
   // Gmail
   gmailStatus: () => request<GmailStatus>("/gmail/status"),
   connectAppPassword: (body: { email: string; appPassword: string }) =>
@@ -253,7 +269,17 @@ export const api = {
     request<GmailTestSendResult>("/gmail/test-send", { method: "POST", json: body }),
 
   /** Schedule a first email to one contact (409 if it already has one). */
-  createEmail: (body: { professorId: string; subject: string; body: string; isHtml?: boolean; attachCv?: boolean; scheduledAt: string }) =>
+  createEmail: (body: {
+    professorId: string;
+    subject: string;
+    body: string;
+    isHtml?: boolean;
+    attachCv?: boolean;
+    attachFileIds?: string[];
+    cc?: string | null;
+    bcc?: string | null;
+    scheduledAt: string;
+  }) =>
     request<EmailWithProfessor>("/emails", { method: "POST", json: body }),
 
   // Reminders

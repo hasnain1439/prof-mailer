@@ -4,7 +4,7 @@ import { uid } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError, parseQuery, validateBody } from "../lib/http.js";
 import { PLACEHOLDERS, renderTemplate, unknownPlaceholders } from "../lib/template.js";
-import { reqStr } from "../services/core/schemas.js";
+import { addressListField, fileIdsField, reqStr } from "../services/core/schemas.js";
 import { loadSenderProfile } from "../services/core/sender.js";
 
 export const templatesRouter = Router();
@@ -41,8 +41,18 @@ const createSchema = z.object({
   isFollowUp: z.boolean().optional(),
   isHtml: z.boolean().optional(),
   attachCv: z.boolean().optional(),
+  attachFileIds: fileIdsField.optional(),
+  cc: addressListField,
+  bcc: addressListField,
+  trackOpens: z.boolean().optional(),
 });
 const patchSchema = createSchema.partial();
+
+async function assertFiles(userId: string, ids: string[] | undefined) {
+  if (!ids?.length) return;
+  const n = await prisma.userFile.count({ where: { userId, id: { in: ids } } });
+  if (n !== new Set(ids).size) throw new HttpError(400, "One of the selected documents no longer exists");
+}
 
 function assertPlaceholders(subject?: string, body?: string) {
   const unknown = [...new Set([...unknownPlaceholders(subject ?? ""), ...unknownPlaceholders(body ?? "")])];
@@ -57,6 +67,7 @@ function assertPlaceholders(subject?: string, body?: string) {
 templatesRouter.post("/", validateBody(createSchema), async (req, res) => {
   const data = req.body as z.infer<typeof createSchema>;
   assertPlaceholders(data.subject, data.body);
+  await assertFiles(uid(req), data.attachFileIds);
   const t = await prisma.template.create({ data: { ...data, userId: uid(req) } });
   res.status(201).json(t);
 });
@@ -64,6 +75,7 @@ templatesRouter.post("/", validateBody(createSchema), async (req, res) => {
 templatesRouter.patch("/:id", validateBody(patchSchema), async (req, res) => {
   const data = req.body as z.infer<typeof patchSchema>;
   assertPlaceholders(data.subject, data.body);
+  await assertFiles(uid(req), data.attachFileIds);
   const t = await prisma.template.update({ where: { id: req.params.id as string, userId: uid(req) }, data }); // P2025 → 404
   res.json(t);
 });

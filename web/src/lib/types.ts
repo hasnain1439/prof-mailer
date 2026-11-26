@@ -43,6 +43,13 @@ export interface Template {
   isFollowUp: boolean;
   isHtml: boolean;
   attachCv: boolean;
+  /** Extra documents (UserFile ids) attached to emails from this template. */
+  attachFileIds: string[];
+  /** Default CC / BCC (comma-separated). */
+  cc: string | null;
+  bcc: string | null;
+  /** Open-tracking pixel (HTML only). */
+  trackOpens: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -60,6 +67,13 @@ export interface Email {
   error: string | null;
   isHtml: boolean;
   attachCv: boolean;
+  attachFileIds: string[];
+  cc: string | null;
+  bcc: string | null;
+  trackOpens: boolean;
+  /** First time the tracking pixel loaded (approximate). */
+  openedAt: string | null;
+  openCount: number;
   gmailThreadId: string | null;
   gmailMessageId: string | null;
   messageIdHeader: string | null;
@@ -117,6 +131,10 @@ export interface TemplateInput {
   isFollowUp?: boolean;
   isHtml?: boolean;
   attachCv?: boolean;
+  attachFileIds?: string[];
+  cc?: string | null;
+  bcc?: string | null;
+  trackOpens?: boolean;
 }
 
 export interface ImportRowData {
@@ -335,4 +353,14 @@ export interface CvList {
 export function cvFor(list: CvList | undefined, kind: ContactKind): CvInfo | null | undefined {
   if (!list) return undefined;
   return (kind === "COMPANY" ? list.cvs.company : list.cvs.professor) ?? list.cvs.general;
+}
+
+/** An extra document (transcript, cover letter, ...) that can be attached besides the CV. */
+export interface UserFile {
+  id: string;
+  label: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
 }

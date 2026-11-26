@@ -81,6 +81,12 @@ function MessageBlock({ e, sender, onChanged }: { e: Email; sender: string | nul
               From <Mono className="!text-xs">{sender}</Mono>
             </span>
           )}
+          {e.cc && (
+            <span>
+              CC <Mono className="!text-xs">{e.cc}</Mono>
+            </span>
+          )}
+          {e.status === "SENT" && e.trackOpens && <span>{e.openedAt ? `Opened ${formatKarachi(e.openedAt)}` : "Not opened yet"}</span>}
         </div>
       </div>
       <div className="px-4 py-3">

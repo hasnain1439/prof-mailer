@@ -1,4 +1,6 @@
+import { randomBytes } from "node:crypto";
 import { env } from "../lib/env.js";
+import { withTrackingPixel } from "../services/core/tracking.js";
 import { prisma } from "../lib/prisma.js";
 import { MAX_DAILY_SEND_LIMIT, getSettings } from "../lib/settings.js";
 import { karachiDayRange } from "../lib/time.js";
@@ -156,6 +158,22 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
       attachments = [{ filename: cv.filename, contentType: cv.mimeType, content }];
     }
 
+    // Extra documents (transcript, ...). A document deleted since scheduling is skipped, not fatal.
+    if (email.attachFileIds.length) {
+      const files = await prisma.userFile.findMany({ where: { userId, id: { in: email.attachFileIds } } });
+      for (const f of files) {
+        try {
+          (attachments ??= []).push({ filename: f.filename, contentType: f.mimeType, content: await readCv(f) });
+        } catch (err) {
+          console.error(`[send-due] document read failed: ${safeErrorMessage(err)}`);
+        }
+      }
+    }
+
+    // Open tracking (HTML only): a per-email pixel, added to the sent copy only (the stored body stays clean).
+    const openToken = email.trackOpens && email.isHtml ? randomBytes(18).toString("base64url") : null;
+    const body = openToken ? withTrackingPixel(email.body, openToken) : email.body;
+
     try {
       const threading = await threadingFor(email);
       // Same clock for the DB sentAt and the DRY_RUN thread store, so daily counts and reply checks agree.
@@ -163,8 +181,10 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
       const sent = await sendEmail(userId, {
         to: email.professor.email,
         subject: email.subject,
-        body: email.body,
+        body,
         isHtml: email.isHtml,
+        cc: email.cc,
+        bcc: email.bcc,
         sentAt: sendTime,
         ...(attachments ? { attachments } : {}),
         ...threading,
@@ -178,6 +198,7 @@ async function sendDueForUser(userId: string, now: Date, clock: () => Date, resu
           gmailMessageId: sent.gmailMessageId,
           gmailThreadId: sent.gmailThreadId,
           messageIdHeader: sent.messageIdHeader,
+          ...(openToken ? { openToken } : {}),
         },
       });
       await prisma.professor.updateMany({

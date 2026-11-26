@@ -9,6 +9,7 @@ import { useApi } from "@/lib/useApi";
 import { useAuth } from "@/components/Auth";
 import { useGmailStatus } from "@/components/GmailStatus";
 import { IconCheck, IconDownload, IconFile, IconTrash, IconUpload } from "@/components/icons";
+import { DocumentsCard } from "@/components/Documents";
 import { SenderProfileCard } from "@/components/SenderProfile";
 import { useToast } from "@/components/Toast";
 import { Badge, Button, Card, ErrorBox, Loading, Mono, Notice, PageHeader, Select, Skeleton, btnSecondary, btnSmall, input, link } from "@/components/ui";
@@ -381,6 +382,7 @@ export default function SettingsPage() {
             </Card>
             <SenderProfileCard />
             <CvCard />
+            <DocumentsCard />
           </div>
           <div>
             <Card title="Account" description="Read-only">

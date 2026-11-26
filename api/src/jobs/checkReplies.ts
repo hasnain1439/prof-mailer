@@ -122,7 +122,10 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
         result.threadsChecked++;
         reader ??= await createThreadReader(userId);
         const messages = await reader.getThreadMessages(threadId);
-        const reply = findReply(messages, professor.email, ownAddresses, firstSentAt);
+        // In the thread from anyone but the user; else a new email (not a Reply) from the contact's address.
+        const reply =
+          findReply(messages, professor.email, ownAddresses, firstSentAt) ??
+          findReply(await reader.getMessagesFrom(professor.email, firstSentAt), professor.email, ownAddresses, firstSentAt);
 
         if (reply) {
           result.repliesFound++;
@@ -197,6 +200,9 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
             body,
             isHtml: template.isHtml,
             attachCv: template.attachCv,
+            // Same people copied as on the first email; documents stay with the first email.
+            cc: root.cc,
+            bcc: root.bcc,
             status: "SCHEDULED",
             scheduledAt: now,
             followUpNo: head.followUpNo + 1,

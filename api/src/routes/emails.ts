@@ -4,7 +4,7 @@ import type { EmailStatus, Prisma } from "@prisma/client";
 import { uid } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError, parseQuery, validateBody } from "../lib/http.js";
-import { EMAIL_STATUSES, professorSummarySelect } from "../services/core/schemas.js";
+import { EMAIL_STATUSES, addressListField, fileIdsField, professorSummarySelect } from "../services/core/schemas.js";
 
 export const emailsRouter = Router();
 
@@ -72,12 +72,14 @@ const patchSchema = z
     subject: z.string().trim().min(1).optional(),
     body: z.string().refine((s) => s.trim() !== "", "Required").optional(),
     attachCv: z.boolean().optional(),
+    cc: addressListField,
+    bcc: addressListField,
   })
   .refine((d) => Object.values(d).some((v) => v !== undefined), "Nothing to update");
 
 emailsRouter.patch("/:id", validateBody(patchSchema), async (req, res) => {
   const id = req.params.id as string;
-  const { scheduledAt, subject, body, attachCv } = req.body as z.infer<typeof patchSchema>;
+  const { scheduledAt, subject, body, attachCv, cc, bcc } = req.body as z.infer<typeof patchSchema>;
   const userId = uid(req);
   const e = await getEmailOr404(userId, id);
   // Rescheduling revives FAILED/CANCELLED; edits without scheduledAt only apply to SCHEDULED emails.
@@ -92,6 +94,8 @@ emailsRouter.patch("/:id", validateBody(patchSchema), async (req, res) => {
       ...(subject !== undefined ? { subject } : {}),
       ...(body !== undefined ? { body } : {}),
       ...(attachCv !== undefined ? { attachCv } : {}),
+      ...(cc !== undefined ? { cc } : {}),
+      ...(bcc !== undefined ? { bcc } : {}),
     },
   });
   if (r.count === 0) throw new HttpError(409, "Email status changed; please refresh");
@@ -106,6 +110,10 @@ const createSchema = z.object({
   body: z.string().refine((s) => s.trim() !== "", "Required"),
   isHtml: z.boolean().optional(),
   attachCv: z.boolean().optional(),
+  attachFileIds: fileIdsField.optional(),
+  cc: addressListField,
+  bcc: addressListField,
+  trackOpens: z.boolean().optional(),
   scheduledAt: z.iso.datetime({ offset: true }).transform((s) => new Date(s)),
 });
 
@@ -114,6 +122,10 @@ emailsRouter.post("/", validateBody(createSchema), async (req, res) => {
   const userId = uid(req);
   const prof = await prisma.professor.findFirst({ where: { id: data.professorId, userId }, select: { id: true } });
   if (!prof) throw new HttpError(404, "Contact not found");
+  if (data.attachFileIds?.length) {
+    const n = await prisma.userFile.count({ where: { userId, id: { in: data.attachFileIds } } });
+    if (n !== new Set(data.attachFileIds).size) throw new HttpError(400, "One of the selected documents no longer exists");
+  }
   const existing = await prisma.email.findFirst({
     where: {
       userId,
@@ -139,6 +151,10 @@ emailsRouter.post("/", validateBody(createSchema), async (req, res) => {
       body: data.body,
       isHtml: data.isHtml ?? false,
       attachCv: data.attachCv ?? false,
+      attachFileIds: data.attachFileIds ?? [],
+      cc: data.cc ?? null,
+      bcc: data.bcc ?? null,
+      trackOpens: !!data.trackOpens && !!data.isHtml,
       status: "SCHEDULED",
       scheduledAt: data.scheduledAt,
       followUpNo: 0,

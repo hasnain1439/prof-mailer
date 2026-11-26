@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ACCOUNT_BLOCKED, ApiError, api, errorMessage } from "@/lib/api";
 import { safeNext, useAuth } from "@/components/Auth";
 import { AuthCard, AuthLink, AuthLinks, PasswordInput, ResendVerification } from "@/components/AuthCard";
+import { GoogleSignIn } from "@/components/GoogleSignIn";
 import { Badge, Button, Field, Input, Notice } from "@/components/ui";
 
 const IS_DEV = process.env.NODE_ENV !== "production";
@@ -80,7 +81,15 @@ function DevLogin({ next }: { next: string }) {
 }
 
 /** The sign-in card. Also the prerendered fallback before search params are known (interactive = false). */
-export function LoginCard({ next = "/", interactive = true }: { next?: string; interactive?: boolean }) {
+export function LoginCard({
+  next = "/",
+  interactive = true,
+  googleError = null,
+}: {
+  next?: string;
+  interactive?: boolean;
+  googleError?: string | null;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -113,6 +122,7 @@ export function LoginCard({ next = "/", interactive = true }: { next?: string; i
 
   return (
     <AuthCard title="Sign in" description="Schedule and track your Master's admissions emails to professors.">
+      {interactive && <GoogleSignIn error={googleError} />}
       <form onSubmit={submit} className="space-y-3">
         <Field label="Email" htmlFor="login-email">
           <Input
@@ -183,5 +193,5 @@ export function LoginPanel() {
     if (!loading && user) router.replace(next);
   }, [loading, user, next, router]);
 
-  return <LoginCard next={next} />;
+  return <LoginCard next={next} googleError={params.get("google")} />;
 }

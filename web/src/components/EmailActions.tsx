@@ -13,6 +13,8 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
+  const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +41,8 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
     // For failed/past emails, default to a few minutes from now.
     const isPast = Date.parse(email.scheduledAt) < Date.now();
     setValue(isPast ? karachiInputFromNow(5) : current);
+    setCc(email.cc ?? "");
+    setBcc(email.bcc ?? "");
     setError(null);
     setEditing(true);
   }
@@ -48,7 +52,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
     setError(null);
     try {
       const scheduledAt = karachiInputToUtcIso(value);
-      await api.updateEmail(email.id, { scheduledAt });
+      await api.updateEmail(email.id, { scheduledAt, cc: cc.trim() || null, bcc: bcc.trim() || null });
       setEditing(false);
       toast(`Rescheduled for ${formatKarachi(scheduledAt)}.`);
       onChanged();
@@ -63,6 +67,20 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
     <div className="flex flex-col gap-1">
       {editing ? (
         <div className="flex flex-wrap items-center gap-1.5">
+          <input
+            className={`${input} !h-7 !w-40 !text-xs`}
+            placeholder="CC (optional)"
+            aria-label="CC"
+            value={cc}
+            onChange={(e) => setCc(e.target.value)}
+          />
+          <input
+            className={`${input} !h-7 !w-40 !text-xs`}
+            placeholder="BCC (optional)"
+            aria-label="BCC"
+            value={bcc}
+            onChange={(e) => setBcc(e.target.value)}
+          />
           <input
             type="datetime-local"
             className={`${input} !h-7 !w-auto font-mono !text-xs`}
@@ -83,7 +101,7 @@ export function EmailActions({ email, onChanged }: { email: Email; onChanged: ()
           {canReschedule && (
             <button type="button" className={`${btnSecondary} ${btnSmall}`} disabled={busy} onClick={startEdit}>
               <IconCalendar size={14} />
-              {email.status === "FAILED" ? "Retry / reschedule" : "Reschedule"}
+              {email.status === "FAILED" ? "Retry / reschedule" : "Reschedule / CC"}
             </button>
           )}
           {canCancel && (

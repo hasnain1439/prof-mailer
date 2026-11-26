@@ -61,9 +61,25 @@ interface Draft {
   isFollowUp: boolean;
   isHtml: boolean;
   attachCv: boolean;
+  attachFileIds: string[];
+  cc: string;
+  bcc: string;
+  trackOpens: boolean;
 }
 
-const emptyDraft: Draft = { id: null, name: "", subject: "", body: "", isFollowUp: false, isHtml: false, attachCv: false };
+const emptyDraft: Draft = {
+  id: null,
+  name: "",
+  subject: "",
+  body: "",
+  isFollowUp: false,
+  isHtml: false,
+  attachCv: false,
+  attachFileIds: [],
+  cc: "",
+  bcc: "",
+  trackOpens: false,
+};
 
 function TemplateEditor({
   draft,
@@ -85,6 +101,7 @@ function TemplateEditor({
   const lastFocused = useRef<"subject" | "body">("body");
   const htmlFile = useRef<HTMLInputElement>(null);
   const [fileNote, setFileNote] = useState<string | null>(null);
+  const docs = useApi(() => api.listFiles(), []);
 
   function loadHtmlFile(file: File | undefined) {
     if (htmlFile.current) htmlFile.current.value = "";
@@ -146,6 +163,10 @@ function TemplateEditor({
         isFollowUp: form.isFollowUp,
         isHtml: form.isHtml,
         attachCv: form.attachCv,
+        attachFileIds: form.attachFileIds,
+        cc: form.cc.trim() || null,
+        bcc: form.bcc.trim() || null,
+        trackOpens: form.isHtml && form.trackOpens,
       };
       const saved = form.id ? await api.updateTemplate(form.id, body) : await api.createTemplate(body);
       onSaved(saved);
@@ -194,6 +215,37 @@ function TemplateEditor({
           </p>
         )}
         {!form.attachCv && <p className="mt-1 text-xs text-muted">Useful for job applications: the CV from Settings is attached to every email from this template.</p>}
+      </div>
+      {docs.data && docs.data.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted">Also attach</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+            {docs.data.map((d) => (
+              <label key={d.id} className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-text">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-accent"
+                  checked={form.attachFileIds.includes(d.id)}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      attachFileIds: e.target.checked ? [...form.attachFileIds, d.id] : form.attachFileIds.filter((x) => x !== d.id),
+                    })
+                  }
+                />
+                {d.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="CC (optional)" htmlFor="t-cc" hint="Comma-separated, e.g. a lab assistant. Import rows can override it.">
+          <Input id="t-cc" placeholder="name@lab.edu" value={form.cc} onChange={(e) => setForm({ ...form, cc: e.target.value })} />
+        </Field>
+        <Field label="BCC (optional)" htmlFor="t-bcc" hint="Hidden copy, e.g. your own address for records.">
+          <Input id="t-bcc" placeholder="me@example.com" value={form.bcc} onChange={(e) => setForm({ ...form, bcc: e.target.value })} />
+        </Field>
       </div>
       <Field label="Subject *" htmlFor="t-subject">
         <input
@@ -250,6 +302,23 @@ function TemplateEditor({
           A simple, personal-looking email usually gets more replies than a heavily designed one. Keep the HTML light.
         </p>
         {fileNote && <p className="w-full text-xs text-sent-fg">{fileNote}</p>}
+        {form.isHtml && (
+          <label className="flex w-full cursor-pointer items-start gap-2 text-[13px] text-text">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-accent"
+              checked={form.trackOpens}
+              onChange={(e) => setForm({ ...form, trackOpens: e.target.checked })}
+            />
+            <span>
+              Track opens
+              <span className="block text-xs text-muted">
+                Adds an invisible image to see when the email was opened. Approximate (many clients block images, Gmail may pre-load them)
+                and it can make emails more likely to be filtered, so leave it off for professors.
+              </span>
+            </span>
+          </label>
+        )}
       </div>
       <div className={form.isHtml ? "grid grid-cols-1 gap-4 xl:grid-cols-2" : ""}>
         <Field label={form.isHtml ? "HTML body *" : "Body *"} htmlFor="t-body">
@@ -457,6 +526,10 @@ export default function TemplatesPage() {
                 isFollowUp: t.isFollowUp,
                 isHtml: !!t.isHtml,
                 attachCv: !!t.attachCv,
+                attachFileIds: t.attachFileIds ?? [],
+                cc: t.cc ?? "",
+                bcc: t.bcc ?? "",
+                trackOpens: !!t.trackOpens,
               });
             }}
           >

@@ -115,9 +115,13 @@ export default function SentPage() {
                         ) : (
                           <span className="text-xs text-muted">No reply yet</span>
                         )
-                      ) : (
-                        <EmailActions email={e} onChanged={reload} />
+                      ) : null}
+                      {tab === "SENT" && e.trackOpens && (
+                        <span className="mt-1 block text-xs text-muted">
+                          {e.openedAt ? `Opened ${formatKarachi(e.openedAt)}${e.openCount > 1 ? ` (${e.openCount}×)` : ""}` : "Not opened yet"}
+                        </span>
                       )}
+                      {tab !== "SENT" && <EmailActions email={e} onChanged={reload} />}
                     </Td>
                   </tr>
                   {open === e.id && (
@@ -126,6 +130,20 @@ export default function SentPage() {
                         <p className="mb-2 text-xs text-muted">
                           <span className="font-medium text-text">Subject:</span> {e.subject}
                         </p>
+                        {(e.cc || e.bcc) && (
+                          <p className="mb-2 text-xs text-muted">
+                            {e.cc && (
+                              <>
+                                <span className="font-medium text-text">CC:</span> {e.cc}{" "}
+                              </>
+                            )}
+                            {e.bcc && (
+                              <>
+                                <span className="font-medium text-text">BCC:</span> {e.bcc}
+                              </>
+                            )}
+                          </p>
+                        )}
                         {e.isHtml ? (
                           <EmailBody body={e.body} isHtml title={`Email: ${e.subject}`} />
                         ) : (

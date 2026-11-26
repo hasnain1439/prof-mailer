@@ -2,6 +2,7 @@ import { z } from "zod";
 import { formatKarachi, parseKarachiLocal } from "../../lib/time.js";
 import { renderTemplate, unknownPlaceholders, type SenderProfile, type TemplateVars } from "../../lib/template.js";
 import type { ImportRowData, ParsedRow } from "./parse.js";
+import { addressListError } from "../core/schemas.js";
 
 /** Pure import-row validation (no DB). */
 
@@ -70,6 +71,10 @@ export interface ImportTemplate {
   body: string;
   isHtml: boolean;
   attachCv: boolean;
+  attachFileIds?: string[];
+  cc?: string | null;
+  bcc?: string | null;
+  trackOpens?: boolean;
 }
 
 const emailSchema = z.email();
@@ -118,6 +123,11 @@ export function validateImportRows(
       const first = seen.get(email);
       if (first !== undefined) errors.push(`duplicate email (already used on row ${first})`);
       else seen.set(email, rowNumber);
+    }
+
+    for (const col of ["cc", "bcc"] as const) {
+      const err = addressListError(data[col]);
+      if (err) errors.push(`${col}: ${err}`);
     }
 
     let scheduledAtUtc: string | null = null;

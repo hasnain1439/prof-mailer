@@ -18,6 +18,8 @@ export const IMPORT_COLUMNS = [
   "subject",
   "body",
   "scheduledAt",
+  "cc",
+  "bcc",
 ] as const;
 
 export type ImportColumn = (typeof IMPORT_COLUMNS)[number];

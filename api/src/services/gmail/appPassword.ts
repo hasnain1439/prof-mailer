@@ -210,6 +210,9 @@ export interface SmtpSendInput {
   inReplyTo?: string | null;
   references?: string[] | null;
   attachments?: EmailAttachment[];
+  /** Comma-separated CC / BCC addresses. */
+  cc?: string | null;
+  bcc?: string | null;
 }
 
 export async function sendViaSmtp(
@@ -223,6 +226,8 @@ export async function sendViaSmtp(
     await transport.sendMail({
       from: creds.email,
       to: input.to,
+      ...(input.cc ? { cc: input.cc } : {}),
+      ...(input.bcc ? { bcc: input.bcc } : {}),
       subject: sanitizeHeaderValue(input.subject),
       text: input.isHtml ? htmlToText(input.body) : input.body,
       ...(input.isHtml ? { html: input.body } : {}),
@@ -354,6 +359,27 @@ export class ImapThreadReader {
       if (uids.length === 0) return [];
       const msgs = await client.fetchAll(uids, { uid: true, envelope: true, internalDate: true }, { uid: true });
       return msgs.map(toThreadMessage).sort((a, b) => a.date.getTime() - b.date.getTime());
+    } catch (err) {
+      throw wrap("IMAP", err);
+    } finally {
+      lock.release();
+    }
+  }
+
+  async getMessagesFrom(address: string, since: Date): Promise<ThreadMessageLike[]> {
+    const client = await this.open();
+    let lock: Awaited<ReturnType<ImapFlow["getMailboxLock"]>>;
+    try {
+      lock = await client.getMailboxLock(this.allMail!, { readOnly: true });
+    } catch (err) {
+      throw wrap("IMAP", err);
+    }
+    try {
+      // IMAP SINCE is day-granular; the exact time is checked below.
+      const uids = (await client.search({ from: address, since }, { uid: true })) || [];
+      if (uids.length === 0) return [];
+      const msgs = await client.fetchAll(uids, { uid: true, envelope: true, internalDate: true }, { uid: true });
+      return msgs.map(toThreadMessage).filter((m) => m.date.getTime() > since.getTime());
     } catch (err) {
       throw wrap("IMAP", err);
     } finally {

@@ -9,11 +9,11 @@ import { deleteCvObject, findSlot, putCvObject, r2Enabled, readCv } from "../ser
 /** The user's CVs: one for professors, one for companies and a general fallback, attached to emails with attachCv. */
 export const cvRouter = Router();
 
-const MAX_BYTES = 4 * 1024 * 1024; // Vercel rejects request bodies over 4.5 MB
+export const MAX_BYTES = 4 * 1024 * 1024; // Vercel rejects request bodies over 4.5 MB
 const MAX_NAME = 120;
 
 // Allowed types: extension → MIME type + magic bytes the content must start with.
-const TYPES: Record<string, { mime: string; magic: number[] }> = {
+export const TYPES: Record<string, { mime: string; magic: number[] }> = {
   pdf: { mime: "application/pdf", magic: [0x25, 0x50, 0x44, 0x46] }, // %PDF
   docx: {
     mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -21,9 +21,9 @@ const TYPES: Record<string, { mime: string; magic: number[] }> = {
   },
   doc: { mime: "application/msword", magic: [0xd0, 0xcf, 0x11, 0xe0] }, // OLE2
 };
-const TYPE_ERROR = "Only PDF, DOC or DOCX files are accepted";
+export const TYPE_ERROR = "Only PDF, DOC or DOCX files are accepted";
 
-function extOf(name: string): string {
+export function extOf(name: string): string {
   const i = name.lastIndexOf(".");
   return i === -1 ? "" : name.slice(i + 1).toLowerCase();
 }

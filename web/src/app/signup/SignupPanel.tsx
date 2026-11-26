@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/components/Auth";
 import { AuthCard, AuthLink, AuthLinks, ResendVerification } from "@/components/AuthCard";
+import { GoogleSignIn } from "@/components/GoogleSignIn";
 import { Button, Field, Input, Notice } from "@/components/ui";
 
 export function SignupPanel() {
@@ -54,6 +55,7 @@ export function SignupPanel() {
 
   return (
     <AuthCard title="Create an account" description="Schedule and track your Master's admissions emails to professors.">
+      <GoogleSignIn />
       <form onSubmit={submit} className="space-y-3">
         <Field label="Email" htmlFor="signup-email">
           <Input

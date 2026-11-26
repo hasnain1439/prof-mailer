@@ -22,6 +22,7 @@ import {
   type ImportTemplate,
 } from "../services/import/validate.js";
 import { loadSenderProfile } from "../services/core/sender.js";
+import { joinAddresses } from "../services/core/schemas.js";
 
 export const importRouter = Router();
 
@@ -63,7 +64,7 @@ async function loadTemplate(userId: string, templateId: string | undefined): Pro
   if (!templateId) return null;
   const t = await prisma.template.findFirst({
     where: { id: templateId, userId },
-    select: { subject: true, body: true, isHtml: true, attachCv: true },
+    select: { subject: true, body: true, isHtml: true, attachCv: true, attachFileIds: true, cc: true, bcc: true, trackOpens: true },
   });
   if (!t) throw new HttpError(400, "Template not found", { templateId });
   return t;
@@ -117,8 +118,8 @@ function expectedKindOf(v: unknown): "PROFESSOR" | "COMPANY" | undefined {
 }
 
 // Columns of the per-kind samples (`skills` is read as researchFocus).
-const PROFESSOR_SAMPLE_COLUMNS = ["name", "email", "university", "country", "researchFocus", "whyFits", "profileUrl", "subject", "body", "scheduledAt"] as const;
-const COMPANY_SAMPLE_COLUMNS = ["company", "role", "name", "email", "jobUrl", "country", "skills", "whyFits", "subject", "body", "scheduledAt"] as const;
+const PROFESSOR_SAMPLE_COLUMNS = ["name", "email", "university", "country", "researchFocus", "whyFits", "profileUrl", "subject", "body", "scheduledAt", "cc", "bcc"] as const;
+const COMPANY_SAMPLE_COLUMNS = ["company", "role", "name", "email", "jobUrl", "country", "skills", "whyFits", "subject", "body", "scheduledAt", "cc", "bcc"] as const;
 
 importRouter.get("/sample.csv", (req, res) => {
   const only = expectedKindOf(req.query.type);
@@ -139,6 +140,8 @@ importRouter.get("/sample.csv", (req, res) => {
       body:
         "Dear {{name}},\n\nI am applying to the Master's program at {{university}} and am very interested in your work on {{researchFocus}}. {{whyFits}}.\n\nBest regards,\nYour Name",
       scheduledAt: "2026-11-20 09:30",
+      cc: "",
+      bcc: "",
     },
     {
       type: "professor",
@@ -155,6 +158,8 @@ importRouter.get("/sample.csv", (req, res) => {
       subject: "Master's admission inquiry",
       body: "Dear Prof. Sample,\n\nI would love to discuss Master's opportunities in your group.\n\nKind regards,\nYour Name",
       scheduledAt: "2026-11-20 10:15",
+      cc: "",
+      bcc: "",
     },
     {
       type: "",
@@ -171,6 +176,8 @@ importRouter.get("/sample.csv", (req, res) => {
       subject: "",
       body: "",
       scheduledAt: "2026-11-21 14:00",
+      cc: "",
+      bcc: "",
     },
     {
       type: "company",
@@ -188,6 +195,8 @@ importRouter.get("/sample.csv", (req, res) => {
       body:
         "Dear {{name}},\n\nI am writing to apply for the {{role}} position at {{company}} ({{jobUrl}}). {{whyFits}}.\n\nMy CV is attached.\n\nBest regards,\nYour Name",
       scheduledAt: "2026-11-22 11:00",
+      cc: "",
+      bcc: "",
     },
   ];
   let csv: string;
@@ -329,6 +338,10 @@ importRouter.post("/commit", validateBody(commitSchema), async (req, res) => {
             body: row.body,
             isHtml: row.isHtml,
             attachCv,
+            attachFileIds: template?.attachFileIds ?? [],
+            cc: joinAddresses(d.cc) ?? template?.cc ?? null,
+            bcc: joinAddresses(d.bcc) ?? template?.bcc ?? null,
+            trackOpens: !!template?.trackOpens && row.isHtml,
             status: "SCHEDULED",
             scheduledAt: new Date(row.scheduledAtUtc!),
             followUpNo: 0,

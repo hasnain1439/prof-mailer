@@ -4,6 +4,7 @@ import { env } from "../lib/env.js";
 import { rateLimit } from "../middleware/security.js";
 import { adminRouter } from "./admin.js";
 import { authRouter } from "./auth.js";
+import { googleAuthRouter } from "./googleAuth.js";
 import { healthRouter } from "./health.js";
 import { professorsRouter } from "./professors.js";
 import { templatesRouter } from "./templates.js";
@@ -11,6 +12,7 @@ import { importRouter } from "./import.js";
 import { emailsRouter } from "./emails.js";
 import { settingsRouter } from "./settings.js";
 import { cvRouter } from "./cv.js";
+import { filesRouter } from "./files.js";
 import { remindersRouter } from "./reminders.js";
 import { analyticsRouter } from "./analytics.js";
 import { aiRouter } from "./ai.js";
@@ -18,6 +20,7 @@ import { getNotice } from "../services/core/notice.js";
 import { dashboardRouter } from "./dashboard.js";
 import { appPasswordHandlers, gmailRouter } from "./gmail.js";
 import { jobsRouter } from "./jobs.js";
+import { trackingRouter } from "./tracking.js";
 import { devRouter } from "./dev.js";
 
 export const apiRouter = Router();
@@ -29,12 +32,14 @@ const appPasswordLimiter = rateLimit({ capacity: 5, refillPerMinute: 2 });
 // ---- public ----
 apiRouter.use("/health", healthRouter);
 // /auth/me runs on every page load and logout must always work: keep them out of the auth limiter.
+apiRouter.use("/auth/google", authLimiter, googleAuthRouter);
 apiRouter.use(
   "/auth",
   (req, res, next) => (req.path === "/me" || req.path === "/logout" ? next() : authLimiter(req, res, next)),
   authRouter,
 );
 apiRouter.use("/jobs", jobsRouter); // CRON_SECRET bearer
+apiRouter.use("/t", trackingRouter); // open-tracking pixel (public)
 // Admins only (ADMIN_EMAILS); answers 404 to everyone else, signed in or not, so the routes stay hidden.
 apiRouter.use("/admin", adminRouter);
 
@@ -46,6 +51,7 @@ apiRouter.use("/import", importRouter);
 apiRouter.use("/emails", emailsRouter);
 apiRouter.use("/settings", settingsRouter);
 apiRouter.use("/cv", cvRouter);
+apiRouter.use("/files", filesRouter);
 apiRouter.use("/reminders", remindersRouter);
 apiRouter.use("/analytics", analyticsRouter);
 apiRouter.use("/ai", aiRouter);
