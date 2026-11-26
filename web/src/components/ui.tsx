@@ -29,7 +29,7 @@ export const link = "font-medium text-accent underline-offset-2 hover:underline"
 export const mono = "font-mono text-[13px]";
 
 /** Scroll container for tables; sticky headers stick to its top. */
-export const tableWrap = "max-h-[70vh] overflow-auto";
+export const tableWrap = "relative max-h-[70vh] overflow-auto";
 export const table = "w-full border-separate border-spacing-0 text-[13px]";
 export const th =
   "sticky top-0 z-10 h-9 border-b border-border bg-surface px-3 text-left text-xs font-medium whitespace-nowrap text-muted first:pl-4 last:pr-4";
