@@ -4,6 +4,7 @@
  * exists, emails are sent in the background (so timing does not depend on it), and login runs a
  * dummy scrypt for unknown addresses. Never log passwords, tokens or request bodies.
  */
+import { waitUntil } from "@vercel/functions";
 import { randomBytes } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
@@ -41,13 +42,21 @@ const passwordField = z
   .max(PASSWORD_MAX, `Password must be at most ${PASSWORD_MAX} characters`);
 const tokenField = z.string().min(1).max(200);
 
+/**
+ * Keep sending after the response: on Vercel a plain un-awaited promise is frozen once the response
+ * is sent (the mail never left), so register it with waitUntil.
+ */
+function background(p: Promise<unknown>): void {
+  waitUntil(p.catch(() => console.error("[auth] system mail failed")));
+}
+
 /** Fire-and-forget system mail, throttled per address. Failures are logged by the mailer. */
 function sendInBackground(to: string, send: () => Promise<boolean>): void {
   if (!mailPerAddress.tryHit(to)) {
     console.warn("[auth] system mail throttled for one address");
     return;
   }
-  void send().catch(() => console.error("[auth] system mail failed"));
+  background(send());
 }
 
 async function startVerification(user: { id: string; email: string; name: string | null }): Promise<void> {
@@ -57,7 +66,7 @@ async function startVerification(user: { id: string; email: string; name: string
   }
   const token = await issueAuthToken(user.id, "VERIFY_EMAIL", VERIFY_TTL_MS);
   const url = webLink(env.PUBLIC_URL, "/verify-email", token);
-  void sendVerificationEmail(user.email, user.name, url).catch(() => console.error("[auth] system mail failed"));
+  background(sendVerificationEmail(user.email, user.name, url));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -186,7 +195,7 @@ authRouter.post("/forgot-password", strictLimiter, validateBody(emailOnlySchema)
   if (user && mailPerAddress.tryHit(user.email)) {
     const token = await issueAuthToken(user.id, "RESET_PASSWORD", RESET_TTL_MS);
     const url = webLink(env.PUBLIC_URL, "/reset-password", token);
-    void sendPasswordResetEmail(user.email, user.name, url).catch(() => console.error("[auth] system mail failed"));
+    background(sendPasswordResetEmail(user.email, user.name, url));
   }
   res.json({ ok: true });
 });
