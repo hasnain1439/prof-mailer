@@ -35,6 +35,29 @@ async function cancelFollowUpsForStoppedProfessors(): Promise<number> {
   return r.count;
 }
 
+// Automatic senders that can land in a thread (bounces, delivery reports): never a reply.
+const SYSTEM_SENDER = /^(mailer-daemon|postmaster|no-?reply|do-?not-?reply|bounces?)([+.@-]|$)/i;
+
+/**
+ * The contact's reply in a thread: a message after our first send from anyone but the user.
+ * Contacts often answer from another address than the one we wrote to (a personal Gmail, a
+ * different domain or a colleague), so the sender does not have to match the contact's email;
+ * an exact match is still preferred.
+ */
+export function findReply<M extends { from: string; date: Date }>(
+  messages: M[],
+  contactEmail: string,
+  ownAddresses: ReadonlySet<string>,
+  firstSentAt: Date,
+): M | undefined {
+  const contact = contactEmail.trim().toLowerCase();
+  const candidates = messages.filter((m) => {
+    const from = parseFromAddress(m.from);
+    return from !== "" && !ownAddresses.has(from) && !SYSTEM_SENDER.test(from) && m.date.getTime() > firstSentAt.getTime();
+  });
+  return candidates.find((m) => parseFromAddress(m.from) === contact) ?? candidates[0];
+}
+
 /** First existing template among the preferred ids, else any follow-up template. */
 async function pickFollowUpTemplate(userId: string, preferredIds: (string | null)[]) {
   for (const id of preferredIds) {
@@ -56,6 +79,14 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
   loggedNotConnected.delete(userId);
 
   const settings = await getSettings(userId);
+  // The user's own addresses: their messages in a thread are not replies.
+  const account = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, gmailAccount: { select: { email: true } } },
+  });
+  const ownAddresses = new Set(
+    [account?.email, account?.gmailAccount?.email].filter((a): a is string => !!a).map((a) => a.trim().toLowerCase()),
+  );
   const sent = await prisma.email.findMany({
     where: { userId, status: "SENT", gmailThreadId: { not: null } },
     orderBy: { sentAt: "asc" },
@@ -91,10 +122,7 @@ async function checkRepliesForUser(userId: string, now: Date, result: CheckRepli
         result.threadsChecked++;
         reader ??= await createThreadReader(userId);
         const messages = await reader.getThreadMessages(threadId);
-        const profAddr = professor.email.trim().toLowerCase();
-        const reply = messages.find(
-          (m) => parseFromAddress(m.from) === profAddr && m.date.getTime() > firstSentAt.getTime(),
-        );
+        const reply = findReply(messages, professor.email, ownAddresses, firstSentAt);
 
         if (reply) {
           result.repliesFound++;
